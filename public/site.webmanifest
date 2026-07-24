@@ -1,0 +1,17 @@
+{
+  "name": "Eventerz — Wallet-native Events on Solana",
+  "short_name": "Eventerz",
+  "description": "Wallet-native event infrastructure on Solana. On-chain RSVPs, NFT tickets, proof-of-attendance and portable reputation.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#050816",
+  "theme_color": "#050816",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
