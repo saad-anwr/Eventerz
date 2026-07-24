@@ -3,12 +3,13 @@
 import * as React from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowUpRight, Wallet } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { navLinks, siteConfig } from "@/lib/site";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/ui/logo";
 import { Magnetic } from "@/components/ui/magnetic";
+import { ConnectWalletButton } from "@/components/wallet/connect-wallet-button";
 import { useScrollLock } from "@/hooks/use-scroll-lock";
 
 export function Navbar() {
@@ -66,12 +67,9 @@ export function Navbar() {
           </div>
 
           <div className="flex items-center gap-2">
-            <Link href="#demo" className="hidden sm:inline-flex">
-              <Button variant="ghost" size="sm">
-                <Wallet className="size-4" />
-                Connect Wallet
-              </Button>
-            </Link>
+            <div className="hidden sm:block">
+              <ConnectWalletButton variant="ghost" size="sm" />
+            </div>
             <Magnetic className="hidden sm:block">
               <Button asChild size="sm">
                 <Link href="#cta">
@@ -153,17 +151,7 @@ export function Navbar() {
                 ))}
               </nav>
               <div className="mt-3 flex flex-col gap-2 border-t border-white/10 pt-4">
-                <Button
-                  asChild
-                  variant="secondary"
-                  className="w-full"
-                  onClick={() => setOpen(false)}
-                >
-                  <Link href="#demo">
-                    <Wallet className="size-4" />
-                    Connect Wallet
-                  </Link>
-                </Button>
+                <ConnectWalletButton variant="secondary" fullWidth />
                 <Button asChild className="w-full" onClick={() => setOpen(false)}>
                   <Link href="#cta">
                     Launch App

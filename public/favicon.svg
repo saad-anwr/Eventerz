@@ -1,12 +1,21 @@
-<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+<svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#9945FF"/>
-      <stop offset="0.5" stop-color="#2F80FF"/>
-      <stop offset="1" stop-color="#22D3EE"/>
+    <linearGradient id="front" x1="24" y1="18" x2="80" y2="82" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A374FF"/><stop offset="1" stop-color="#7A2BE0"/>
+    </linearGradient>
+    <linearGradient id="top" x1="14" y1="10" x2="80" y2="55" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E7DCFF"/><stop offset="1" stop-color="#C2A9FF"/>
+    </linearGradient>
+    <linearGradient id="side" x1="14" y1="10" x2="24" y2="82" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5C24AE"/><stop offset="1" stop-color="#3E1A80"/>
     </linearGradient>
   </defs>
-  <rect width="64" height="64" rx="16" fill="#050816"/>
-  <rect x="6" y="6" width="52" height="52" rx="13" fill="url(#g)" fill-opacity="0.16"/>
-  <path d="M20 20C20 18.34 21.34 17 23 17H44V23H26V29.5H41V35.5H26V41H44V47H23C21.34 47 20 45.66 20 44V20Z" fill="url(#g)"/>
+  <rect width="100" height="100" rx="24" fill="#050816"/>
+  <g transform="translate(4 3)">
+    <path d="M24 18 L24 82 L14 74 L14 10 Z" fill="url(#side)"/>
+    <path d="M24 18 L80 18 L70 10 L14 10 Z" fill="url(#top)"/>
+    <path d="M42 43 L72 43 L62 35 L32 35 Z" fill="url(#top)"/>
+    <path d="M42 63 L80 63 L70 55 L32 55 Z" fill="url(#top)"/>
+    <path d="M24 18 L80 18 L80 37 L42 37 L42 43 L72 43 L72 58 L42 58 L42 63 L80 63 L80 82 L24 82 Z" fill="url(#front)"/>
+  </g>
 </svg>

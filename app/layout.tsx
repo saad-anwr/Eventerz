@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import { siteConfig } from "@/lib/site";
+import { WalletProviders } from "@/components/wallet/providers";
 import "./globals.css";
 
 const inter = Inter({
@@ -98,7 +99,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-screen bg-brand-bg text-foreground selection:bg-brand-purple/30">
-        {children}
+        <WalletProviders>{children}</WalletProviders>
       </body>
     </html>
   );

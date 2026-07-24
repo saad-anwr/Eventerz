@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { useWallet } from "@solana/wallet-adapter-react";
 import {
   BadgeCheck,
   CalendarDays,
@@ -76,6 +77,12 @@ function ReputationRing({ score = 78 }: { score?: number }) {
 export function InteractiveDemo() {
   const [selectedId, setSelectedId] = React.useState(demoEvents[0].id);
   const [rsvp, setRsvp] = React.useState<Record<string, RsvpState>>({});
+  const { connected, publicKey } = useWallet();
+
+  const walletLabel =
+    connected && publicKey
+      ? `${publicKey.toBase58().slice(0, 4)}…${publicKey.toBase58().slice(-4)}`
+      : "9xQe…4dRt";
 
   const selected = demoEvents.find((e) => e.id === selectedId)!;
   const state = rsvp[selectedId] ?? "idle";
@@ -133,7 +140,7 @@ export function InteractiveDemo() {
                 </span>
                 <span className="flex items-center gap-1.5 rounded-full border border-brand-green/30 bg-brand-green/10 px-3 py-1.5 text-xs font-medium text-brand-green">
                   <span className="size-1.5 animate-pulse rounded-full bg-brand-green" />
-                  9xQe…4dRt
+                  {walletLabel}
                 </span>
               </div>
             </div>

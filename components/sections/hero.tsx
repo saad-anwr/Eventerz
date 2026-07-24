@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowUpRight, PlayCircle, Sparkles, Wallet } from "lucide-react";
+import { ArrowUpRight, PlayCircle, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Magnetic } from "@/components/ui/magnetic";
+import { ConnectWalletButton } from "@/components/wallet/connect-wallet-button";
 import { AnimatedCounter } from "@/components/ui/animated-counter";
 import { HeroDashboard } from "@/components/sections/hero-dashboard";
 import { heroStats } from "@/lib/data";
@@ -97,12 +98,7 @@ export function Hero() {
               View Demo
             </Link>
           </Button>
-          <Button asChild size="lg" variant="outline">
-            <Link href="#demo">
-              <Wallet className="size-4" />
-              Connect Wallet
-            </Link>
-          </Button>
+          <ConnectWalletButton size="lg" variant="outline" />
         </motion.div>
 
         {/* Hero illustration */}

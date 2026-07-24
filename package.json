@@ -12,6 +12,9 @@
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.2",
     "@radix-ui/react-slot": "^1.1.1",
+    "@solana/wallet-adapter-base": "^0.9.27",
+    "@solana/wallet-adapter-react": "^0.15.39",
+    "@solana/web3.js": "^1.98.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "framer-motion": "^11.15.0",

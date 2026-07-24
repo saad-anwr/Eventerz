@@ -23,12 +23,27 @@
   <rect width="1200" height="630" fill="url(#glow1)"/>
   <rect width="1200" height="630" fill="url(#glow2)"/>
 
-  <!-- Logo mark -->
-  <g transform="translate(90 90)">
-    <rect width="88" height="88" rx="22" fill="url(#grad)" fill-opacity="0.16"/>
-    <rect x="1.5" y="1.5" width="85" height="85" rx="20.5" stroke="url(#grad)" stroke-opacity="0.5" stroke-width="3"/>
-    <path d="M27 25C27 22.8 28.8 21 31 21H62V32H40V41H58V52H40V61H62V72H31C28.8 72 27 70.2 27 68V25Z" fill="url(#grad)"/>
-  </g>
+  <!-- Logo mark (3D folded-ribbon E) -->
+  <svg x="80" y="72" width="108" height="108" viewBox="0 0 100 100">
+    <defs>
+      <linearGradient id="mFront" x1="24" y1="18" x2="80" y2="82" gradientUnits="userSpaceOnUse">
+        <stop stop-color="#A374FF"/><stop offset="1" stop-color="#7A2BE0"/>
+      </linearGradient>
+      <linearGradient id="mTop" x1="14" y1="10" x2="80" y2="55" gradientUnits="userSpaceOnUse">
+        <stop stop-color="#E7DCFF"/><stop offset="1" stop-color="#C2A9FF"/>
+      </linearGradient>
+      <linearGradient id="mSide" x1="14" y1="10" x2="24" y2="82" gradientUnits="userSpaceOnUse">
+        <stop stop-color="#5C24AE"/><stop offset="1" stop-color="#3E1A80"/>
+      </linearGradient>
+    </defs>
+    <g transform="translate(4 3)">
+      <path d="M24 18 L24 82 L14 74 L14 10 Z" fill="url(#mSide)"/>
+      <path d="M24 18 L80 18 L70 10 L14 10 Z" fill="url(#mTop)"/>
+      <path d="M42 43 L72 43 L62 35 L32 35 Z" fill="url(#mTop)"/>
+      <path d="M42 63 L80 63 L70 55 L32 55 Z" fill="url(#mTop)"/>
+      <path d="M24 18 L80 18 L80 37 L42 37 L42 43 L72 43 L72 58 L42 58 L42 63 L80 63 L80 82 L24 82 Z" fill="url(#mFront)"/>
+    </g>
+  </svg>
   <text x="200" y="150" font-family="Space Grotesk, Arial, sans-serif" font-size="44" font-weight="700" fill="#FFFFFF">Eventerz</text>
 
   <!-- Headline -->
