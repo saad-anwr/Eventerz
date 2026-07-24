@@ -1,3 +1,5 @@
+"use client";
+
 import dynamic from "next/dynamic";
 
 // Particle canvas is client-only & non-critical — load lazily.
