@@ -118,15 +118,6 @@ Swap the stub bodies for real SDK calls when wiring the product.
 
 ---
 
-## ▲ Deploy to Vercel
-
-1. Push this repo to GitHub.
-2. Import it at [vercel.com/new](https://vercel.com/new).
-3. Add any `.env` values from `.env.example` (optional for the static site).
-4. Deploy — the defaults work out of the box.
-
----
-
 ## ♿ Performance & accessibility
 
 - Server-rendered content for SEO; client components are code-split automatically.
