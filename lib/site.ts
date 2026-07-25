@@ -8,7 +8,7 @@ export const siteConfig = {
   tagline: "Everything is On-chain. Why not your events?",
   description:
     "Eventerz is wallet-native event infrastructure on Solana. Discover events, RSVP on-chain, receive NFT tickets and Proof-of-Attendance, build portable reputation and join token-gated communities.",
-  url: "https://eventerz.xyz",
+  url: "https://eventerz-three.vercel.app",
   ogImage: "/og.svg",
   keywords: [
     "Eventerz",
@@ -25,9 +25,9 @@ export const siteConfig = {
   ],
   creator: "Eventerz Labs",
   links: {
-    twitter: "https://twitter.com/eventerz",
-    github: "https://github.com/eventerz",
-    discord: "https://discord.gg/eventerz",
+    twitter: "https://twitter.com/eventerz_web",
+    github: "https://github.com/saad-anwr/Eventerz",
+    discord: "https://discord.gg/_saadanwar",
     docs: "/docs",
   },
 } as const;

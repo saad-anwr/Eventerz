@@ -1,0 +1,96 @@
+"use client";
+
+import Link from "next/link";
+import { motion } from "framer-motion";
+import { Globe, Lock, MapPin, Users } from "lucide-react";
+import { useAppStore } from "@/lib/store/use-app-store";
+import type { EventItem } from "@/lib/store/types";
+import { Avatar } from "./avatar";
+import { eventDateParts, formatEventDate, isUpcoming } from "@/lib/format";
+import { cn } from "@/lib/utils";
+
+export function EventCard({ event }: { event: EventItem }) {
+  const host = useAppStore((s) => s.users[event.hostId]);
+  const { month, day } = eventDateParts(event.startsAt);
+  const upcoming = isUpcoming(event.startsAt);
+
+  return (
+    <motion.div whileHover={{ y: -4 }} transition={{ duration: 0.2 }}>
+      <Link
+        href={`/events/${event.id}`}
+        className="group flex h-full flex-col overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03] backdrop-blur-xl transition-colors hover:border-brand-purple/30"
+      >
+        {/* Cover */}
+        <div
+          className={cn(
+            "relative h-32 bg-gradient-to-br",
+            event.coverGradient
+          )}
+        >
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_15%,rgba(255,255,255,0.35),transparent_55%)]" />
+          <div className="absolute left-3 top-3 flex gap-1.5">
+            <span className="rounded-full bg-black/30 px-2.5 py-1 text-[10px] font-semibold text-white backdrop-blur-md">
+              {event.category}
+            </span>
+            {event.tokenGated && (
+              <span className="flex items-center gap-1 rounded-full bg-black/30 px-2 py-1 text-[10px] font-semibold text-white backdrop-blur-md">
+                <Lock className="size-2.5" />
+                Gated
+              </span>
+            )}
+          </div>
+          <div className="absolute bottom-3 left-3 flex items-center gap-2">
+            <div className="flex flex-col items-center rounded-xl bg-black/40 px-2.5 py-1 backdrop-blur-md">
+              <span className="text-[9px] font-semibold uppercase text-white/80">
+                {month}
+              </span>
+              <span className="text-sm font-bold leading-none text-white">
+                {day}
+              </span>
+            </div>
+            {!upcoming && (
+              <span className="rounded-full bg-black/40 px-2 py-1 text-[10px] font-medium text-white/80 backdrop-blur-md">
+                Ended
+              </span>
+            )}
+          </div>
+          <span className="absolute bottom-3 right-3 rounded-full bg-black/40 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-md">
+            {event.price}
+          </span>
+        </div>
+
+        {/* Body */}
+        <div className="flex flex-1 flex-col p-4">
+          <p className="text-xs text-brand-cyan">
+            {formatEventDate(event.startsAt)}
+          </p>
+          <h3 className="mt-1 line-clamp-2 font-display text-base font-semibold text-white">
+            {event.title}
+          </h3>
+
+          <div className="mt-3 flex items-center gap-2">
+            <Avatar name={host?.name ?? "Host"} seed={event.hostId} size="xs" />
+            <span className="truncate text-xs text-muted-foreground">
+              {host?.name ?? "Unknown host"}
+            </span>
+          </div>
+
+          <div className="mt-auto flex items-center gap-3 pt-3 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1">
+              {event.isOnline ? (
+                <Globe className="size-3.5" />
+              ) : (
+                <MapPin className="size-3.5" />
+              )}
+              <span className="truncate">{event.location}</span>
+            </span>
+            <span className="flex items-center gap-1">
+              <Users className="size-3.5" />
+              {event.attendeeIds.length}
+            </span>
+          </div>
+        </div>
+      </Link>
+    </motion.div>
+  );
+}

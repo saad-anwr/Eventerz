@@ -86,6 +86,41 @@ All copy lives in [`lib/data.ts`](lib/data.ts) and site-wide config in
 
 ---
 
+## 🧑‍🚀 The application (`/dashboard`, `/explore`, …)
+
+Beyond the marketing site, Eventerz ships a full, working app (routes under the
+`app/(app)` group). It runs entirely on a **persisted local store**
+([zustand](https://github.com/pmndrs/zustand) + `localStorage`) seeded with demo
+users, events and chats — so everything works immediately, and the seams are
+ready to swap for a real backend (Supabase / Anchor).
+
+**Auth** — sign in with **Google, Apple or Email** (via the auth modal) _or_
+**Connect Wallet** (Solana wallet adapter). A unified session
+([`useSession`](components/auth/use-session.ts)) merges both.
+> ⚠️ Social sign-in is **simulated** for the demo. Wire NextAuth/Auth.js or
+> Supabase Auth with the credentials in [`.env.example`](.env.example) for prod.
+
+**Features**
+
+| Route              | What it does                                                        |
+| ------------------ | ------------------------------------------------------------------- |
+| `/dashboard`       | Personalised home — upcoming events, stats, friend requests         |
+| `/explore`         | Browse/search events with category & date filters                   |
+| `/create`          | Create an event (with live preview, access rules, token-gating)     |
+| `/events/[id]`     | Event page — RSVP, attendees, and **per-event group chat**          |
+| `/my-events`       | Hosting / Attending / Past tabs                                     |
+| `/friends`         | Discover people, **Add Friend**, accept requests, friends list      |
+| `/messages`, `/messages/[id]` | **DM chat** — unlocked once both users are friends       |
+| `/profile`, `/u/[id]` | Editable profile (name, bio, location, contact…) & public profiles |
+
+Chats (event group chats and DMs) show a sender, day separators and per-message
+timestamps, and persist across reloads.
+
+State + domain model live in [`lib/store`](lib/store); the app UI in
+[`components/app`](components/app) and [`components/auth`](components/auth).
+
+---
+
 ## 🎨 Design system
 
 | Token           | Value                                             |

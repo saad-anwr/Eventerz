@@ -86,7 +86,7 @@ export function Hero() {
         >
           <Magnetic>
             <Button asChild size="lg">
-              <Link href="#cta">
+              <Link href="/dashboard">
                 Launch App
                 <ArrowUpRight className="size-4" />
               </Link>

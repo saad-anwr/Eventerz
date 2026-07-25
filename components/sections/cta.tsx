@@ -53,14 +53,14 @@ export function CTA() {
           <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Magnetic>
               <Button asChild size="lg">
-                <Link href="#top">
+                <Link href="/dashboard">
                   Launch App
                   <ArrowUpRight className="size-4" />
                 </Link>
               </Button>
             </Magnetic>
             <Button asChild size="lg" variant="secondary">
-              <Link href={`mailto:hello@eventerz.xyz?subject=Eventerz%20Demo`}>
+              <Link href={`mailto:eventerz.web@gmail.com?subject=Eventerz%20Demo`}>
                 <CalendarClock className="size-4" />
                 Book a Demo
               </Link>

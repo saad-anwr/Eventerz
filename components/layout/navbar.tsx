@@ -9,7 +9,7 @@ import { navLinks, siteConfig } from "@/lib/site";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/ui/logo";
 import { Magnetic } from "@/components/ui/magnetic";
-import { ConnectWalletButton } from "@/components/wallet/connect-wallet-button";
+import { NavAuth } from "@/components/auth/nav-auth";
 import { useScrollLock } from "@/hooks/use-scroll-lock";
 
 export function Navbar() {
@@ -68,11 +68,11 @@ export function Navbar() {
 
           <div className="flex items-center gap-2">
             <div className="hidden sm:block">
-              <ConnectWalletButton variant="ghost" size="sm" />
+              <NavAuth />
             </div>
             <Magnetic className="hidden sm:block">
               <Button asChild size="sm">
-                <Link href="#cta">
+                <Link href="/dashboard">
                   Launch App
                   <ArrowUpRight className="size-4" />
                 </Link>
@@ -151,9 +151,9 @@ export function Navbar() {
                 ))}
               </nav>
               <div className="mt-3 flex flex-col gap-2 border-t border-white/10 pt-4">
-                <ConnectWalletButton variant="secondary" fullWidth />
+                <NavAuth mobile onNavigate={() => setOpen(false)} />
                 <Button asChild className="w-full" onClick={() => setOpen(false)}>
-                  <Link href="#cta">
+                  <Link href="/dashboard">
                     Launch App
                     <ArrowUpRight className="size-4" />
                   </Link>

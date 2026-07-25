@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import { siteConfig } from "@/lib/site";
 import { WalletProviders } from "@/components/wallet/providers";
+import { AuthProvider } from "@/components/auth/auth-provider";
 import "./globals.css";
 
 const inter = Inter({
@@ -58,7 +59,7 @@ export const metadata: Metadata = {
     title: `${siteConfig.name} — Wallet-native Events on Solana`,
     description: siteConfig.description,
     images: [siteConfig.ogImage],
-    creator: "@eventerz",
+    creator: "@eventerz_web",
   },
   icons: {
     icon: [
@@ -99,7 +100,9 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-screen bg-brand-bg text-foreground selection:bg-brand-purple/30">
-        <WalletProviders>{children}</WalletProviders>
+        <WalletProviders>
+          <AuthProvider>{children}</AuthProvider>
+        </WalletProviders>
       </body>
     </html>
   );

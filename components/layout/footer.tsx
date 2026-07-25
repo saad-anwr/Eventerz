@@ -34,7 +34,7 @@ const footerColumns = [
     links: [
       { label: "Privacy", href: "#" },
       { label: "Terms", href: "#" },
-      { label: "Contact", href: "mailto:hello@eventerz.xyz" },
+      { label: "Contact", href: "mailto:eventerz.web@gmail.com" },
     ],
   },
 ];
