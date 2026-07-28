@@ -127,6 +127,119 @@ Restart both dev servers. Metro caches env aggressively — use
 
 ---
 
+## 6. Deploying to Vercel
+
+`.env.local` is gitignored and **local only**. A deployed site knows nothing
+about it — this is the single most common reason production still shows
+*"Demo mode"* after local sign-in already works.
+
+### The one thing that trips everyone up
+
+`NEXT_PUBLIC_*` variables are **inlined into the JavaScript bundle at build
+time**, not read at runtime. So:
+
+> Adding an environment variable does **nothing** to deployments that already
+> exist. You must trigger a **new build** afterwards.
+
+If you set the variables and reload the site without redeploying, you will see
+exactly the same demo-mode behaviour and reasonably conclude it didn't work.
+
+### Option A — dashboard
+
+1. <https://vercel.com/saadanwr/eventerz/settings/environment-variables>
+2. **Add New** for each, ticking **Production**, **Preview** and **Development**:
+
+   | Key | Value |
+   | --- | --- |
+   | `NEXT_PUBLIC_SUPABASE_URL` | `https://zfijqnvzvnrchaemjfst.supabase.co` |
+   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `eyJhbGciOiJIUzI1NiIs…` (the anon key) |
+
+   Leave **Sensitive** off. These are public by design — the anon key ships in
+   the browser bundle no matter what, and RLS is what protects your data.
+   Marking it sensitive only stops *you* reading it back later.
+
+3. **Deployments** tab → newest deployment → **⋯** → **Redeploy**
+4. **Untick "Use existing Build Cache"** → Redeploy
+
+Step 4 matters. With the cache on, Vercel can reuse the previously compiled
+chunks that still have the old (empty) values baked in.
+
+### Option B — CLI
+
+Faster, and repeatable. From `Eventerz/`:
+
+```bash
+# One-time: bind this folder to the Vercel project
+vercel link --scope saadanwr --project eventerz
+
+# Add to all three environments
+vercel env add NEXT_PUBLIC_SUPABASE_URL production
+vercel env add NEXT_PUBLIC_SUPABASE_URL preview
+vercel env add NEXT_PUBLIC_SUPABASE_ANON_KEY production
+vercel env add NEXT_PUBLIC_SUPABASE_ANON_KEY preview
+# each prompts for the value
+
+# Ship a fresh production build
+vercel --prod
+```
+
+Non-interactive (useful in CI):
+
+```bash
+echo "https://zfijqnvzvnrchaemjfst.supabase.co" \
+  | vercel env add NEXT_PUBLIC_SUPABASE_URL production
+```
+
+Confirm what the project actually holds:
+
+```bash
+vercel env ls
+vercel env pull .env.vercel.local   # writes them locally to diff against
+```
+
+### Register the deployed callback with Supabase
+
+Vercel env vars alone are not enough — Google must be allowed to return to the
+deployed origin. **Authentication → URL Configuration → Redirect URLs**:
+
+```
+https://eventerz-three.vercel.app/auth/callback
+https://*-saadanwr.vercel.app/auth/callback
+```
+
+The wildcard covers preview deployments. This matters because every push gets a
+unique URL like `eventerz-40k4o97e0-saadanwr.vercel.app` — adding those one at a
+time is a losing game, and Supabase supports `*` for exactly this reason.
+
+Also set **Site URL** to `https://eventerz-three.vercel.app`. That is the
+fallback Supabase redirects to when a `redirect_to` is not allow-listed, so
+getting it right turns a confusing silent failure into a survivable one.
+
+### Verify the deployment
+
+```bash
+# The project ref should appear in the shipped bundle.
+curl -s https://eventerz-three.vercel.app | grep -c zfijqnvzvnrchaemjfst
+```
+
+`0` means the build did not receive the variables — check the environment
+checkboxes, then redeploy without cache.
+
+Or just look at the sign-in modal footer:
+
+| Footer text | Meaning |
+| --- | --- |
+| "Your wallet stays the primary identity…" | Live ✅ |
+| "Demo mode — social sign-in is simulated" | Variables missing from that build |
+
+### Preview deployments
+
+Preview builds get their own env scope. If you tick only **Production**, every
+preview URL stays in demo mode. Tick **Preview** too, and keep the wildcard
+redirect URL above, or PR previews will fail at the callback.
+
+---
+
 ## Verifying it works
 
 **Website**
