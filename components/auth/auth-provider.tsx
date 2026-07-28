@@ -1,17 +1,60 @@
 "use client";
 
+/**
+ * Auth provider.
+ *
+ * Identity model — the wallet is primary:
+ *   • Connecting a wallet creates or resumes the account. This is the main path.
+ *   • Google is a secondary credential: it authenticates a real person and is
+ *     used for recovery and cross-device profile sync. A Google-only account is
+ *     "wallet pending" — it can browse, but on-chain actions need a wallet.
+ *
+ * When Supabase is configured, Google runs a real OAuth flow and the session
+ * comes back from the auth server. When it is not, the provider falls back to
+ * the local demo store so the marketing site still works from a fresh clone.
+ */
+
 import * as React from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
+import type { Session, User as SupabaseUser } from "@supabase/supabase-js";
+
 import { useAppStore } from "@/lib/store/use-app-store";
 import type { User } from "@/lib/store/types";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
+import {
+  linkWallet as linkWalletRemote,
+  profileForWallet,
+  signInWithEmail as startEmailOtp,
+  signInWithGoogle as startGoogleOAuth,
+  signOut as signOutRemote,
+} from "@/lib/supabase/auth-service";
+import type { ProfileRow } from "@/lib/supabase/types";
 import { AuthModal } from "./auth-modal";
 
 type SocialMethod = "google" | "apple" | "email";
 
 interface AuthContextValue {
+  /** True when a real Supabase project is wired up. */
+  isLive: boolean;
   authOpen: boolean;
   openAuth: () => void;
   closeAuth: () => void;
+
+  /** The authenticated Supabase user, when running live. */
+  supabaseUser: SupabaseUser | null;
+  /** The profile row backing the session, when running live. */
+  profile: ProfileRow | null;
+  /** True while the initial session is being restored. */
+  loading: boolean;
+  /** Signed in via Google but no wallet linked yet. */
+  walletPending: boolean;
+
+  /** Real Google OAuth. Navigates away on success. */
+  signInWithGoogle: () => Promise<{ ok: boolean; error?: string }>;
+  /** Real passwordless email — sends a one-time link. */
+  signInWithEmail: (email: string) => Promise<{ ok: boolean; error?: string }>;
+  /** Demo-only local sign-in, used when Supabase is absent. */
   signIn: (method: SocialMethod, data: { name: string; email: string }) => User;
   signOut: () => void;
 }
@@ -23,6 +66,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [authOpen, setAuthOpen] = React.useState(false);
   const prevConnected = React.useRef(false);
 
+  const [supabaseUser, setSupabaseUser] = React.useState<SupabaseUser | null>(
+    null
+  );
+  const [profile, setProfile] = React.useState<ProfileRow | null>(null);
+  const [loading, setLoading] = React.useState(isSupabaseConfigured);
+
   const hasHydrated = useAppStore((s) => s.hasHydrated);
 
   // Seed demo data once the persisted store has hydrated.
@@ -30,33 +79,125 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (hasHydrated) useAppStore.getState().seedIfEmpty();
   }, [hasHydrated]);
 
-  // Sync wallet connection ⇄ app session.
+  /* --------------------------------------------------------------------- */
+  /*  Live session                                                          */
+  /* --------------------------------------------------------------------- */
+
+  const loadProfile = React.useCallback(async (userId: string) => {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    const { data } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", userId)
+      .single();
+    setProfile(data ?? null);
+  }, []);
+
+  React.useEffect(() => {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
+
+    let active = true;
+
+    // Restore an existing session on mount.
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!active) return;
+      setSupabaseUser(session?.user ?? null);
+      if (session?.user) void loadProfile(session.user.id);
+      setLoading(false);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(
+      (_event: string, session: Session | null) => {
+        if (!active) return;
+        setSupabaseUser(session?.user ?? null);
+        if (session?.user) {
+          void loadProfile(session.user.id);
+          setAuthOpen(false);
+        } else {
+          setProfile(null);
+        }
+      }
+    );
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
+  }, [loadProfile]);
+
+  /* --------------------------------------------------------------------- */
+  /*  Wallet ⇄ session                                                      */
+  /* --------------------------------------------------------------------- */
+
   React.useEffect(() => {
     if (!hasHydrated) return;
-    const store = useAppStore.getState();
-    const addr = publicKey?.toBase58();
+    const address = publicKey?.toBase58();
 
-    if (connected && addr) {
-      if (!store.currentUserId) {
-        store.ensureWalletUser(addr);
-      } else {
-        store.linkWallet(addr);
+    // Live: the wallet is the primary credential.
+    if (isSupabaseConfigured) {
+      if (connected && address) {
+        void (async () => {
+          if (supabaseUser) {
+            // Signed in via Google — bind this wallet to that account.
+            const result = await linkWalletRemote(address);
+            if (result.ok) setProfile(result.data);
+          } else {
+            // No session yet. Surface the account that owns this wallet so the
+            // UI can prompt for the matching Google login (recovery path).
+            const owner = await profileForWallet(address);
+            setProfile(owner);
+          }
+          setAuthOpen(false);
+        })();
+      } else if (!connected && prevConnected.current) {
+        setProfile((current) =>
+          current ? { ...current, wallet_address: null } : current
+        );
       }
+      prevConnected.current = connected;
+      return;
+    }
+
+    // Demo fallback — the original local-store behaviour.
+    const store = useAppStore.getState();
+    if (connected && address) {
+      if (!store.currentUserId) store.ensureWalletUser(address);
+      else store.linkWallet(address);
       setAuthOpen(false);
     } else if (!connected && prevConnected.current) {
-      // Wallet just disconnected — sign out only if it was a wallet session.
       const me = store.currentUserId ? store.users[store.currentUserId] : null;
       if (me?.authMethod === "wallet") store.signOut();
     }
     prevConnected.current = connected;
-  }, [connected, publicKey, hasHydrated]);
+  }, [connected, publicKey, hasHydrated, supabaseUser]);
+
+  /* --------------------------------------------------------------------- */
+  /*  Actions                                                               */
+  /* --------------------------------------------------------------------- */
+
+  const signInWithGoogle = React.useCallback(async () => {
+    const result = await startGoogleOAuth(window.location.pathname);
+    return result.ok ? { ok: true } : { ok: false, error: result.error };
+  }, []);
+
+  const signInWithEmail = React.useCallback(async (email: string) => {
+    const result = await startEmailOtp(email, window.location.pathname);
+    return result.ok ? { ok: true } : { ok: false, error: result.error };
+  }, []);
 
   const signIn = React.useCallback<AuthContextValue["signIn"]>(
     (method, data) => {
       const store = useAppStore.getState();
       const user = store.signInLocal(method, data);
-      const addr = publicKey?.toBase58();
-      if (connected && addr) store.linkWallet(addr);
+      const address = publicKey?.toBase58();
+      if (connected && address) store.linkWallet(address);
       setAuthOpen(false);
       return user;
     },
@@ -64,19 +205,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const signOut = React.useCallback(() => {
-    useAppStore.getState().signOut();
+    if (isSupabaseConfigured) {
+      void signOutRemote();
+      setSupabaseUser(null);
+      setProfile(null);
+    } else {
+      useAppStore.getState().signOut();
+    }
     if (connected) void disconnect();
   }, [connected, disconnect]);
 
   const value = React.useMemo<AuthContextValue>(
     () => ({
+      isLive: isSupabaseConfigured,
       authOpen,
       openAuth: () => setAuthOpen(true),
       closeAuth: () => setAuthOpen(false),
+      supabaseUser,
+      profile,
+      loading,
+      walletPending: Boolean(supabaseUser) && !profile?.wallet_address,
+      signInWithGoogle,
+      signInWithEmail,
       signIn,
       signOut,
     }),
-    [authOpen, signIn, signOut]
+    [
+      authOpen,
+      supabaseUser,
+      profile,
+      loading,
+      signInWithGoogle,
+      signInWithEmail,
+      signIn,
+      signOut,
+    ]
   );
 
   return (

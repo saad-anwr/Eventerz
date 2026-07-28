@@ -9,6 +9,10 @@ import { useScrollLock } from "@/hooks/use-scroll-lock";
 import { EventerzMark } from "@/components/ui/logo";
 import { cn } from "@/lib/utils";
 
+/**
+ * Names used only by the offline demo path, when no Supabase project is
+ * configured. With Supabase wired up, Google returns the person's real name.
+ */
 const DEMO_NAMES = [
   "Alex Rivera",
   "Jordan Lee",
@@ -52,7 +56,14 @@ function AppleIcon() {
 }
 
 export function AuthModal() {
-  const { authOpen, closeAuth, signIn } = useAuth();
+  const {
+    authOpen,
+    closeAuth,
+    signIn,
+    signInWithGoogle,
+    signInWithEmail,
+    isLive,
+  } = useAuth();
   const { open: openWalletModal } = useConnectModal();
   useScrollLock(authOpen);
 
@@ -62,12 +73,15 @@ export function AuthModal() {
   const [name, setName] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [error, setError] = React.useState("");
+  /** Set once a magic link has been mailed, so we can confirm it. */
+  const [sentTo, setSentTo] = React.useState("");
 
   // Reset transient state when closing.
   React.useEffect(() => {
     if (!authOpen) {
       setBusy(null);
       setError("");
+      setSentTo("");
     }
   }, [authOpen]);
 
@@ -78,9 +92,30 @@ export function AuthModal() {
     return () => window.removeEventListener("keydown", onKey);
   }, [authOpen, closeAuth]);
 
-  const social = (method: "google" | "apple") => {
+  const social = async (method: "google" | "apple") => {
     setBusy(method);
-    // Simulated OAuth handshake (see README — wire real providers for prod).
+    setError("");
+
+    // Real Google OAuth once a Supabase project is configured. On success the
+    // browser navigates to Google, so nothing after this resolves.
+    if (method === "google" && isLive) {
+      const result = await signInWithGoogle();
+      if (!result.ok) {
+        setError(result.error ?? "Could not start Google sign-in.");
+        setBusy(null);
+      }
+      return;
+    }
+
+    if (method === "apple" && isLive) {
+      setError(
+        "Apple sign-in is not enabled yet. Use Google or connect a wallet."
+      );
+      setBusy(null);
+      return;
+    }
+
+    // Offline demo path — no backend configured.
     window.setTimeout(() => {
       const rnd = DEMO_NAMES[Math.floor(Math.random() * DEMO_NAMES.length)];
       const handle = rnd.toLowerCase().replace(/\s+/g, ".");
@@ -89,7 +124,7 @@ export function AuthModal() {
     }, 850);
   };
 
-  const submitEmail = (e: React.FormEvent) => {
+  const submitEmail = async (e: React.FormEvent) => {
     e.preventDefault();
     const value = email.trim();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
@@ -97,6 +132,17 @@ export function AuthModal() {
       return;
     }
     setBusy("email");
+    setError("");
+
+    // Live: Supabase mails a one-time link. No password is ever stored.
+    if (isLive) {
+      const result = await signInWithEmail(value);
+      setBusy(null);
+      if (result.ok) setSentTo(value);
+      else setError(result.error ?? "Could not send the sign-in link.");
+      return;
+    }
+
     window.setTimeout(() => {
       signIn("email", { name: name.trim(), email: value });
     }, 500);
