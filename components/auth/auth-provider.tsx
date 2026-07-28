@@ -29,6 +29,7 @@ import {
   signInWithGoogle as startGoogleOAuth,
   signOut as signOutRemote,
 } from "@/lib/supabase/auth-service";
+import { profileToUser } from "@/lib/supabase/map-profile";
 import type { ProfileRow } from "@/lib/supabase/types";
 import { AuthModal } from "./auth-modal";
 
@@ -91,7 +92,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .select("*")
       .eq("id", userId)
       .single();
+
     setProfile(data ?? null);
+
+    // Mirror the real account into the app store so `useSession()` — and
+    // therefore the navbar, dashboard and every screen — reflects the actual
+    // signed-in person rather than a demo record.
+    if (data) useAppStore.getState().syncRemoteUser(profileToUser(data));
   }, []);
 
   React.useEffect(() => {
@@ -122,6 +129,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setAuthOpen(false);
         } else {
           setProfile(null);
+          // Signed out of the real backend — drop the mirrored session too.
+          useAppStore.getState().signOut();
         }
       }
     );
@@ -147,12 +156,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (supabaseUser) {
             // Signed in via Google — bind this wallet to that account.
             const result = await linkWalletRemote(address);
-            if (result.ok) setProfile(result.data);
+            if (result.ok) {
+              setProfile(result.data);
+              useAppStore.getState().syncRemoteUser(profileToUser(result.data));
+            }
           } else {
-            // No session yet. Surface the account that owns this wallet so the
-            // UI can prompt for the matching Google login (recovery path).
+            /*
+             * No session yet. The wallet is the primary credential, so adopt
+             * the account it already owns — that is a real sign-in, not a
+             * prompt. Unknown wallets fall through to the demo store below.
+             */
             const owner = await profileForWallet(address);
-            setProfile(owner);
+            if (owner) {
+              setProfile(owner);
+              useAppStore.getState().syncRemoteUser(profileToUser(owner));
+            } else {
+              useAppStore.getState().ensureWalletUser(address);
+            }
           }
           setAuthOpen(false);
         })();
@@ -160,6 +180,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfile((current) =>
           current ? { ...current, wallet_address: null } : current
         );
+        // A wallet-only session ends when the wallet disconnects.
+        if (!supabaseUser) useAppStore.getState().signOut();
       }
       prevConnected.current = connected;
       return;
@@ -209,9 +231,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       void signOutRemote();
       setSupabaseUser(null);
       setProfile(null);
-    } else {
-      useAppStore.getState().signOut();
     }
+    // Clear the mirrored session either way — live or demo, the app store is
+    // what `useSession()` reads.
+    useAppStore.getState().signOut();
     if (connected) void disconnect();
   }, [connected, disconnect]);
 

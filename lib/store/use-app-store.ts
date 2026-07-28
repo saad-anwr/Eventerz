@@ -51,6 +51,12 @@ interface AppState {
     method: Exclude<AuthMethod, "wallet">,
     data: { name: string; email: string }
   ) => User;
+  /**
+   * Adopt a user authenticated by the real backend as the current session.
+   * Lets every existing screen keep reading `useSession()` unchanged while the
+   * identity behind it is a genuine Supabase account.
+   */
+  syncRemoteUser: (user: User) => void;
   ensureWalletUser: (address: string) => User;
   linkWallet: (address: string) => void;
   signOut: () => void;
@@ -145,6 +151,18 @@ export const useAppStore = create<AppState>()(
           friendRequests: [...s.friendRequests, ...welcomeRequests(get().users, id)],
         }));
         return user;
+      },
+
+      syncRemoteUser: (user) => {
+        set((s) => ({
+          users: {
+            ...s.users,
+            // Keep any locally-known extras (interests picked in the demo)
+            // but let the server's copy win on every field it owns.
+            [user.id]: { ...s.users[user.id], ...user },
+          },
+          currentUserId: user.id,
+        }));
       },
 
       ensureWalletUser: (address) => {
