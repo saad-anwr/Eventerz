@@ -189,13 +189,28 @@ export function AuthModal() {
             <div className="p-6 pt-8 text-center">
               <EventerzMark className="mx-auto size-12" />
               <h2 className="mt-4 font-display text-xl font-bold text-white">
-                Sign in to Eventerz
+                {sentTo ? "Check your inbox" : "Sign in to Eventerz"}
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                One account for events, tickets & reputation.
+                {sentTo
+                  ? `We sent a one-time sign-in link to ${sentTo}.`
+                  : "Your wallet is your identity — Google keeps it recoverable."}
               </p>
             </div>
 
+            {sentTo ? (
+              <div className="px-6 pb-2">
+                <button
+                  onClick={() => {
+                    setSentTo("");
+                    setEmail("");
+                  }}
+                  className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] text-sm font-semibold text-white transition-colors hover:bg-white/[0.08]"
+                >
+                  Use a different email
+                </button>
+              </div>
+            ) : (
             <div className="space-y-2.5 px-6">
               {/* Social */}
               <button
@@ -225,14 +240,20 @@ export function AuthModal() {
 
               {/* Email */}
               <form onSubmit={submitEmail} className="space-y-2.5 pt-1">
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Full name (optional)"
-                  autoComplete="name"
-                  className="h-11 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 text-sm text-white placeholder:text-muted-foreground focus:border-brand-purple/40 focus:outline-none"
-                />
+                {/*
+                  Live, the display name comes from the provider or the profile
+                  editor — asking for it here would be a field we then ignore.
+                */}
+                {!isLive && (
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Full name (optional)"
+                    autoComplete="name"
+                    className="h-11 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 text-sm text-white placeholder:text-muted-foreground focus:border-brand-purple/40 focus:outline-none"
+                  />
+                )}
                 <div className="relative">
                   <Mail className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                   <input
@@ -257,7 +278,7 @@ export function AuthModal() {
                     <Loader2 className="size-4 animate-spin" />
                   ) : (
                     <>
-                      Continue with Email
+                      {isLive ? "Email me a sign-in link" : "Continue with Email"}
                       <ArrowRight className="size-4" />
                     </>
                   )}
@@ -281,12 +302,23 @@ export function AuthModal() {
                 Connect a wallet
               </button>
             </div>
+            )}
 
             <div className="mt-5 flex items-start gap-2 border-t border-white/10 px-6 py-3.5 text-xs text-muted-foreground">
               <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-brand-green" />
               <span>
-                Demo mode — social sign-in is simulated. By continuing you agree
-                to our Terms & Privacy Policy.
+                {isLive ? (
+                  <>
+                    Your wallet stays the primary identity — Google and email
+                    only make the account recoverable. By continuing you agree to
+                    our Terms &amp; Privacy Policy.
+                  </>
+                ) : (
+                  <>
+                    Demo mode — social sign-in is simulated. Configure Supabase to
+                    enable real accounts (see docs/AUTH_SETUP.md).
+                  </>
+                )}
               </span>
             </div>
           </motion.div>
