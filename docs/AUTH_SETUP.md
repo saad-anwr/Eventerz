@@ -90,7 +90,7 @@ Then **Authentication → URL Configuration**:
 - **Redirect URLs** — add every origin you will run on:
   ```
   http://localhost:3000/auth/callback
-  https://eventerz-three.vercel.app/auth/callback
+  https://www.eventerz.xyz/auth/callback
   eventerz://auth/callback
   exp://127.0.0.1:8081/--/auth/callback
   ```
@@ -203,15 +203,21 @@ Vercel env vars alone are not enough — Google must be allowed to return to the
 deployed origin. **Authentication → URL Configuration → Redirect URLs**:
 
 ```
-https://eventerz-three.vercel.app/auth/callback
+https://www.eventerz.xyz/auth/callback
+https://eventerz.xyz/auth/callback
 https://*-saadanwr.vercel.app/auth/callback
 ```
+
+Both `www` and the apex are listed on purpose: whichever host the browser is
+on becomes the `redirect_to`, and Vercel serves both unless you force a
+redirect. Missing one produces exactly the bug where sign-in bounces you to
+the `.vercel.app` origin instead of your domain.
 
 The wildcard covers preview deployments. This matters because every push gets a
 unique URL like `eventerz-40k4o97e0-saadanwr.vercel.app` — adding those one at a
 time is a losing game, and Supabase supports `*` for exactly this reason.
 
-Also set **Site URL** to `https://eventerz-three.vercel.app`. That is the
+Also set **Site URL** to `https://www.eventerz.xyz`. That is the
 fallback Supabase redirects to when a `redirect_to` is not allow-listed, so
 getting it right turns a confusing silent failure into a survivable one.
 
@@ -219,7 +225,7 @@ getting it right turns a confusing silent failure into a survivable one.
 
 ```bash
 # The project ref should appear in the shipped bundle.
-curl -s https://eventerz-three.vercel.app | grep -c zfijqnvzvnrchaemjfst
+curl -s https://www.eventerz.xyz | grep -c zfijqnvzvnrchaemjfst
 ```
 
 `0` means the build did not receive the variables — check the environment

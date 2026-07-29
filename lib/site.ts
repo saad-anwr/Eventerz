@@ -2,13 +2,26 @@
  * Central site configuration — used across metadata, navigation and the footer.
  * Update these values in one place when wiring the real product.
  */
+
+/**
+ * Canonical origin, no trailing slash.
+ *
+ * `NEXT_PUBLIC_SITE_URL` wins so preview deployments can advertise their own
+ * origin; the literal is the production fallback. This value drives
+ * `metadataBase`, OG tags, the sitemap, robots.txt and — importantly — the
+ * OAuth redirect, so it must match the domain the user is actually browsing.
+ */
+const canonicalUrl =
+  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ??
+  "https://www.eventerz.xyz";
+
 export const siteConfig = {
   name: "Eventerz",
   shortName: "Eventerz",
   tagline: "Everything is On-chain. Why not your events?",
   description:
     "Eventerz is wallet-native event infrastructure on Solana. Discover events, RSVP on-chain, receive NFT tickets and Proof-of-Attendance, build portable reputation and join token-gated communities.",
-  url: "https://eventerz-three.vercel.app",
+  url: canonicalUrl,
   ogImage: "/og.svg",
   keywords: [
     "Eventerz",

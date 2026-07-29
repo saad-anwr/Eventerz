@@ -73,7 +73,7 @@ export function Navbar() {
             <Magnetic className="hidden sm:block">
               <Button asChild size="sm">
                 <Link href="/dashboard">
-                  Launch App
+                  Let&apos;s Event
                   <ArrowUpRight className="size-4" />
                 </Link>
               </Button>
@@ -154,7 +154,7 @@ export function Navbar() {
                 <NavAuth mobile onNavigate={() => setOpen(false)} />
                 <Button asChild className="w-full" onClick={() => setOpen(false)}>
                   <Link href="/dashboard">
-                    Launch App
+                    Let&apos;s Event
                     <ArrowUpRight className="size-4" />
                   </Link>
                 </Button>

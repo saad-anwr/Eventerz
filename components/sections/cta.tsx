@@ -54,7 +54,7 @@ export function CTA() {
             <Magnetic>
               <Button asChild size="lg">
                 <Link href="/dashboard">
-                  Launch App
+                  Let&apos;s Event
                   <ArrowUpRight className="size-4" />
                 </Link>
               </Button>
