@@ -1,47 +1,94 @@
 "use client";
 
+/**
+ * Friend action button.
+ *
+ * Reads real `friend_requests` rows from Supabase — previously this used the
+ * local demo store, which is why people who actually signed up never appeared
+ * as addable and requests never reached anyone.
+ */
+
 import * as React from "react";
 import Link from "next/link";
-import { Check, Clock, MessageCircle, UserCheck, UserPlus, X } from "lucide-react";
-import { useAppStore } from "@/lib/store/use-app-store";
+import {
+  Check,
+  Clock,
+  Loader2,
+  MessageCircle,
+  UserCheck,
+  UserPlus,
+  X,
+} from "lucide-react";
+
+import {
+  useFriendRequests,
+  useRespondToFriendRequest,
+  useSendFriendRequest,
+} from "@/lib/hooks/use-eventerz-data";
 import { useSession } from "@/components/auth/use-session";
 import { Button, type ButtonProps } from "@/components/ui/button";
 
+type Relation = "self" | "none" | "friends" | "outgoing" | "incoming";
+
+/** Shared derivation so the button and the pill can never disagree. */
+function useRelation(otherId: string) {
+  const { userId: me } = useSession();
+  const { data: requests = [], isLoading } = useFriendRequests(me ?? undefined);
+
+  return React.useMemo(() => {
+    if (!me || me === otherId) {
+      return { relation: "self" as Relation, request: null, me, isLoading };
+    }
+
+    const request = requests.find(
+      (r) =>
+        (r.requester_id === me && r.addressee_id === otherId) ||
+        (r.requester_id === otherId && r.addressee_id === me),
+    );
+
+    let relation: Relation = "none";
+    if (request && request.status !== "declined") {
+      relation =
+        request.status === "accepted"
+          ? "friends"
+          : request.requester_id === me
+            ? "outgoing"
+            : "incoming";
+    }
+
+    return { relation, request: request ?? null, me, isLoading };
+  }, [requests, me, otherId, isLoading]);
+}
+
 interface FriendButtonProps {
-  userId: string; // the OTHER user
+  /** The OTHER user. */
+  userId: string;
   size?: ButtonProps["size"];
   className?: string;
 }
 
-export function FriendButton({ userId, size = "sm", className }: FriendButtonProps) {
-  const { userId: me } = useSession();
-  const requests = useAppStore((s) => s.friendRequests);
-  const sendFriendRequest = useAppStore((s) => s.sendFriendRequest);
-  const respondFriendRequest = useAppStore((s) => s.respondFriendRequest);
+export function FriendButton({
+  userId,
+  size = "sm",
+  className,
+}: FriendButtonProps) {
+  const { relation, request, me, isLoading } = useRelation(userId);
 
-  const rel = React.useMemo(() => {
-    if (!me || me === userId) return "self" as const;
-    const req = requests.find(
-      (r) =>
-        (r.from === me && r.to === userId) ||
-        (r.from === userId && r.to === me)
+  const sendRequest = useSendFriendRequest(me ?? undefined);
+  const respond = useRespondToFriendRequest();
+
+  if (!me || relation === "self") return null;
+
+  // Hold the slot while the relationship resolves, so the row does not jump.
+  if (isLoading) {
+    return (
+      <Button size={size} variant="secondary" disabled className={className}>
+        <Loader2 className="size-4 animate-spin" />
+      </Button>
     );
-    if (!req || req.status === "declined") return "none" as const;
-    if (req.status === "accepted") return "friends" as const;
-    return req.from === me ? ("outgoing" as const) : ("incoming" as const);
-  }, [requests, me, userId]);
+  }
 
-  const incomingReq = React.useMemo(
-    () =>
-      requests.find(
-        (r) => r.from === userId && r.to === me && r.status === "pending"
-      ),
-    [requests, userId, me]
-  );
-
-  if (!me || rel === "self") return null;
-
-  if (rel === "friends") {
+  if (relation === "friends") {
     return (
       <Button asChild size={size} variant="secondary" className={className}>
         <Link href={`/messages/${userId}`}>
@@ -52,7 +99,7 @@ export function FriendButton({ userId, size = "sm", className }: FriendButtonPro
     );
   }
 
-  if (rel === "outgoing") {
+  if (relation === "outgoing") {
     return (
       <Button size={size} variant="outline" disabled className={className}>
         <Clock className="size-4" />
@@ -61,24 +108,28 @@ export function FriendButton({ userId, size = "sm", className }: FriendButtonPro
     );
   }
 
-  if (rel === "incoming") {
+  if (relation === "incoming" && request) {
     return (
       <div className="flex items-center gap-2">
         <Button
           size={size}
           className={className}
-          onClick={() => incomingReq && respondFriendRequest(incomingReq.id, true)}
+          disabled={respond.isPending}
+          onClick={() => respond.mutate({ id: request.id, accept: true })}
         >
-          <Check className="size-4" />
+          {respond.isPending ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <Check className="size-4" />
+          )}
           Accept
         </Button>
         <Button
           size="icon"
           variant="ghost"
           aria-label="Decline"
-          onClick={() =>
-            incomingReq && respondFriendRequest(incomingReq.id, false)
-          }
+          disabled={respond.isPending}
+          onClick={() => respond.mutate({ id: request.id, accept: false })}
         >
           <X className="size-4" />
         </Button>
@@ -86,15 +137,19 @@ export function FriendButton({ userId, size = "sm", className }: FriendButtonPro
     );
   }
 
-  // none
   return (
     <Button
       size={size}
       variant="secondary"
       className={className}
-      onClick={() => sendFriendRequest(me, userId)}
+      disabled={sendRequest.isPending}
+      onClick={() => sendRequest.mutate(userId)}
     >
-      <UserPlus className="size-4" />
+      {sendRequest.isPending ? (
+        <Loader2 className="size-4 animate-spin" />
+      ) : (
+        <UserPlus className="size-4" />
+      )}
       Add Friend
     </Button>
   );
@@ -102,20 +157,9 @@ export function FriendButton({ userId, size = "sm", className }: FriendButtonPro
 
 /** Small inline label reflecting friendship state (for profile headers). */
 export function FriendStatusPill({ userId }: { userId: string }) {
-  const { userId: me } = useSession();
-  const requests = useAppStore((s) => s.friendRequests);
-  const areFriends = React.useMemo(
-    () =>
-      !!me &&
-      requests.some(
-        (r) =>
-          r.status === "accepted" &&
-          ((r.from === me && r.to === userId) ||
-            (r.from === userId && r.to === me))
-      ),
-    [requests, me, userId]
-  );
-  if (!areFriends) return null;
+  const { relation } = useRelation(userId);
+  if (relation !== "friends") return null;
+
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full border border-brand-green/30 bg-brand-green/10 px-2.5 py-1 text-xs font-medium text-brand-green">
       <UserCheck className="size-3.5" />

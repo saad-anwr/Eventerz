@@ -3,8 +3,9 @@
 import * as React from "react";
 import Link from "next/link";
 import { CalendarSearch, Plus, Search } from "lucide-react";
-import { useAppStore } from "@/lib/store/use-app-store";
-import { isUpcoming } from "@/lib/format";
+import { Loader2 } from "lucide-react";
+import { useEvents } from "@/lib/hooks/use-eventerz-data";
+import { eventRowToItem } from "@/lib/supabase/map-event";
 import { PageHeader } from "@/components/app/page-header";
 import { EventCard } from "@/components/app/event-card";
 import { EmptyState } from "@/components/app/empty-state";
@@ -22,28 +23,23 @@ const CATEGORIES = [
 ] as const;
 
 export default function ExplorePage() {
-  const eventsMap = useAppStore((s) => s.events);
   const [query, setQuery] = React.useState("");
   const [category, setCategory] = React.useState<(typeof CATEGORIES)[number]>(
     "All"
   );
   const [upcomingOnly, setUpcomingOnly] = React.useState(true);
 
-  const events = React.useMemo(() => {
-    const all = Object.values(eventsMap);
-    const q = query.trim().toLowerCase();
-    return all
-      .filter((e) => (upcomingOnly ? isUpcoming(e.startsAt) : true))
-      .filter((e) => (category === "All" ? true : e.category === category))
-      .filter(
-        (e) =>
-          !q ||
-          e.title.toLowerCase().includes(q) ||
-          e.location.toLowerCase().includes(q) ||
-          e.tags.some((t) => t.toLowerCase().includes(q))
-      )
-      .sort((a, b) => +new Date(a.startsAt) - +new Date(b.startsAt));
-  }, [eventsMap, query, category, upcomingOnly]);
+  /*
+   * Filtering happens server-side so every client sees the same result set —
+   * this list is now shared state, not one browser's local store.
+   */
+  const { data: rows = [], isLoading } = useEvents({
+    upcomingOnly,
+    category,
+    query,
+  });
+
+  const events = React.useMemo(() => rows.map(eventRowToItem), [rows]);
 
   return (
     <div>
@@ -104,7 +100,12 @@ export default function ExplorePage() {
       </div>
 
       {/* Results */}
-      {events.length === 0 ? (
+      {isLoading ? (
+        <div className="flex items-center gap-2 py-16 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" />
+          Loading events…
+        </div>
+      ) : events.length === 0 ? (
         <EmptyState
           icon={CalendarSearch}
           title="No events found"

@@ -57,17 +57,139 @@ export type ProfileUpdate = Partial<
  *  2. `Tables`, `Views` and `Functions` are all required, as is `Relationships`
  *     on every table.
  */
+export type EventRow = {
+  id: string;
+  title: string;
+  description: string;
+  host_id: string;
+  community_id: string | null;
+  cover_gradient: string;
+  cover_image: string | null;
+  category: string;
+  starts_at: string;
+  ends_at: string | null;
+  location: string;
+  is_online: boolean;
+  capacity: number;
+  price: string;
+  visibility: string;
+  requires_approval: boolean;
+  token_gated: boolean;
+  gate_requirement: string | null;
+  tags: string[];
+  schedule: unknown;
+  featured: boolean;
+  onchain_signature: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RsvpRow = {
+  id: string;
+  event_id: string;
+  profile_id: string;
+  status: string;
+  wallet_address: string | null;
+  created_at: string;
+};
+
+export type TicketRow = {
+  id: string;
+  event_id: string;
+  owner_id: string;
+  asset_id: string | null;
+  serial: number;
+  status: string;
+  soulbound: boolean;
+  tier: string;
+  qr_secret: string;
+  minted_at: string;
+  checked_in_at: string | null;
+};
+
+export type FriendRequestRow = {
+  id: string;
+  requester_id: string;
+  addressee_id: string;
+  status: 'pending' | 'accepted' | 'declined';
+  created_at: string;
+  updated_at: string;
+};
+
+export type MessageRow = {
+  id: string;
+  scope: 'event' | 'dm';
+  channel_id: string;
+  sender_id: string;
+  body: string;
+  created_at: string;
+};
+
+export type NotificationRow = {
+  id: string;
+  profile_id: string;
+  kind: string;
+  title: string;
+  body: string;
+  href: string | null;
+  read: boolean;
+  created_at: string;
+};
+
+export type CommunityRow = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  icon: string;
+  accent: string;
+  cover_gradient: string;
+  token_gated: boolean;
+  verified: boolean;
+  owner_id: string | null;
+  created_at: string;
+};
+
+/** `discoverable_people` view — a profile plus this viewer's relationship to it. */
+export type DiscoverablePersonRow = ProfileRow & {
+  friend_status: 'pending' | 'accepted' | 'declined' | null;
+  request_sent_by_me: boolean | null;
+};
+
+type Table<Row, Insert = Partial<Row>, Update = Partial<Row>> = {
+  Row: Row;
+  Insert: Insert;
+  Update: Update;
+  Relationships: [];
+};
+
 export type Database = {
   public: {
     Tables: {
-      profiles: {
-        Row: ProfileRow;
-        Insert: Partial<ProfileRow> & { id: string };
-        Update: ProfileUpdate;
+      profiles: Table<
+        ProfileRow,
+        Partial<ProfileRow> & { id: string },
+        ProfileUpdate
+      >;
+      events: Table<EventRow>;
+      communities: Table<CommunityRow>;
+      community_members: Table<{
+        community_id: string;
+        profile_id: string;
+        joined_at: string;
+      }>;
+      rsvps: Table<RsvpRow>;
+      tickets: Table<TicketRow>;
+      notifications: Table<NotificationRow>;
+      friend_requests: Table<FriendRequestRow>;
+      messages: Table<MessageRow>;
+    };
+    Views: {
+      discoverable_people: {
+        Row: DiscoverablePersonRow;
         Relationships: [];
       };
     };
-    Views: Record<never, never>;
     Functions: {
       link_wallet: {
         Args: { p_wallet_address: string };
@@ -77,8 +199,28 @@ export type Database = {
         Args: { p_wallet_address: string };
         Returns: ProfileRow;
       };
+      rsvp: {
+        Args: { p_event_id: string };
+        Returns: TicketRow;
+      };
+      cancel_rsvp: {
+        Args: { p_event_id: string };
+        Returns: undefined;
+      };
+      check_in_ticket: {
+        Args: { p_ticket_id: string; p_qr_secret: string };
+        Returns: TicketRow;
+      };
+      dm_channel_id: {
+        Args: { a: string; b: string };
+        Returns: string;
+      };
+      friend_ids: {
+        Args: { p_profile_id: string };
+        Returns: string[];
+      };
     };
     Enums: Record<never, never>;
     CompositeTypes: Record<never, never>;
   };
-}
+};

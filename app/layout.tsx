@@ -3,6 +3,7 @@ import { Inter, Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import { siteConfig } from "@/lib/site";
 import { WalletProviders } from "@/components/wallet/providers";
 import { AuthProvider } from "@/components/auth/auth-provider";
+import { QueryProvider } from "@/components/query-provider";
 import "./globals.css";
 
 const inter = Inter({
@@ -100,9 +101,11 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-screen bg-brand-bg text-foreground selection:bg-brand-purple/30">
-        <WalletProviders>
-          <AuthProvider>{children}</AuthProvider>
-        </WalletProviders>
+        <QueryProvider>
+          <WalletProviders>
+            <AuthProvider>{children}</AuthProvider>
+          </WalletProviders>
+        </QueryProvider>
       </body>
     </html>
   );

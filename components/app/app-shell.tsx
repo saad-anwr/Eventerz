@@ -19,7 +19,8 @@ import {
 import { useSession } from "@/components/auth/use-session";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useConnectModal } from "@/components/wallet/connect-modal-context";
-import { useAppStore, incomingRequests } from "@/lib/store/use-app-store";
+import { useFriendRequests } from "@/lib/hooks/use-eventerz-data";
+import { useRealtimeSync } from "@/lib/hooks/use-realtime";
 import { Logo } from "@/components/ui/logo";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "./avatar";
@@ -35,9 +36,12 @@ interface NavItem {
 
 function useNav(): NavItem[] {
   const { userId } = useSession();
-  const pending = useAppStore((s) =>
-    userId ? incomingRequests(s.friendRequests, userId).length : 0
-  );
+  const { data: requests = [] } = useFriendRequests(userId ?? undefined);
+
+  // Requests waiting on this user to answer.
+  const pending = requests.filter(
+    (r) => r.status === "pending" && r.addressee_id === userId
+  ).length;
   return [
     { href: "/dashboard", label: "Home", icon: Home },
     { href: "/explore", label: "Explore", icon: Compass },
@@ -130,9 +134,16 @@ function WalletChip() {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { user, isSignedIn, isLoading } = useSession();
+  const { user, userId, isSignedIn, isLoading } = useSession();
   const { signOut } = useAuth();
   const nav = useNav();
+
+  /*
+   * One subscription for the whole app section. Changes another user makes —
+   * publishing an event, sending a friend request, RSVPing — invalidate the
+   * matching queries here, so the UI updates without a refresh.
+   */
+  useRealtimeSync(userId);
 
   if (isLoading) {
     return (

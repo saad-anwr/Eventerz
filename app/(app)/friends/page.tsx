@@ -1,13 +1,22 @@
 "use client";
 
+/**
+ * Friends.
+ *
+ * Reads real profiles from Supabase. Previously this listed the seeded demo
+ * users from the local store, so anyone who actually signed up was invisible
+ * to everyone else — which is exactly the bug this fixes.
+ */
+
 import * as React from "react";
 import Link from "next/link";
-import { Search, UserPlus, Users } from "lucide-react";
+import { Loader2, Search, UserPlus, Users } from "lucide-react";
+
 import {
-  useAppStore,
-  friendIdsOf,
-  incomingRequests,
-} from "@/lib/store/use-app-store";
+  useDiscoverablePeople,
+  useFriendRequests,
+} from "@/lib/hooks/use-eventerz-data";
+import { profileToUser } from "@/lib/supabase/map-profile";
 import { useSession } from "@/components/auth/use-session";
 import { PageHeader } from "@/components/app/page-header";
 import { UserCard } from "@/components/app/user-card";
@@ -17,33 +26,41 @@ import { FriendButton } from "@/components/app/friend-button";
 
 export default function FriendsPage() {
   const { userId: me } = useSession();
-  const usersMap = useAppStore((s) => s.users);
-  const requests = useAppStore((s) => s.friendRequests);
   const [query, setQuery] = React.useState("");
 
-  const { friends, incoming, discover } = React.useMemo(() => {
-    const all = Object.values(usersMap).filter((u) => u.id !== me);
-    const friendIds = new Set(me ? friendIdsOf(requests, me) : []);
-    const incomingReqs = me ? incomingRequests(requests, me) : [];
-    const incomingIds = new Set(incomingReqs.map((r) => r.from));
+  const { data: people = [], isLoading } = useDiscoverablePeople();
+  const { data: requests = [] } = useFriendRequests(me ?? undefined);
 
+  const { friends, incoming, discover } = React.useMemo(() => {
     const q = query.trim().toLowerCase();
-    const match = (u: (typeof all)[number]) =>
+    const match = (name: string, handle: string | null) =>
       !q ||
-      u.name.toLowerCase().includes(q) ||
-      u.handle.toLowerCase().includes(q);
+      name.toLowerCase().includes(q) ||
+      (handle ?? "").toLowerCase().includes(q);
+
+    const accepted = new Set(
+      requests
+        .filter((r) => r.status === "accepted")
+        .map((r) => (r.requester_id === me ? r.addressee_id : r.requester_id)),
+    );
+
+    // Requests waiting on *me* to answer.
+    const incomingIds = new Set(
+      requests
+        .filter((r) => r.status === "pending" && r.addressee_id === me)
+        .map((r) => r.requester_id),
+    );
+
+    const visible = people.filter((p) => match(p.name, p.handle));
 
     return {
-      friends: all.filter((u) => friendIds.has(u.id) && match(u)),
-      incoming: incomingReqs
-        .map((r) => usersMap[r.from])
-        .filter(Boolean)
-        .filter(match),
-      discover: all.filter(
-        (u) => !friendIds.has(u.id) && !incomingIds.has(u.id) && match(u)
+      friends: visible.filter((p) => accepted.has(p.id)),
+      incoming: visible.filter((p) => incomingIds.has(p.id)),
+      discover: visible.filter(
+        (p) => !accepted.has(p.id) && !incomingIds.has(p.id),
       ),
     };
-  }, [usersMap, requests, me, query]);
+  }, [people, requests, me, query]);
 
   return (
     <div>
@@ -64,6 +81,13 @@ export default function FriendsPage() {
         />
       </div>
 
+      {isLoading && (
+        <div className="flex items-center gap-2 py-10 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" />
+          Loading people…
+        </div>
+      )}
+
       {/* Incoming requests */}
       {incoming.length > 0 && (
         <section className="mb-10">
@@ -75,26 +99,26 @@ export default function FriendsPage() {
             </span>
           </h2>
           <div className="space-y-2">
-            {incoming.map((u) => (
+            {incoming.map((p) => (
               <div
-                key={u.id}
+                key={p.id}
                 className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3"
               >
-                <Link href={`/u/${u.id}`}>
-                  <Avatar name={u.name} seed={u.id} size="md" ring />
+                <Link href={`/u/${p.id}`}>
+                  <Avatar name={p.name} seed={p.id} size="md" ring />
                 </Link>
                 <div className="min-w-0 flex-1">
                   <Link
-                    href={`/u/${u.id}`}
+                    href={`/u/${p.id}`}
                     className="block truncate font-semibold text-white hover:underline"
                   >
-                    {u.name}
+                    {p.name}
                   </Link>
                   <p className="truncate text-xs text-muted-foreground">
                     wants to connect
                   </p>
                 </div>
-                <FriendButton userId={u.id} />
+                <FriendButton userId={p.id} />
               </div>
             ))}
           </div>
@@ -112,16 +136,18 @@ export default function FriendsPage() {
         </h2>
         {friends.length ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {friends.map((u) => (
-              <UserCard key={u.id} user={u} />
+            {friends.map((p) => (
+              <UserCard key={p.id} user={profileToUser(p)} />
             ))}
           </div>
         ) : (
-          <EmptyState
-            icon={Users}
-            title="No friends yet"
-            description="Add people from the Discover section below to start building your network."
-          />
+          !isLoading && (
+            <EmptyState
+              icon={Users}
+              title="No friends yet"
+              description="Add people from the Discover section below to start building your network."
+            />
+          )
         )}
       </section>
 
@@ -133,14 +159,16 @@ export default function FriendsPage() {
         </h2>
         {discover.length ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {discover.map((u) => (
-              <UserCard key={u.id} user={u} />
+            {discover.map((p) => (
+              <UserCard key={p.id} user={profileToUser(p)} />
             ))}
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">
-            No more people to discover right now.
-          </p>
+          !isLoading && (
+            <p className="text-sm text-muted-foreground">
+              No more people to discover right now.
+            </p>
+          )
         )}
       </section>
     </div>
