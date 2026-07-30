@@ -353,7 +353,7 @@ deleting their account and their attendance history with it.
 The whole flow above is Postgres, so its suite is SQL:
 
 ```bash
-supabase start && supabase db reset
+npm run db:start && npm run db:reset
 npm run test:db          # supabase/tests/guest_flow_test.sql
 ```
 

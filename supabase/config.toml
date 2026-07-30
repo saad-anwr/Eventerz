@@ -1,0 +1,104 @@
+# Local Supabase stack — `supabase start` reads this file.
+#
+# Without it the CLI stops at "open supabase/config.toml: no such file or
+# directory" before it starts anything, which is why this exists: the migrations
+# and the SQL suite were written first, and the local stack that runs them was
+# assumed rather than declared.
+#
+# Reference: https://supabase.com/docs/guides/local-development/cli/config
+#
+# This configures the LOCAL stack only. It has no effect on the hosted project
+# and cannot change it. `supabase link` is a separate, deliberate act.
+
+project_id = "eventerz"
+
+[api]
+enabled = true
+port = 54321
+# `graphql_public` is exposed because the CLI's default does; nothing here uses
+# it. `extensions` is on the search path so pgcrypto/uuid functions resolve
+# unqualified inside the definer functions.
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+# Must match the hosted project, or a migration can pass locally and fail in
+# production on a version difference. Check yours at:
+#   Dashboard → Project Settings → Infrastructure → Postgres version
+# and change this to match before trusting a local run.
+major_version = 17
+
+[db.pooler]
+# Off locally. The pooler is a production concern (connection limits under
+# serverless fan-out); running it here only adds a component that can fail
+# between you and a test.
+enabled = false
+port = 54329
+pool_mode = "transaction"
+default_pool_size = 20
+max_client_conn = 100
+
+[db.seed]
+# No seed.sql. Fixtures belong to the suite that asserts on them — a shared seed
+# file makes every test depend on rows it did not create, and then one test's
+# change quietly breaks another. `guest_flow_test.sql` builds and rolls back its
+# own world.
+enabled = false
+
+[realtime]
+# Both clients subscribe to `messages` and `notifications`. Leaving this off
+# would make a whole class of bug untestable locally.
+enabled = true
+
+[studio]
+enabled = true
+port = 54323
+api_url = "http://127.0.0.1"
+
+[local_smtp]
+# Local mail catcher — signup confirmations and magic links land at
+# http://127.0.0.1:54324 instead of a real inbox. (Was [inbucket]; renamed in
+# CLI 2.x, which warns on the old name.)
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+# Event banners. Matches the bucket limit set in 0004_event_banners.sql.
+file_size_limit = "50MiB"
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:3000"
+additional_redirect_urls = ["http://127.0.0.1:3000/auth/callback"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+# Off locally so a test account is usable the moment it is created. Production
+# keeps confirmations on — see docs/AUTH_SETUP.md.
+enable_confirmations = false
+
+[auth.external.google]
+# Google OAuth cannot round-trip to 127.0.0.1 without a matching redirect URI
+# registered in the Google console, so it stays off locally. The email/password
+# path exercises the same profile-creation trigger.
+enabled = false
+client_id = ""
+secret = ""
+
+[edge_runtime]
+enabled = true
+# "oneshot" reloads the function on every request, which is what you want while
+# editing `link-wallet` or `verify-payment`. "per_worker" is faster but caches.
+policy = "oneshot"
+inspector_port = 8083
+
+[analytics]
+enabled = false
