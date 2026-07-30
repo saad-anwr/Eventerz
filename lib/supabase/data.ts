@@ -18,6 +18,7 @@ import type {
   GuestPreview,
   MessageRow,
   NotificationRow,
+  PaymentRow,
   ProfileRow,
   ProfileUpdate,
   RsvpRow,
@@ -53,6 +54,14 @@ export type EventWithMeta = EventRow & {
   host: ProfileRow | null;
   /** The viewer's own RSVP state for this event. */
   my_status: RsvpStatus | null;
+  /**
+   * The viewer's 1-based place in the queue, when they are waitlisted.
+   *
+   * Not derivable here: RLS hands a waitlisted guest only their own row, so the
+   * people ahead of them are rows this client cannot see. It comes from
+   * `my_waitlist_positions`, one call for the whole page.
+   */
+  waitlist_position: number | null;
 };
 
 /**
@@ -91,12 +100,48 @@ async function hydrateEvents(rows: EventRow[]): Promise<EventWithMeta[]> {
 
   const hostById = new Map((hosts ?? []).map((h) => [h.id, h]));
 
+  /*
+   * One extra round trip, and only when the viewer is actually waitlisted
+   * somewhere. Asking per event would be an N+1 that grows with how patient
+   * the user has been, which is a strange thing to charge them for.
+   */
+  const waitlisted = Object.entries(mine)
+    .filter(([, status]) => status === 'waitlist')
+    .map(([eventId]) => eventId);
+  const positions = await waitlistPositions(waitlisted);
+
   return rows.map((row) => ({
     ...row,
     attendee_ids: roster[row.id] ?? [],
     host: hostById.get(row.host_id) ?? null,
     my_status: mine[row.id] ?? null,
+    waitlist_position: positions[row.id] ?? null,
   }));
+}
+
+/**
+ * The viewer's place in the queue for each of these events.
+ *
+ * A failure here is not worth failing the page over: the position is extra
+ * detail on a status the guest can already see, so a null position renders the
+ * generic "you are on the waitlist" line and nothing looks broken.
+ */
+async function waitlistPositions(
+  eventIds: string[],
+): Promise<Record<string, number>> {
+  if (eventIds.length === 0) return {};
+
+  const { data, error } = await client().rpc('my_waitlist_positions', {
+    p_event_ids: eventIds,
+  });
+  if (error || !data) return {};
+
+  return Object.fromEntries(
+    (data as { event_id: string; queue_position: number }[]).map((row) => [
+      row.event_id,
+      row.queue_position,
+    ]),
+  );
 }
 
 /** The signed-in user's id, or null. Cheap — reads the cached session. */
@@ -239,6 +284,16 @@ export interface CreateEventInput {
   coverGradient: string;
   /** Public URL from `uploadEventBanner`. The gradient shows when absent. */
   coverImage?: string;
+
+  /**
+   * Structured location, when the host picked a place rather than typing one.
+   * All optional: an event with a location a geocoder never saw is still a
+   * valid event, and refusing it would make the picker mandatory.
+   */
+  latitude?: number;
+  longitude?: number;
+  placeId?: string;
+  address?: string;
 }
 
 export async function createEvent(input: CreateEventInput, hostId: string) {
@@ -261,11 +316,100 @@ export async function createEvent(input: CreateEventInput, hostId: string) {
       tags: input.tags,
       cover_gradient: input.coverGradient,
       cover_image: input.coverImage ?? null,
+      latitude: input.latitude ?? null,
+      longitude: input.longitude ?? null,
+      place_id: input.placeId ?? null,
+      address: input.address ?? null,
     })
     .select()
     .single();
 
   if (error) fail('Publishing the event', error);
+  return data;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Editing and cancelling                                                     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Fields a host may change after publishing.
+ *
+ * Every field is optional and undefined means "leave alone" — the RPC treats
+ * null the same way. That is what makes two devices editing the same event
+ * safe: a full-row write would send back stale values for everything the user
+ * did not touch and clobber the other device's change with them.
+ */
+export interface UpdateEventInput {
+  title?: string;
+  description?: string;
+  category?: string;
+  startsAt?: string;
+  endsAt?: string | null;
+  location?: string;
+  isOnline?: boolean;
+  capacity?: number;
+  price?: string;
+  visibility?: string;
+  requiresApproval?: boolean;
+  tags?: string[];
+  coverGradient?: string;
+  coverImage?: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  placeId?: string | null;
+  address?: string | null;
+}
+
+export async function updateEvent(
+  eventId: string,
+  patch: UpdateEventInput,
+): Promise<EventRow> {
+  const { data, error } = await client().rpc('update_event', {
+    p_event_id: eventId,
+    p_title: patch.title,
+    p_description: patch.description,
+    p_category: patch.category,
+    p_starts_at: patch.startsAt,
+    p_ends_at: patch.endsAt ?? undefined,
+    // Null and undefined mean different things to the RPC and the same thing
+    // in JS optional-property land, so clearing an end time is a separate flag.
+    p_clear_ends_at: patch.endsAt === null,
+    p_location: patch.location,
+    p_is_online: patch.isOnline,
+    p_capacity: patch.capacity,
+    p_price: patch.price,
+    p_visibility: patch.visibility,
+    p_requires_approval: patch.requiresApproval,
+    p_tags: patch.tags,
+    p_cover_gradient: patch.coverGradient,
+    p_cover_image: patch.coverImage,
+    p_latitude: patch.latitude,
+    p_longitude: patch.longitude,
+    p_place_id: patch.placeId,
+    p_address: patch.address,
+  });
+
+  if (error) fail('Saving your changes', error);
+  return data;
+}
+
+/**
+ * Call an event off.
+ *
+ * Soft: the row survives, every live RSVP is closed and everyone who was
+ * coming is notified. Deleting would cascade to `rsvps` and `tickets` and
+ * erase the attendance record of anyone who already checked in.
+ */
+export async function cancelEvent(
+  eventId: string,
+  reason?: string,
+): Promise<EventRow> {
+  const { data, error } = await client().rpc('cancel_event', {
+    p_event_id: eventId,
+    p_reason: reason?.trim() || null,
+  });
+  if (error) fail('Cancelling the event', error);
   return data;
 }
 
@@ -481,21 +625,48 @@ export function dmChannelId(a: string, b: string): string {
 export interface Conversation {
   user: ProfileRow;
   last: MessageRow | null;
+  /**
+   * Distinguishes a thread with a friend from one opened by "Contact host".
+   * The inbox labels the second kind, because an unexplained stranger in an
+   * inbox reads as spam.
+   */
+  isFriend: boolean;
 }
 
 /**
- * The inbox: every friend, plus the most recent message with them.
+ * The inbox: everyone the viewer can talk to, newest thread first.
  *
- * Three queries total regardless of friend count — friends, then all DM rows
- * for those channels, then reduce. A per-friend query would be N+1.
+ * The set is friends **union** everyone who has actually messaged them. It
+ * used to be friends alone, which meant a host contacted through "Contact
+ * host" — by definition someone they are not friends with — received the
+ * message into a thread that appeared nowhere. The message arrived, was
+ * readable, and was invisible.
+ *
+ * Friends with no messages are still listed: an empty thread with someone you
+ * know is a starting point, and hiding it turns "message a friend" into a
+ * search problem.
+ *
+ * Four queries regardless of how many people are involved.
  */
 export async function fetchConversations(
   profileId: string,
 ): Promise<Conversation[]> {
-  const friends = await fetchFriends(profileId);
-  if (friends.length === 0) return [];
+  const [friends, { data: partners }] = await Promise.all([
+    fetchFriends(profileId),
+    client().rpc('my_dm_partners'),
+  ]);
 
-  const channels = friends.map((f) => dmChannelId(profileId, f.id));
+  const ids = new Set(friends.map((f) => f.id));
+  (partners ?? []).forEach((p) => {
+    if (p.profile_id && p.profile_id !== profileId) ids.add(p.profile_id);
+  });
+  if (ids.size === 0) return [];
+
+  const known = new Map(friends.map((f) => [f.id, f]));
+  const missing = Array.from(ids).filter((id) => !known.has(id));
+  (await fetchProfiles(missing)).forEach((p) => known.set(p.id, p));
+
+  const channels = Array.from(ids).map((id) => dmChannelId(profileId, id));
 
   const { data: rows } = await client()
     .from('messages')
@@ -509,10 +680,13 @@ export async function fetchConversations(
     if (!latest.has(m.channel_id)) latest.set(m.channel_id, m);
   });
 
-  return friends
+  return Array.from(ids)
+    .map((id) => known.get(id))
+    .filter((user): user is ProfileRow => Boolean(user))
     .map((user) => ({
       user,
       last: latest.get(dmChannelId(profileId, user.id)) ?? null,
+      isFriend: known.has(user.id) && friends.some((f) => f.id === user.id),
     }))
     .sort((a, b) => {
       const at = a.last ? Date.parse(a.last.created_at) : 0;
@@ -545,4 +719,152 @@ export async function sendMessage(
     .from('messages')
     .insert({ channel_id: channelId, sender_id: senderId, body: trimmed, scope });
   if (error) fail('Sending the message', error);
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Payments                                                                   */
+/* -------------------------------------------------------------------------- */
+
+export interface RecordPaymentInput {
+  /** The confirmed transaction signature. Unique — retrying is safe. */
+  signature: string;
+  toWallet: string;
+  /** Base units. Lamports for SOL. */
+  amount: bigint;
+  channelId?: string;
+  toProfile?: string;
+  memo?: string;
+  mint?: string;
+  symbol?: string;
+  decimals?: number;
+  cluster?: string;
+}
+
+/**
+ * File the receipt for a transfer that has already confirmed.
+ *
+ * Called *after* the chain has accepted the transaction, never before: a
+ * receipt for a transfer that has not landed is a lie the recipient acts on.
+ * The RPC posts the message into the thread in the same transaction, so a
+ * receipt cannot exist without something rendering it.
+ */
+export async function recordPayment(
+  input: RecordPaymentInput,
+): Promise<PaymentRow> {
+  const { data, error } = await client().rpc('record_payment', {
+    p_signature: input.signature,
+    p_to_wallet: input.toWallet,
+    // PostgREST accepts a numeric string for `bigint`, which is the only way
+    // to send a value above 2^53 without losing precision on the way.
+    p_amount: input.amount.toString() as unknown as number,
+    p_channel_id: input.channelId ?? null,
+    p_to_profile: input.toProfile ?? null,
+    p_memo: input.memo ?? null,
+    p_mint: input.mint ?? null,
+    p_symbol: input.symbol ?? 'SOL',
+    p_decimals: input.decimals ?? 9,
+    p_cluster: input.cluster ?? process.env.NEXT_PUBLIC_SOLANA_NETWORK ?? 'mainnet-beta',
+  });
+
+  if (error) fail('Saving the receipt', error);
+  return data;
+}
+
+/** Receipts referenced by the messages in a thread. */
+export async function fetchPayments(ids: string[]): Promise<PaymentRow[]> {
+  if (ids.length === 0) return [];
+  const { data, error } = await client()
+    .from('payments')
+    .select('*')
+    .in('id', ids);
+  if (error) fail('Loading receipts', error);
+  return data ?? [];
+}
+
+/**
+ * Ask the Edge Function to check a receipt against the cluster.
+ *
+ * Best-effort by design. A receipt that has not been verified renders with its
+ * explorer link and no tick, which is honest and useful; blocking the UI on an
+ * RPC that may not have seen the transaction yet is neither.
+ */
+export async function verifyPayment(signature: string): Promise<boolean> {
+  const supabase = client();
+  const { data, error } = await supabase.functions.invoke('verify-payment', {
+    body: { signature },
+  });
+  if (error) return false;
+  return Boolean((data as { verified?: boolean } | null)?.verified);
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Wallet ownership                                                           */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Step one of linking a wallet: get the text to sign.
+ *
+ * The server returns a full sentence, not a bare nonce, and the wallet shows
+ * it to the user verbatim. A popup asking someone to approve an opaque UUID
+ * teaches the habit every signature-phishing attack depends on.
+ */
+export async function issueWalletLinkChallenge(
+  walletAddress: string,
+): Promise<string> {
+  const { data, error } = await client().rpc('issue_wallet_link_nonce', {
+    p_wallet_address: walletAddress,
+  });
+  if (error) fail('Starting wallet verification', error);
+  return data as string;
+}
+
+/**
+ * Step two: submit the signature for verification.
+ *
+ * Postgres has no Ed25519, so the check happens in the `link-wallet` Edge
+ * Function, which then calls a function revoked from `authenticated` — the
+ * caller cannot link a wallet without going through the signature check.
+ */
+export async function linkWalletWithSignature(args: {
+  walletAddress: string;
+  message: string;
+  /** Base58 or base64; the function accepts whichever the wallet produced. */
+  signature: string;
+}): Promise<ProfileRow> {
+  const { data, error } = await client().functions.invoke('link-wallet', {
+    body: args,
+  });
+
+  if (error) {
+    /*
+     * `FunctionsHttpError` carries the useful message in the response body
+     * rather than in `error.message`, which is always "Edge Function returned a
+     * non-2xx status code". Surfacing that instead of "already linked to
+     * another account" would make a self-explanatory failure unreadable.
+     */
+    const detail = await readFunctionError(error);
+    throw new Error(detail ?? 'Could not verify that wallet.');
+  }
+
+  const payload = data as { profile?: ProfileRow } | null;
+  if (!payload?.profile) throw new Error('Could not verify that wallet.');
+  return payload.profile;
+}
+
+/** Detach the wallet from this account, leaving the account intact. */
+export async function unlinkWallet(): Promise<ProfileRow> {
+  const { data, error } = await client().rpc('unlink_wallet');
+  if (error) fail('Unlinking your wallet', error);
+  return data;
+}
+
+async function readFunctionError(error: unknown): Promise<string | null> {
+  const response = (error as { context?: Response })?.context;
+  if (!response || typeof response.json !== 'function') return null;
+  try {
+    const body = await response.json();
+    return typeof body?.error === 'string' ? body.error : null;
+  } catch {
+    return null;
+  }
 }

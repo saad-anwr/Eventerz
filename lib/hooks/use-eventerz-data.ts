@@ -11,6 +11,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
   approveGuest,
+  cancelEvent,
   cancelRsvp,
   createEvent,
   declineGuest,
@@ -27,16 +28,25 @@ import {
   fetchConversations,
   fetchMessages,
   fetchNotifications,
+  fetchPayments,
   fetchProfile,
   fetchProfiles,
+  issueWalletLinkChallenge,
+  linkWalletWithSignature,
   markNotificationsRead,
+  recordPayment,
   removeFriend,
   requestToJoin,
   respondToFriendRequest,
   sendFriendRequest,
   sendMessage,
+  unlinkWallet,
+  updateEvent,
   updateProfile,
+  verifyPayment,
   type CreateEventInput,
+  type RecordPaymentInput,
+  type UpdateEventInput,
 } from '@/lib/supabase/data';
 import type { ProfileUpdate } from '@/lib/supabase/types';
 import { isSupabaseConfigured } from '@/lib/supabase/config';
@@ -197,6 +207,43 @@ export function useCreateEvent(hostId: string | undefined) {
   });
 }
 
+/**
+ * Save a host's edits.
+ *
+ * Invalidates notifications too: a move or a time change writes one to every
+ * live guest, and the host is often looking at their own bell when it happens.
+ */
+export function useUpdateEvent(eventId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (patch: UpdateEventInput) => {
+      if (!eventId) throw new Error('No event to update.');
+      return updateEvent(eventId, patch);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.events });
+      queryClient.invalidateQueries({ queryKey: queryKeys.notifications });
+    },
+  });
+}
+
+export function useCancelEvent(eventId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (reason?: string) => {
+      if (!eventId) throw new Error('No event to cancel.');
+      return cancelEvent(eventId, reason);
+    },
+    onSuccess: () => {
+      // Cancelling closes every RSVP and deletes unused tickets, so the guest
+      // keys move as well as the event's own.
+      queryClient.invalidateQueries({ queryKey: queryKeys.events });
+      queryClient.invalidateQueries({ queryKey: queryKeys.guests });
+      queryClient.invalidateQueries({ queryKey: queryKeys.notifications });
+    },
+  });
+}
+
 /* -------------------------------------------------------------------------- */
 /*  People & friends                                                           */
 /* -------------------------------------------------------------------------- */
@@ -310,7 +357,7 @@ export function useProfiles(ids: string[]) {
 
 export function useConversations(profileId: string | undefined) {
   return useQuery({
-    queryKey: ['conversations', profileId ?? ''],
+    queryKey: queryKeys.conversations(profileId ?? ''),
     queryFn: () => fetchConversations(profileId!),
     enabled: Boolean(profileId) && isSupabaseConfigured,
   });
@@ -341,6 +388,103 @@ export function useSendMessage(
           queryKey: queryKeys.messages(channelId),
         });
       }
+    },
+  });
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Payments                                                                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The receipts a thread's messages point at.
+ *
+ * Keyed by channel and driven by the ids already in the message list, so it
+ * costs one extra request per thread and none at all for a thread with no
+ * payments in it.
+ */
+export function usePayments(channelId: string | null, paymentIds: string[]) {
+  // Sorted so the key is stable regardless of message ordering.
+  const key = [...paymentIds].sort().join(',');
+  return useQuery({
+    queryKey: [...queryKeys.payments(channelId ?? ''), key],
+    queryFn: () => fetchPayments(paymentIds),
+    enabled: paymentIds.length > 0 && isSupabaseConfigured,
+    staleTime: 30_000,
+  });
+}
+
+/**
+ * File a receipt for a transfer that has already confirmed on-chain.
+ *
+ * Verification is fired off but not awaited. The receipt is useful the moment
+ * it exists — it carries an explorer link — and making the user watch a
+ * spinner while an RPC catches up with a transaction they already saw confirm
+ * would be waiting for nothing. The tick appears over Realtime when the Edge
+ * Function is done.
+ */
+export function useRecordPayment(channelId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: RecordPaymentInput) => {
+      const payment = await recordPayment(input);
+      void verifyPayment(payment.signature);
+      return payment;
+    },
+    onSuccess: () => {
+      if (channelId) {
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.messages(channelId),
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    },
+  });
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Wallet ownership                                                           */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Link a wallet by proving you hold its key.
+ *
+ * `signMessage` is supplied by the caller because the two platforms sign
+ * differently — the browser wallet adapter's `signMessage` returns bytes, and
+ * Mobile Wallet Adapter needs an association intent — and neither belongs in a
+ * data hook.
+ */
+export function useLinkWallet(profileId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (args: {
+      walletAddress: string;
+      signMessage: (message: string) => Promise<string>;
+    }) => {
+      if (!profileId) throw new Error('Sign in before linking a wallet.');
+      const message = await issueWalletLinkChallenge(args.walletAddress);
+      const signature = await args.signMessage(message);
+      return linkWalletWithSignature({
+        walletAddress: args.walletAddress,
+        message,
+        signature,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.people });
+    },
+  });
+}
+
+export function useUnlinkWallet() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => unlinkWallet(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.people });
     },
   });
 }

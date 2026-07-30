@@ -39,5 +39,17 @@ export function eventRowToItem(row: EventWithMeta): EventItem {
     waitlistCount: row.waitlist_count ?? 0,
     checkedInCount: row.checked_in_count ?? 0,
     myStatus: (row.my_status as RsvpState | null) ?? undefined,
+    waitlistPosition: row.waitlist_position ?? undefined,
+
+    cancelledAt: row.cancelled_at ?? undefined,
+    cancelReason: row.cancel_reason ?? undefined,
+
+    // `?? undefined` rather than `?? 0`: a missing coordinate has to stay
+    // missing. Zero is the Gulf of Guinea, and a confident pin in the wrong
+    // ocean is worse than no map at all.
+    latitude: row.latitude ?? undefined,
+    longitude: row.longitude ?? undefined,
+    placeId: row.place_id ?? undefined,
+    address: row.address ?? undefined,
   };
 }

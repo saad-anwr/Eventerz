@@ -93,6 +93,25 @@ export type EventRow = {
   pending_count: number;
   waitlist_count: number;
   checked_in_count: number;
+
+  /*
+   * Cancellation is soft (0007). The row survives so ticket holders keep the
+   * record and the URL still resolves — a dead link where an event used to be
+   * is a worse answer than a page saying it was called off.
+   */
+  cancelled_at: string | null;
+  cancel_reason: string | null;
+
+  /*
+   * Structured location (0006), alongside the free-text `location` the host
+   * typed. Null on every event created before that migration, and on any event
+   * whose location never resolved to a place — both clients fall back to a
+   * plain map search in that case, so null is a supported state and not a gap.
+   */
+  latitude: number | null;
+  longitude: number | null;
+  place_id: string | null;
+  address: string | null;
 };
 
 /**
@@ -172,6 +191,46 @@ export type MessageRow = {
   sender_id: string;
   body: string;
   created_at: string;
+  /**
+   * `payment` messages are written only by `record_payment` — the insert
+   * policy on `messages` pins client writes to `text`, so a client cannot
+   * post a receipt for a transfer that never happened.
+   */
+  kind: 'text' | 'payment';
+  payment_id: string | null;
+};
+
+/**
+ * A crypto transfer sent from a chat thread.
+ *
+ * `amount` is in the token's base units (lamports for SOL) and typed as a
+ * string because Postgres `bigint` exceeds `Number.MAX_SAFE_INTEGER` and
+ * PostgREST serialises it as a string for exactly that reason. Parse it with
+ * `BigInt`, never `Number` — a silently truncated amount is the worst possible
+ * bug in a payment path.
+ */
+export type PaymentRow = {
+  id: string;
+  signature: string;
+  cluster: string;
+  from_profile: string;
+  to_profile: string | null;
+  from_wallet: string;
+  to_wallet: string;
+  amount: string;
+  /** Null for native SOL; an SPL mint address otherwise. */
+  mint: string | null;
+  symbol: string;
+  decimals: number;
+  memo: string | null;
+  channel_id: string | null;
+  /**
+   * False until the `verify-payment` Edge Function has checked the signature
+   * against the cluster. Render an unverified receipt without a tick: an
+   * unchecked claim must not look like a checked one.
+   */
+  verified: boolean;
+  created_at: string;
 };
 
 export type NotificationRow = {
@@ -231,7 +290,13 @@ export type Database = {
       tickets: Table<TicketRow>;
       notifications: Table<NotificationRow>;
       friend_requests: Table<FriendRequestRow>;
-      messages: Table<MessageRow>;
+      messages: Table<
+        MessageRow,
+        // A client may only insert plain text. Receipts come from
+        // `record_payment`; see migration 0009.
+        Pick<MessageRow, 'channel_id' | 'sender_id' | 'body' | 'scope'>
+      >;
+      payments: Table<PaymentRow>;
     };
     Views: {
       discoverable_people: {
@@ -268,6 +333,78 @@ export type Database = {
         Args: { p_event_id: string };
         Returns: undefined;
       };
+      update_event: {
+        Args: {
+          p_event_id: string;
+          p_title?: string;
+          p_description?: string;
+          p_category?: string;
+          p_starts_at?: string;
+          p_ends_at?: string | null;
+          p_clear_ends_at?: boolean;
+          p_location?: string;
+          p_is_online?: boolean;
+          p_capacity?: number;
+          p_price?: string;
+          p_visibility?: string;
+          p_requires_approval?: boolean;
+          p_tags?: string[];
+          p_cover_gradient?: string;
+          p_cover_image?: string | null;
+          p_latitude?: number | null;
+          p_longitude?: number | null;
+          p_place_id?: string | null;
+          p_address?: string | null;
+        };
+        Returns: EventRow;
+      };
+      cancel_event: {
+        Args: { p_event_id: string; p_reason?: string | null };
+        Returns: EventRow;
+      };
+      my_waitlist_position: {
+        Args: { p_event_id: string };
+        Returns: number | null;
+      };
+      my_waitlist_positions: {
+        Args: { p_event_ids: string[] };
+        Returns: { event_id: string; queue_position: number }[];
+      };
+      record_payment: {
+        Args: {
+          p_signature: string;
+          p_to_wallet: string;
+          p_amount: number;
+          p_channel_id?: string | null;
+          p_to_profile?: string | null;
+          p_memo?: string | null;
+          p_mint?: string | null;
+          p_symbol?: string;
+          p_decimals?: number;
+          p_cluster?: string;
+        };
+        Returns: PaymentRow;
+      };
+      my_dm_partners: {
+        Args: Record<string, never>;
+        Returns: { profile_id: string; last_message_at: string }[];
+      };
+      /**
+       * Returns the full challenge *text* to sign, not a bare nonce — a wallet
+       * popup showing an opaque UUID teaches users to approve opaque UUIDs.
+       */
+      issue_wallet_link_nonce: {
+        Args: { p_wallet_address: string };
+        Returns: string;
+      };
+      unlink_wallet: {
+        Args: Record<string, never>;
+        Returns: ProfileRow;
+      };
+      /**
+       * @deprecated Revoked in 0011 — it linked a wallet without checking that
+       * the caller held its key. Use the `link-wallet` Edge Function.
+       */
       link_wallet: {
         Args: { p_wallet_address: string };
         Returns: ProfileRow;

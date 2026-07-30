@@ -33,6 +33,9 @@ export const queryKeys = {
   friends: (id: string) => ['friends', id] as const,
   profile: (id: string) => ['profile', id] as const,
   messages: (channelId: string) => ['messages', channelId] as const,
+  /** Receipts referenced by a thread's messages. */
+  payments: (channelId: string) => ['payments', channelId] as const,
+  conversations: (id: string) => ['conversations', id] as const,
   notifications: ['notifications'] as const,
 };
 
@@ -102,6 +105,18 @@ export function useRealtimeSync(profileId: string | null): void {
         { event: '*', schema: 'public', table: 'notifications' },
         () => {
           queryClient.invalidateQueries({ queryKey: queryKeys.notifications });
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'payments' },
+        () => {
+          /*
+           * Covers both a receipt arriving and one flipping to verified. RLS
+           * on `payments` means this only ever fires for the two parties, so
+           * nobody is woken by other people's transfers.
+           */
+          queryClient.invalidateQueries({ queryKey: ['payments'] });
         },
       )
       .subscribe();

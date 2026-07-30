@@ -69,6 +69,30 @@ export interface EventItem {
   checkedInCount?: number;
   /** This viewer's own RSVP state, or undefined if they have never asked. */
   myStatus?: RsvpState;
+
+  /**
+   * The viewer's 1-based place in the waitlist queue, when they are on it.
+   *
+   * Cannot be derived on the client: RLS returns a waitlisted guest exactly
+   * one RSVP row — their own — so counting the people ahead of them means
+   * counting rows they may not read. It comes from `my_waitlist_position`.
+   */
+  waitlistPosition?: number;
+
+  /** Set when the host called the event off. The row survives; see 0007. */
+  cancelledAt?: string;
+  cancelReason?: string;
+
+  /**
+   * Structured location, when the host's input resolved to a place. Undefined
+   * is a supported state, not a gap — the UI falls back to a map search on the
+   * `location` string.
+   */
+  latitude?: number;
+  longitude?: number;
+  placeId?: string;
+  /** Formatted address from the geocoder; `location` stays the host's wording. */
+  address?: string;
 }
 
 /** Mirrors the `rsvp_status` enum in Postgres. */

@@ -54,6 +54,28 @@ export function isConfirmed(
   return myRsvpState(event, userId) === 'confirmed';
 }
 
+/** The host called it off. Soft — the row and its page survive. */
+export function isCancelled(event: EventItem): boolean {
+  return Boolean(event.cancelledAt);
+}
+
+/**
+ * Past the point where the server will still accept a guest.
+ *
+ * Keyed off `ends_at` when there is one, matching `request_to_join`. Using
+ * `startsAt` alone showed "Event ended" for an event that was running and
+ * still letting people in.
+ */
+export function hasEnded(event: EventItem): boolean {
+  const closesAt = event.endsAt ?? event.startsAt;
+  return Date.parse(closesAt) < Date.now();
+}
+
+/** Whether the host may still change anything. */
+export function isEditable(event: EventItem): boolean {
+  return !isCancelled(event) && !hasEnded(event);
+}
+
 /* -------------------------------------------------------------------------- */
 /*  Presentation                                                              */
 /* -------------------------------------------------------------------------- */
@@ -113,4 +135,52 @@ export function rsvpActionLabel(event: EventItem): string {
   if (isFull(event)) return 'Join the waitlist';
   if (event.requiresApproval) return 'Request to attend';
   return 'RSVP on-chain';
+}
+
+/**
+ * The waitlist line, with the guest's place in it when we know it.
+ *
+ * "On the waitlist" alone is not actionable: third in line means keep the
+ * evening free, fortieth means make other plans, and the difference is the
+ * entire decision. Falls back to the generic sentence when the position has
+ * not loaded — an unknown position must not render as "you are 0th".
+ */
+export function waitlistDetail(event: EventItem): string {
+  const position = event.waitlistPosition;
+  if (!position) return RSVP_PRESENTATION.waitlist.detail;
+
+  const ordinal = formatOrdinal(position);
+  if (position === 1) {
+    return 'You are next in line. You will be let in as soon as a spot opens.';
+  }
+  return `You are ${ordinal} in line. You will be let in automatically if enough spots open.`;
+}
+
+/** 1 → "1st", 2 → "2nd", 11 → "11th", 22 → "22nd". */
+export function formatOrdinal(n: number): string {
+  // The teens are the exception every naive implementation gets wrong: 11, 12
+  // and 13 take "th" even though 1, 2 and 3 take "st", "nd", "rd".
+  const tens = n % 100;
+  if (tens >= 11 && tens <= 13) return `${n}th`;
+  switch (n % 10) {
+    case 1:
+      return `${n}st`;
+    case 2:
+      return `${n}nd`;
+    case 3:
+      return `${n}rd`;
+    default:
+      return `${n}th`;
+  }
+}
+
+/**
+ * The state sentence for the RSVP card, with the waitlist case specialised.
+ *
+ * Every screen reads through this rather than indexing `RSVP_PRESENTATION`
+ * directly, so the position appears everywhere the status does.
+ */
+export function rsvpDetail(event: EventItem, status: RsvpState): string {
+  if (status === 'waitlist') return waitlistDetail(event);
+  return RSVP_PRESENTATION[status].detail;
 }
