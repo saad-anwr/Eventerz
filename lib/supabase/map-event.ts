@@ -16,6 +16,7 @@ export function eventRowToItem(row: EventWithMeta): EventItem {
     description: row.description,
     hostId: row.host_id,
     coverGradient: row.cover_gradient,
+    coverImage: row.cover_image ?? undefined,
     category: row.category as EventCategory,
     startsAt: row.starts_at,
     endsAt: row.ends_at ?? undefined,

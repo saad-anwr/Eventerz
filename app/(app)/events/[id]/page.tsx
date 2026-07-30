@@ -95,6 +95,15 @@ export default function EventDetailPage() {
           event.coverGradient
         )}
       >
+        {/* Banner over the gradient, which remains the fallback. */}
+        {event.coverImage && (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={event.coverImage}
+            alt=""
+            className="absolute inset-0 size-full object-cover"
+          />
+        )}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_15%,rgba(255,255,255,0.35),transparent_55%)]" />
         <div className="absolute left-4 top-4 flex flex-wrap gap-2">
           <Badge className="bg-black/30 text-white">{event.category}</Badge>

@@ -142,6 +142,49 @@ export async function fetchEventsAttending(profileId: string) {
   return hydrateEvents(data ?? []);
 }
 
+/* -------------------------------------------------------------------------- */
+/*  Banner upload                                                              */
+/* -------------------------------------------------------------------------- */
+
+const BANNER_BUCKET = 'event-banners';
+const MAX_BANNER_BYTES = 5 * 1024 * 1024;
+const BANNER_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/avif'];
+
+/**
+ * Upload an event banner and return its public URL.
+ *
+ * Validated client-side for a fast, specific error; the bucket enforces the
+ * same limits server-side, because a client check is a convenience and not a
+ * control.
+ *
+ * The path is `<uid>/<random>.<ext>` — the uid prefix is what the storage
+ * policy checks, and the random name avoids one upload clobbering another.
+ */
+export async function uploadEventBanner(
+  file: File,
+  profileId: string,
+): Promise<string> {
+  if (!BANNER_TYPES.includes(file.type)) {
+    throw new Error('Use a JPEG, PNG, WebP or AVIF image.');
+  }
+  if (file.size > MAX_BANNER_BYTES) {
+    const mb = (file.size / 1024 / 1024).toFixed(1);
+    throw new Error(`That image is ${mb} MB. The limit is 5 MB.`);
+  }
+
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg';
+  const path = `${profileId}/${crypto.randomUUID()}.${ext}`;
+
+  const { error } = await client()
+    .storage.from(BANNER_BUCKET)
+    .upload(path, file, { cacheControl: '31536000', upsert: false });
+
+  if (error) fail('Uploading the banner', error);
+
+  const { data } = client().storage.from(BANNER_BUCKET).getPublicUrl(path);
+  return data.publicUrl;
+}
+
 export interface CreateEventInput {
   title: string;
   description: string;
@@ -157,6 +200,8 @@ export interface CreateEventInput {
   tokenGated: boolean;
   tags: string[];
   coverGradient: string;
+  /** Public URL from `uploadEventBanner`. The gradient shows when absent. */
+  coverImage?: string;
 }
 
 export async function createEvent(input: CreateEventInput, hostId: string) {
@@ -178,6 +223,7 @@ export async function createEvent(input: CreateEventInput, hostId: string) {
       token_gated: input.tokenGated,
       tags: input.tags,
       cover_gradient: input.coverGradient,
+      cover_image: input.coverImage ?? null,
     })
     .select()
     .single();

@@ -35,6 +35,8 @@ export interface EventItem {
   description: string;
   hostId: string;
   coverGradient: string;
+  /** Uploaded banner URL. The gradient renders when absent. */
+  coverImage?: string;
   category: EventCategory;
   startsAt: string; // ISO
   endsAt?: string;

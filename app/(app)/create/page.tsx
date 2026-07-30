@@ -2,10 +2,19 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { CalendarPlus, Globe, Lock, MapPin, Sparkles } from "lucide-react";
+import {
+  CalendarPlus,
+  Globe,
+  ImagePlus,
+  Loader2,
+  Lock,
+  MapPin,
+  Sparkles,
+  X,
+} from "lucide-react";
 import { useCreateEvent } from "@/lib/hooks/use-eventerz-data";
 import { useSession } from "@/components/auth/use-session";
-import type { CreateEventInput } from "@/lib/supabase/data";
+import { uploadEventBanner, type CreateEventInput } from "@/lib/supabase/data";
 import type { EventCategory } from "@/lib/store/types";
 import { PageHeader } from "@/components/app/page-header";
 import { Avatar } from "@/components/app/avatar";
@@ -105,6 +114,35 @@ export default function CreateEventPage() {
   const { userId } = useSession();
   const createEvent = useCreateEvent(userId ?? undefined);
 
+  const [bannerUrl, setBannerUrl] = React.useState("");
+  const [uploading, setUploading] = React.useState(false);
+
+  const handleBannerChange = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    // Reset the input so re-picking the same file still fires a change event.
+    e.target.value = "";
+    if (!file) return;
+
+    if (!userId) {
+      setError("Sign in before uploading a banner.");
+      return;
+    }
+
+    setUploading(true);
+    setError("");
+    try {
+      setBannerUrl(await uploadEventBanner(file, userId));
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Could not upload that image."
+      );
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const [form, setForm] = React.useState({
     title: "",
     description: "",
@@ -151,6 +189,7 @@ export default function CreateEventPage() {
         .map((t) => t.trim())
         .filter(Boolean),
       coverGradient: form.coverGradient,
+      coverImage: bannerUrl || undefined,
     };
     if (!userId) {
       return setError("Sign in before publishing an event.");
@@ -303,7 +342,63 @@ export default function CreateEventPage() {
             />
           </div>
 
-          <Field label="Cover">
+          <Field label="Banner image">
+            {bannerUrl ? (
+              <div className="group relative overflow-hidden rounded-2xl border border-white/10">
+                {/* Plain <img>: the URL is a runtime Supabase host, so
+                    next/image would need it whitelisted in next.config. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={bannerUrl}
+                  alt="Event banner preview"
+                  className="h-40 w-full object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={() => setBannerUrl("")}
+                  className="absolute right-3 top-3 flex items-center gap-1.5 rounded-lg bg-black/70 px-2.5 py-1.5 text-xs font-medium text-white backdrop-blur-sm transition-colors hover:bg-black/90"
+                >
+                  <X className="size-3.5" />
+                  Remove
+                </button>
+              </div>
+            ) : (
+              <label
+                className={cn(
+                  "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-white/15 bg-white/[0.02] px-4 py-8 text-center transition-colors hover:border-brand-purple/40 hover:bg-white/[0.04]",
+                  uploading && "pointer-events-none opacity-60"
+                )}
+              >
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/avif"
+                  className="hidden"
+                  onChange={handleBannerChange}
+                  disabled={uploading}
+                />
+                {uploading ? (
+                  <Loader2 className="size-5 animate-spin text-brand-purple" />
+                ) : (
+                  <ImagePlus className="size-5 text-muted-foreground" />
+                )}
+                <span className="text-sm font-medium text-white">
+                  {uploading ? "Uploading…" : "Upload a banner"}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  JPEG, PNG, WebP or AVIF · up to 5 MB · 16:9 looks best
+                </span>
+              </label>
+            )}
+          </Field>
+
+          <Field
+            label={bannerUrl ? "Fallback colour" : "Cover colour"}
+            hint={
+              bannerUrl
+                ? "Used on small cards and while the image loads."
+                : undefined
+            }
+          >
             <div className="flex flex-wrap gap-2">
               {GRADIENTS.map((g) => (
                 <button
@@ -349,7 +444,20 @@ export default function CreateEventPage() {
             Preview
           </p>
           <div className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03] backdrop-blur-xl">
-            <div className={cn("relative h-36 bg-gradient-to-br", form.coverGradient)}>
+            <div
+              className={cn(
+                "relative h-36 overflow-hidden bg-gradient-to-br",
+                form.coverGradient
+              )}
+            >
+              {bannerUrl && (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={bannerUrl}
+                  alt=""
+                  className="absolute inset-0 size-full object-cover"
+                />
+              )}
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_15%,rgba(255,255,255,0.35),transparent_55%)]" />
               <span className="absolute left-3 top-3 rounded-full bg-black/30 px-2.5 py-1 text-[10px] font-semibold text-white backdrop-blur-md">
                 {form.category}

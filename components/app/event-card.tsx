@@ -25,10 +25,21 @@ export function EventCard({ event }: { event: EventItem }) {
         {/* Cover */}
         <div
           className={cn(
-            "relative h-32 bg-gradient-to-br",
+            "relative h-32 overflow-hidden bg-gradient-to-br",
             event.coverGradient
           )}
         >
+          {/* Banner sits over the gradient, which stays as the fallback while
+              the image loads or if it fails. */}
+          {event.coverImage && (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={event.coverImage}
+              alt=""
+              loading="lazy"
+              className="absolute inset-0 size-full object-cover"
+            />
+          )}
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_15%,rgba(255,255,255,0.35),transparent_55%)]" />
           <div className="absolute left-3 top-3 flex gap-1.5">
             <span className="rounded-full bg-black/30 px-2.5 py-1 text-[10px] font-semibold text-white backdrop-blur-md">
