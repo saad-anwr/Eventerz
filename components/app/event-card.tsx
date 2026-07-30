@@ -2,14 +2,20 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Globe, Lock, MapPin, Users } from "lucide-react";
+import { Clock, Globe, Lock, MapPin, Users } from "lucide-react";
 import { useProfile } from "@/lib/hooks/use-eventerz-data";
+import { useSession } from "@/components/auth/use-session";
 import type { EventItem } from "@/lib/store/types";
 import { Avatar } from "./avatar";
 import { eventDateParts, formatEventDate, isUpcoming } from "@/lib/format";
+import { RSVP_PRESENTATION, goingCount, myRsvpState } from "@/lib/events";
 import { cn } from "@/lib/utils";
 
 export function EventCard({ event }: { event: EventItem }) {
+  const { userId } = useSession();
+  const status = myRsvpState(event, userId);
+  const isHost = event.hostId === userId;
+  const pendingCount = event.pendingCount ?? 0;
   // Host is fetched per-card but cached by id, so a grid of events sharing a
   // host costs one request, not one per card.
   const { data: host } = useProfile(event.hostId);
@@ -70,6 +76,29 @@ export function EventCard({ event }: { event: EventItem }) {
           <span className="absolute bottom-3 right-3 rounded-full bg-black/40 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-md">
             {event.price}
           </span>
+          {/*
+            Top-right corner reports whichever is relevant to this viewer: for a
+            host, requests needing a decision; for a guest, their own state.
+            Both matter from a list — otherwise a pending request or a waiting
+            approval queue is only discoverable by opening the event.
+          */}
+          {isHost ? (
+            pendingCount > 0 && (
+              <span className="absolute right-3 top-3 flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-400/15 px-2 py-0.5 text-[10px] font-semibold text-amber-200 backdrop-blur-md">
+                <Clock className="size-2.5" />
+                {pendingCount} to review
+              </span>
+            )
+          ) : status && status !== "cancelled" && status !== "declined" ? (
+            <span
+              className={cn(
+                "absolute right-3 top-3 rounded-full border px-2 py-0.5 text-[10px] font-semibold backdrop-blur-md",
+                RSVP_PRESENTATION[status].tone
+              )}
+            >
+              {RSVP_PRESENTATION[status].label}
+            </span>
+          ) : null}
         </div>
 
         {/* Body */}
@@ -99,7 +128,7 @@ export function EventCard({ event }: { event: EventItem }) {
             </span>
             <span className="flex items-center gap-1">
               <Users className="size-3.5" />
-              {event.attendeeIds.length}
+              {goingCount(event)}
             </span>
           </div>
         </div>

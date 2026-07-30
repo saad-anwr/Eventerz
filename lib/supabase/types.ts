@@ -82,15 +82,64 @@ export type EventRow = {
   onchain_signature: string | null;
   created_at: string;
   updated_at: string;
+
+  /*
+   * Denormalised by trigger in 0005. These exist because the guest roster is
+   * no longer world-readable: a stranger must still see "42 going" without
+   * being able to enumerate the 42, and counting client-side from rows they
+   * cannot select would report 0.
+   */
+  confirmed_count: number;
+  pending_count: number;
+  waitlist_count: number;
+  checked_in_count: number;
 };
+
+/**
+ * `confirmed` — going, holds a seat and a ticket.
+ * `pending`   — asked to join, waiting on the host.
+ * `waitlist`  — event was full; promoted automatically when a seat frees.
+ * `declined`  — the host said no.
+ * `cancelled` — the guest withdrew.
+ */
+export type RsvpStatus =
+  | 'confirmed'
+  | 'pending'
+  | 'waitlist'
+  | 'declined'
+  | 'cancelled';
 
 export type RsvpRow = {
   id: string;
   event_id: string;
   profile_id: string;
-  status: string;
+  status: RsvpStatus;
   wallet_address: string | null;
   created_at: string;
+};
+
+/** `event_guests` view — an RSVP joined to its profile and ticket. */
+export type EventGuestRow = {
+  event_id: string;
+  profile_id: string;
+  status: RsvpStatus;
+  created_at: string;
+  name: string;
+  handle: string | null;
+  avatar_url: string | null;
+  wallet_address: string | null;
+  reputation: number;
+  ticket_id: string | null;
+  ticket_serial: number | null;
+  ticket_status: string | null;
+  checked_in_at: string | null;
+};
+
+/** A bounded sample of confirmed guests, for people who may not read the roster. */
+export type GuestPreview = {
+  id: string;
+  name: string;
+  avatar_url: string | null;
 };
 
 export type TicketRow = {
@@ -189,8 +238,36 @@ export type Database = {
         Row: DiscoverablePersonRow;
         Relationships: [];
       };
+      event_guests: {
+        Row: EventGuestRow;
+        Relationships: [];
+      };
     };
     Functions: {
+      request_to_join: {
+        Args: { p_event_id: string };
+        Returns: RsvpRow;
+      };
+      approve_guest: {
+        Args: { p_event_id: string; p_profile_id: string };
+        Returns: RsvpRow;
+      };
+      decline_guest: {
+        Args: { p_event_id: string; p_profile_id: string };
+        Returns: RsvpRow;
+      };
+      event_guest_preview: {
+        Args: { p_event_id: string; p_limit?: number };
+        Returns: GuestPreview[];
+      };
+      is_confirmed_attendee: {
+        Args: { p_event_id: string; p_profile_id: string };
+        Returns: boolean;
+      };
+      promote_from_waitlist: {
+        Args: { p_event_id: string };
+        Returns: undefined;
+      };
       link_wallet: {
         Args: { p_wallet_address: string };
         Returns: ProfileRow;
@@ -199,9 +276,10 @@ export type Database = {
         Args: { p_wallet_address: string };
         Returns: ProfileRow;
       };
+      /** Legacy alias for `request_to_join`, kept for installed mobile builds. */
       rsvp: {
         Args: { p_event_id: string };
-        Returns: TicketRow;
+        Returns: RsvpRow;
       };
       cancel_rsvp: {
         Args: { p_event_id: string };

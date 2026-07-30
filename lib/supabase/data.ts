@@ -12,11 +12,16 @@
 import { getSupabaseBrowserClient } from './client';
 import type {
   DiscoverablePersonRow,
+  EventGuestRow,
   EventRow,
   FriendRequestRow,
+  GuestPreview,
   MessageRow,
+  NotificationRow,
   ProfileRow,
   ProfileUpdate,
+  RsvpRow,
+  RsvpStatus,
 } from './types';
 
 function client() {
@@ -38,14 +43,25 @@ function fail(context: string, error: { message: string } | null): never {
 /* -------------------------------------------------------------------------- */
 
 export type EventWithMeta = EventRow & {
+  /**
+   * Confirmed guests the viewer is entitled to see. Under the RLS from 0005
+   * that is the host and confirmed guests; everyone else gets their own row
+   * only, so this comes back holding at most themselves. Use the
+   * `*_count` columns for anything numeric.
+   */
   attendee_ids: string[];
   host: ProfileRow | null;
+  /** The viewer's own RSVP state for this event. */
+  my_status: RsvpStatus | null;
 };
 
 /**
- * Attach rosters and hosts in two extra queries rather than one per event.
- * A naive `.select('*, host:profiles(*)')` join would also work, but PostgREST
- * embeds break when RLS hides the joined row, and hosts must always resolve.
+ * Attach rosters, hosts and the viewer's own status.
+ *
+ * Three queries regardless of how many events, rather than one per event. A
+ * `.select('*, host:profiles(*)')` embed would also work, but PostgREST embeds
+ * come back null when RLS hides the joined row, and the host must always
+ * resolve — the card is meaningless without a host name.
  */
 async function hydrateEvents(rows: EventRow[]): Promise<EventWithMeta[]> {
   if (rows.length === 0) return [];
@@ -54,17 +70,23 @@ async function hydrateEvents(rows: EventRow[]): Promise<EventWithMeta[]> {
   const hostIds = Array.from(new Set(rows.map((r) => r.host_id)));
 
   const [{ data: rsvps }, { data: hosts }] = await Promise.all([
+    // Returns the full roster for events this viewer hosts or attends, and
+    // just their own row elsewhere. That asymmetry is the point: it is the
+    // same query for everyone and RLS decides what it yields.
     client()
       .from('rsvps')
-      .select('event_id, profile_id')
-      .in('event_id', eventIds)
-      .neq('status', 'cancelled'),
+      .select('event_id, profile_id, status')
+      .in('event_id', eventIds),
     client().from('profiles').select('*').in('id', hostIds),
   ]);
 
+  const me = await currentUserId();
+
   const roster: Record<string, string[]> = {};
+  const mine: Record<string, RsvpStatus> = {};
   (rsvps ?? []).forEach((r) => {
-    (roster[r.event_id] ??= []).push(r.profile_id);
+    if (r.status === 'confirmed') (roster[r.event_id] ??= []).push(r.profile_id);
+    if (me && r.profile_id === me) mine[r.event_id] = r.status;
   });
 
   const hostById = new Map((hosts ?? []).map((h) => [h.id, h]));
@@ -73,7 +95,14 @@ async function hydrateEvents(rows: EventRow[]): Promise<EventWithMeta[]> {
     ...row,
     attendee_ids: roster[row.id] ?? [],
     host: hostById.get(row.host_id) ?? null,
+    my_status: mine[row.id] ?? null,
   }));
+}
+
+/** The signed-in user's id, or null. Cheap — reads the cached session. */
+async function currentUserId(): Promise<string | null> {
+  const { data } = await client().auth.getSession();
+  return data.session?.user.id ?? null;
 }
 
 export async function fetchEvents(options?: {
@@ -123,12 +152,20 @@ export async function fetchEventsByHost(hostId: string) {
   return hydrateEvents(data ?? []);
 }
 
+/**
+ * Events the viewer has a live relationship with.
+ *
+ * Includes pending and waitlisted, not just confirmed — someone who has asked
+ * to join needs somewhere to watch for the host's answer. Declined and
+ * cancelled are excluded: those are closed, and listing them under "my events"
+ * would read as still being in the running.
+ */
 export async function fetchEventsAttending(profileId: string) {
   const { data: rsvps } = await client()
     .from('rsvps')
     .select('event_id')
     .eq('profile_id', profileId)
-    .neq('status', 'cancelled');
+    .in('status', ['confirmed', 'pending', 'waitlist']);
 
   const ids = (rsvps ?? []).map((r) => r.event_id);
   if (ids.length === 0) return [];
@@ -232,25 +269,106 @@ export async function createEvent(input: CreateEventInput, hostId: string) {
   return data;
 }
 
-/** Toggle RSVP. Capacity and ticket allocation are enforced server-side. */
-export async function toggleRsvp(eventId: string, profileId: string) {
-  const supabase = client();
+/* -------------------------------------------------------------------------- */
+/*  RSVP — request, cancel, and the host's decision                            */
+/* -------------------------------------------------------------------------- */
 
-  const { data: existing } = await supabase
-    .from('rsvps')
-    .select('id, status')
+/**
+ * Ask to attend.
+ *
+ * The server decides the outcome — confirmed, pending approval, or waitlisted —
+ * because capacity and approval have to be evaluated atomically with the seat
+ * being granted. The returned status is what the UI renders, so a caller never
+ * has to guess which of the three happened.
+ */
+export async function requestToJoin(eventId: string): Promise<RsvpRow> {
+  const { data, error } = await client().rpc('request_to_join', {
+    p_event_id: eventId,
+  });
+  if (error) fail('Sending your request', error);
+  return data;
+}
+
+export async function cancelRsvp(eventId: string): Promise<void> {
+  const { error } = await client().rpc('cancel_rsvp', { p_event_id: eventId });
+  if (error) fail('Cancelling your RSVP', error);
+}
+
+/** Host action: let a pending or waitlisted guest in, issuing their ticket. */
+export async function approveGuest(eventId: string, profileId: string) {
+  const { data, error } = await client().rpc('approve_guest', {
+    p_event_id: eventId,
+    p_profile_id: profileId,
+  });
+  if (error) fail('Approving the guest', error);
+  return data;
+}
+
+/** Host action: decline a request, or remove someone already confirmed. */
+export async function declineGuest(eventId: string, profileId: string) {
+  const { data, error } = await client().rpc('decline_guest', {
+    p_event_id: eventId,
+    p_profile_id: profileId,
+  });
+  if (error) fail('Declining the guest', error);
+  return data;
+}
+
+/**
+ * The full guest list. Only returns rows for a host or a confirmed guest —
+ * RLS decides, so there is no separate permission check to keep in sync here.
+ */
+export async function fetchEventGuests(eventId: string): Promise<EventGuestRow[]> {
+  const { data, error } = await client()
+    .from('event_guests')
+    .select('*')
     .eq('event_id', eventId)
+    .order('created_at', { ascending: true });
+  if (error) fail('Loading the guest list', error);
+  return data ?? [];
+}
+
+/**
+ * A few faces for viewers who cannot read the roster.
+ *
+ * Backed by a SECURITY DEFINER function so it can sample rows the caller
+ * cannot select, bounded server-side so it cannot be walked to reconstruct
+ * the full list.
+ */
+export async function fetchGuestPreview(
+  eventId: string,
+  limit = 3,
+): Promise<GuestPreview[]> {
+  const { data, error } = await client().rpc('event_guest_preview', {
+    p_event_id: eventId,
+    p_limit: limit,
+  });
+  if (error) fail('Loading who is going', error);
+  return (data as GuestPreview[] | null) ?? [];
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Notifications                                                              */
+/* -------------------------------------------------------------------------- */
+
+export async function fetchNotifications(): Promise<NotificationRow[]> {
+  const { data, error } = await client()
+    .from('notifications')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(50);
+  if (error) fail('Loading notifications', error);
+  return data ?? [];
+}
+
+/** Mark everything read. RLS scopes the update to the caller's own rows. */
+export async function markNotificationsRead(profileId: string): Promise<void> {
+  const { error } = await client()
+    .from('notifications')
+    .update({ read: true })
     .eq('profile_id', profileId)
-    .maybeSingle();
-
-  const going = existing && existing.status !== 'cancelled';
-
-  const { error } = going
-    ? await supabase.rpc('cancel_rsvp', { p_event_id: eventId })
-    : await supabase.rpc('rsvp', { p_event_id: eventId });
-
-  if (error) fail(going ? 'Cancelling your RSVP' : 'Reserving your ticket', error);
-  return !going;
+    .eq('read', false);
+  if (error) fail('Updating notifications', error);
 }
 
 /* -------------------------------------------------------------------------- */

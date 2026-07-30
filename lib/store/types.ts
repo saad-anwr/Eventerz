@@ -47,10 +47,37 @@ export interface EventItem {
   visibility: "public" | "private";
   requiresApproval: boolean;
   tokenGated: boolean;
+  /**
+   * Confirmed guests, and only when the viewer is allowed to see them — the
+   * host or a confirmed guest. Empty for everyone else, which is why counts
+   * below are separate rather than derived from this array's length.
+   */
   attendeeIds: string[];
   tags: string[];
   createdAt: number;
+
+  /**
+   * Live counts, visible to everyone, maintained server-side by trigger.
+   *
+   * Optional because the local demo store has no server to maintain them —
+   * there `attendeeIds` is the whole truth. Read these through `goingCount()`
+   * and `myRsvpState()` in `lib/events.ts`, which handle both cases.
+   */
+  confirmedCount?: number;
+  pendingCount?: number;
+  waitlistCount?: number;
+  checkedInCount?: number;
+  /** This viewer's own RSVP state, or undefined if they have never asked. */
+  myStatus?: RsvpState;
 }
+
+/** Mirrors the `rsvp_status` enum in Postgres. */
+export type RsvpState =
+  | "confirmed"
+  | "pending"
+  | "waitlist"
+  | "declined"
+  | "cancelled";
 
 export type FriendStatus = "pending" | "accepted" | "declined";
 

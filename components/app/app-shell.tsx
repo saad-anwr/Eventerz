@@ -24,6 +24,7 @@ import { useRealtimeSync } from "@/lib/hooks/use-realtime";
 import { Logo } from "@/components/ui/logo";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "./avatar";
+import { NotificationBell } from "./notification-bell";
 import { shortenAddress } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -159,10 +160,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen">
       {/* Desktop sidebar */}
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-white/10 bg-brand-bg-soft/40 backdrop-blur-xl lg:flex">
-        <div className="p-5">
+        <div className="flex items-center justify-between p-5">
           <Link href="/dashboard">
             <Logo />
           </Link>
+          <NotificationBell />
         </div>
 
         <div className="px-4">
@@ -236,6 +238,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Logo />
         </Link>
         <div className="flex items-center gap-2">
+          <NotificationBell />
           <Button asChild size="sm">
             <Link href="/create">
               <Plus className="size-4" />

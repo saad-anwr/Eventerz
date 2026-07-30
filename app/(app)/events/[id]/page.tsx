@@ -4,32 +4,43 @@ import * as React from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
+  AlertCircle,
   ArrowLeft,
   BadgeCheck,
   CalendarDays,
   Check,
   Clock,
   Globe,
+  Hourglass,
   Lock,
   MapPin,
   MessagesSquare,
-  Users,
   Loader2,
 } from "lucide-react";
 import {
+  useCancelRsvp,
   useEvent,
   useProfile,
-  useProfiles,
-  useToggleRsvp,
+  useRequestToJoin,
 } from "@/lib/hooks/use-eventerz-data";
 import { eventRowToItem } from "@/lib/supabase/map-event";
 import { useSession } from "@/components/auth/use-session";
 import { EmptyState } from "@/components/app/empty-state";
 import { Avatar } from "@/components/app/avatar";
+import { AttendeeList } from "@/components/app/attendee-list";
 import { ChatPanel } from "@/components/app/chat-panel";
+import { GuestManager } from "@/components/app/guest-manager";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatEventDate, isUpcoming } from "@/lib/format";
+import {
+  RSVP_PRESENTATION,
+  filledPercent,
+  goingCount,
+  myRsvpState,
+  rsvpActionLabel,
+  spotsLeft,
+} from "@/lib/events";
 import { cn } from "@/lib/utils";
 
 export default function EventDetailPage() {
@@ -39,10 +50,11 @@ export default function EventDetailPage() {
 
   const { data: row, isLoading } = useEvent(eventId);
   const event = React.useMemo(() => (row ? eventRowToItem(row) : null), [row]);
-  const toggleRsvp = useToggleRsvp(userId ?? undefined);
+
+  const requestToJoin = useRequestToJoin();
+  const cancelRsvp = useCancelRsvp();
 
   const { data: host } = useProfile(row?.host_id);
-  const { data: attendees = [] } = useProfiles(row?.attendee_ids ?? []);
 
   if (isLoading) {
     return (
@@ -69,13 +81,34 @@ export default function EventDetailPage() {
   }
 
   const isHost = event.hostId === userId;
-  const isAttending = !!userId && event.attendeeIds.includes(userId);
-  const spotsLeft = event.capacity - event.attendeeIds.length;
-  const filled = Math.min(
-    100,
-    Math.round((event.attendeeIds.length / event.capacity) * 100)
-  );
-  const upcoming = isUpcoming(event.startsAt);
+  const status = myRsvpState(event, userId);
+  const isConfirmed = status === "confirmed";
+  const left = spotsLeft(event);
+  const going = goingCount(event);
+  const filled = filledPercent(event);
+  /*
+   * Matches `request_to_join`, which refuses only once `coalesce(ends_at,
+   * starts_at)` is past. Keying off `startsAt` alone would show "Event ended"
+   * for an event that is currently running and still accepting guests.
+   */
+  const hasEnded = event.endsAt
+    ? Date.parse(event.endsAt) < Date.now()
+    : !isUpcoming(event.startsAt);
+
+  /*
+   * The roster is gated to the host and confirmed guests, matching the RLS in
+   * migration 0005. Everyone else sees a bounded preview.
+   */
+  const canSeeRoster = isHost || isConfirmed;
+
+  // Whatever the last action was, its failure has to be visible. The previous
+  // version dropped mutation errors on the floor, which is what made the RSVP
+  // button look inert when the server rejected the call.
+  const actionError =
+    (requestToJoin.error as Error | null)?.message ??
+    (cancelRsvp.error as Error | null)?.message ??
+    null;
+  const busy = requestToJoin.isPending || cancelRsvp.isPending;
 
 
   return (
@@ -190,35 +223,7 @@ export default function EventDetailPage() {
             </div>
           )}
 
-          {/* Attendees */}
-          <div>
-            <h2 className="mb-3 flex items-center gap-2 font-display text-lg font-semibold text-white">
-              <Users className="size-5 text-brand-purple" />
-              Attendees
-              <span className="text-sm font-normal text-muted-foreground">
-                ({attendees.length})
-              </span>
-            </h2>
-            <div className="flex flex-wrap gap-3">
-              {attendees.slice(0, 12).map((a) => (
-                <Link
-                  key={a.id}
-                  href={`/u/${a.id}`}
-                  className="flex flex-col items-center gap-1.5"
-                >
-                  <Avatar name={a.name} seed={a.id} size="md" ring />
-                  <span className="max-w-16 truncate text-[11px] text-muted-foreground">
-                    {a.name.split(" ")[0]}
-                  </span>
-                </Link>
-              ))}
-              {attendees.length > 12 && (
-                <span className="flex size-10 items-center justify-center rounded-full bg-white/[0.05] text-xs text-muted-foreground">
-                  +{attendees.length - 12}
-                </span>
-              )}
-            </div>
-          </div>
+          <AttendeeList event={event} canSeeRoster={canSeeRoster} />
         </div>
 
         {/* Right: RSVP + chat */}
@@ -230,7 +235,7 @@ export default function EventDetailPage() {
                 {event.price}
               </span>
               <span className="text-sm text-muted-foreground">
-                {spotsLeft > 0 ? `${spotsLeft} spots left` : "Sold out"}
+                {left > 0 ? `${left} spots left` : "Full"}
               </span>
             </div>
 
@@ -241,8 +246,37 @@ export default function EventDetailPage() {
               />
             </div>
             <p className="mt-1.5 text-xs text-muted-foreground">
-              {event.attendeeIds.length} / {event.capacity} registered
+              {going} / {event.capacity} going
+              {event.pendingCount ? ` · ${event.pendingCount} awaiting approval` : ""}
             </p>
+
+            {/* Current state, when the viewer has one. This is the "revert the
+                decision to the attendee" half of the flow: the host's answer
+                lands here, live, without a refresh. */}
+            {status && !isHost && (
+              <div
+                className={cn(
+                  "mt-4 rounded-2xl border p-3",
+                  RSVP_PRESENTATION[status].tone
+                )}
+              >
+                <p className="flex items-center gap-1.5 text-sm font-semibold">
+                  {status === "confirmed" ? (
+                    <Check className="size-4" />
+                  ) : status === "pending" ? (
+                    <Hourglass className="size-4" />
+                  ) : status === "waitlist" ? (
+                    <Clock className="size-4" />
+                  ) : (
+                    <AlertCircle className="size-4" />
+                  )}
+                  {RSVP_PRESENTATION[status].label}
+                </p>
+                <p className="mt-1 text-xs opacity-80">
+                  {RSVP_PRESENTATION[status].detail}
+                </p>
+              </div>
+            )}
 
             <div className="mt-4">
               {isHost ? (
@@ -250,37 +284,69 @@ export default function EventDetailPage() {
                   <BadgeCheck className="size-4" />
                   You&apos;re hosting
                 </Button>
-              ) : isAttending ? (
-                <Button
-                  variant="secondary"
-                  className="w-full"
-                  onClick={() => userId && toggleRsvp.mutate(event.id)}
-                >
-                  <Check className="size-4 text-brand-green" />
-                  You&apos;re going · Cancel
-                </Button>
-              ) : !upcoming ? (
+              ) : hasEnded ? (
                 <Button variant="outline" className="w-full" disabled>
                   <Clock className="size-4" />
                   Event ended
                 </Button>
+              ) : status === "confirmed" ||
+                status === "pending" ||
+                status === "waitlist" ? (
+                /* One button for all three live states — cancelling a request
+                   and cancelling a confirmed seat are the same intent. */
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  disabled={busy}
+                  onClick={() => cancelRsvp.mutate(event.id)}
+                >
+                  {busy ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <span className="text-muted-foreground">
+                      {status === "confirmed"
+                        ? "Cancel my RSVP"
+                        : "Withdraw my request"}
+                    </span>
+                  )}
+                </Button>
               ) : (
                 <Button
                   className="w-full"
-                  disabled={spotsLeft <= 0}
-                  onClick={() => userId && toggleRsvp.mutate(event.id)}
+                  disabled={busy}
+                  onClick={() => requestToJoin.mutate(event.id)}
                 >
-                  <BadgeCheck className="size-4" />
-                  {event.requiresApproval ? "Request to join" : "RSVP on-chain"}
+                  {busy ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <BadgeCheck className="size-4" />
+                  )}
+                  {busy ? "Sending…" : rsvpActionLabel(event)}
                 </Button>
               )}
             </div>
-            {event.requiresApproval && !isHost && (
+
+            {actionError && (
+              <p className="mt-3 flex items-start gap-1.5 rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+                <AlertCircle className="mt-0.5 size-3.5 shrink-0" />
+                {actionError}
+              </p>
+            )}
+
+            {event.requiresApproval && !isHost && !status && (
               <p className="mt-2 text-center text-xs text-muted-foreground">
-                Host approval required
+                The host approves each guest.
+              </p>
+            )}
+            {!event.requiresApproval && left === 0 && !status && !isHost && (
+              <p className="mt-2 text-center text-xs text-muted-foreground">
+                You&apos;ll be admitted automatically if a spot opens.
               </p>
             )}
           </div>
+
+          {/* Host-only: the approval queue and guest roster. */}
+          {isHost && <GuestManager event={event} />}
 
           {/* Event chat */}
           <div className="flex h-[520px] flex-col rounded-3xl border border-white/10 bg-white/[0.03] p-4 backdrop-blur-xl">
@@ -297,10 +363,16 @@ export default function EventDetailPage() {
               className="min-h-0 flex-1"
               placeholder="Message attendees…"
               emptyHint="Be the first to say something 👋"
+              /* Matches `can_access_channel` in migration 0005: the host and
+                 confirmed guests only. A pending request is not yet a guest. */
               disabledReason={
-                isHost || isAttending
+                canSeeRoster
                   ? undefined
-                  : "RSVP to join the conversation"
+                  : status === "pending"
+                    ? "You'll join the chat once the host approves you"
+                    : status === "waitlist"
+                      ? "You'll join the chat if a spot opens up"
+                      : "RSVP to join the conversation"
               }
             />
           </div>

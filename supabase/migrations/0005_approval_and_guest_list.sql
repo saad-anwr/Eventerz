@@ -38,6 +38,12 @@
    ---------------------------------------------------------------------------
    A host rejection is not the same as the guest cancelling, and the guest has
    to be able to see which of the two happened.
+
+   Note: a new enum value cannot be *used* in the same transaction that adds it.
+   Nothing below uses it at DDL time — the function bodies are text, parsed when
+   they run — so this is safe as one script. If your SQL client wraps everything
+   in a transaction and still objects, run this single statement on its own
+   first, then the rest of the file.
    =========================================================================== */
 
 alter type rsvp_status add value if not exists 'declined';
@@ -148,22 +154,37 @@ grant execute on function public.is_confirmed_attendee(uuid, uuid) to anon, auth
 drop policy if exists "rsvps readable" on public.rsvps;
 create policy "rsvps readable" on public.rsvps
   for select using (
+    -- Your own row, always: you have to be able to see your own status.
     profile_id = (select auth.uid())
+    -- The host sees everything, including who they declined.
     or public.is_event_host(event_id, (select auth.uid()))
-    or public.is_confirmed_attendee(event_id, (select auth.uid()))
+    /*
+     * A confirmed guest sees the other *confirmed* guests, and nothing else.
+     * Restricting to `confirmed` here rather than only in the UI matters: a
+     * declined request is between that person and the host, and letting fellow
+     * guests enumerate rejections would publish the host's moderation.
+     */
+    or (
+      status = 'confirmed'
+      and public.is_confirmed_attendee(event_id, (select auth.uid()))
+    )
   );
 
 /*
- * Writes now go exclusively through the RPCs below, which enforce capacity,
- * approval and serial allocation atomically. The self-write policy from 0002
- * let a client insert a `confirmed` row directly and walk straight past all
- * three, so it is replaced with cancel-only.
+ * No write policies on `rsvps` at all — deliberately.
+ *
+ * 0002's "rsvps self write" policy let a client insert or update its own row
+ * directly, which meant anyone could `update rsvps set status = 'confirmed'`
+ * and walk straight past capacity, approval and ticket allocation. A
+ * cancel-only UPDATE policy has the same hole, because RLS can restrict *which
+ * rows* you may touch but not *which values* you may set.
+ *
+ * Every write therefore goes through the SECURITY DEFINER functions below.
+ * Those run as the function owner and bypass RLS, so no policy is needed for
+ * them — and with none present, a direct client write is refused outright.
  */
 drop policy if exists "rsvps self write" on public.rsvps;
 drop policy if exists "rsvps self cancel" on public.rsvps;
-create policy "rsvps self cancel" on public.rsvps
-  for update using ((select auth.uid()) = profile_id)
-  with check ((select auth.uid()) = profile_id);
 
 /**
  * Counts plus a handful of faces, for people who may not read the roster.
@@ -185,24 +206,24 @@ security definer
 stable
 set search_path = public
 as $$
+  -- The limit is applied in the subquery, before the join, and clamped to
+  -- [0, 12] server-side so a caller cannot widen the sample by passing a large
+  -- p_limit and paging out the whole roster.
   select coalesce(
-    jsonb_agg(jsonb_build_object(
-      'id', p.id,
-      'name', p.name,
-      'avatar_url', p.avatar_url
-    ) order by r.created_at),
+    jsonb_agg(
+      jsonb_build_object('id', p.id, 'name', p.name, 'avatar_url', p.avatar_url)
+      order by sample.created_at
+    ),
     '[]'::jsonb
   )
-  from public.rsvps r
-  join public.profiles p on p.id = r.profile_id
-  where r.event_id = p_event_id
-    and r.status = 'confirmed'
-    and r.profile_id in (
-      select profile_id from public.rsvps
-      where event_id = p_event_id and status = 'confirmed'
-      order by created_at
-      limit greatest(least(p_limit, 12), 0)
-    );
+  from (
+    select profile_id, created_at
+    from public.rsvps
+    where event_id = p_event_id and status = 'confirmed'
+    order by created_at
+    limit greatest(least(p_limit, 12), 0)
+  ) sample
+  join public.profiles p on p.id = sample.profile_id;
 $$;
 
 grant execute on function public.event_guest_preview(uuid, int) to anon, authenticated;
@@ -598,6 +619,8 @@ grant execute on function public.cancel_rsvp(uuid) to authenticated;
    `request_to_join`, which returns the resulting status.
    =========================================================================== */
 
+-- Dropped rather than replaced: 0002 declared it `returns public.tickets`, and
+-- CREATE OR REPLACE cannot change a function's return type.
 drop function if exists public.rsvp(uuid);
 create or replace function public.rsvp(p_event_id uuid)
 returns public.rsvps
@@ -605,7 +628,9 @@ language sql
 security definer
 set search_path = public
 as $$
-  select public.request_to_join(p_event_id);
+  -- `select * from f()` rather than `select f()`: the latter yields one column
+  -- of composite type, which does not satisfy a composite return declaration.
+  select * from public.request_to_join(p_event_id);
 $$;
 
 revoke all on function public.rsvp(uuid) from public;

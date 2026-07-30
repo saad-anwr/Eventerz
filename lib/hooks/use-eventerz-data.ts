@@ -10,24 +10,31 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
+  approveGuest,
+  cancelRsvp,
   createEvent,
+  declineGuest,
   dmChannelId,
   fetchDiscoverablePeople,
   fetchEvent,
+  fetchEventGuests,
   fetchEvents,
   fetchEventsAttending,
   fetchEventsByHost,
   fetchFriendRequests,
   fetchFriends,
+  fetchGuestPreview,
   fetchConversations,
   fetchMessages,
+  fetchNotifications,
   fetchProfile,
   fetchProfiles,
+  markNotificationsRead,
   removeFriend,
+  requestToJoin,
   respondToFriendRequest,
   sendFriendRequest,
   sendMessage,
-  toggleRsvp,
   updateProfile,
   type CreateEventInput,
 } from '@/lib/supabase/data';
@@ -77,15 +84,102 @@ export function useEventsAttending(profileId: string | undefined) {
   });
 }
 
-export function useToggleRsvp(profileId: string | undefined) {
+/**
+ * Everything that can change an event's guest state invalidates the same set,
+ * so approving from the host panel updates the guest's own view of the event,
+ * the counters on every card, and the "my events" list together.
+ */
+function useGuestStateInvalidation() {
+  const queryClient = useQueryClient();
+  return () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.events });
+    queryClient.invalidateQueries({ queryKey: queryKeys.guests });
+    queryClient.invalidateQueries({ queryKey: queryKeys.notifications });
+  };
+}
+
+/**
+ * Ask to attend.
+ *
+ * Returns the resulting RSVP row so the caller can tell the three outcomes
+ * apart — confirmed, pending approval, waitlisted. Errors are deliberately not
+ * swallowed: the previous version of this had no error path at all, so a
+ * server-side rejection made the button look broken rather than saying why.
+ */
+export function useRequestToJoin() {
+  const invalidate = useGuestStateInvalidation();
+  return useMutation({
+    mutationFn: (eventId: string) => requestToJoin(eventId),
+    onSuccess: invalidate,
+  });
+}
+
+export function useCancelRsvp() {
+  const invalidate = useGuestStateInvalidation();
+  return useMutation({
+    mutationFn: (eventId: string) => cancelRsvp(eventId),
+    onSuccess: invalidate,
+  });
+}
+
+export function useApproveGuest() {
+  const invalidate = useGuestStateInvalidation();
+  return useMutation({
+    mutationFn: (vars: { eventId: string; profileId: string }) =>
+      approveGuest(vars.eventId, vars.profileId),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeclineGuest() {
+  const invalidate = useGuestStateInvalidation();
+  return useMutation({
+    mutationFn: (vars: { eventId: string; profileId: string }) =>
+      declineGuest(vars.eventId, vars.profileId),
+    onSuccess: invalidate,
+  });
+}
+
+/** Full roster. Comes back empty unless the viewer is the host or confirmed. */
+export function useEventGuests(eventId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.eventGuests(eventId ?? ''),
+    queryFn: () => fetchEventGuests(eventId!),
+    enabled: Boolean(eventId) && isSupabaseConfigured,
+  });
+}
+
+/** A few faces for viewers who cannot read the roster. */
+export function useGuestPreview(eventId: string | undefined, limit = 3) {
+  return useQuery({
+    queryKey: [...queryKeys.guestPreview(eventId ?? ''), limit],
+    queryFn: () => fetchGuestPreview(eventId!, limit),
+    enabled: Boolean(eventId) && isSupabaseConfigured,
+    staleTime: 30_000,
+  });
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Notifications                                                              */
+/* -------------------------------------------------------------------------- */
+
+export function useNotifications(profileId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.notifications,
+    queryFn: fetchNotifications,
+    enabled: Boolean(profileId) && isSupabaseConfigured,
+  });
+}
+
+export function useMarkNotificationsRead(profileId: string | undefined) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (eventId: string) => {
-      if (!profileId) throw new Error('Sign in to RSVP.');
-      return toggleRsvp(eventId, profileId);
+    mutationFn: () => {
+      if (!profileId) throw new Error('Sign in first.');
+      return markNotificationsRead(profileId);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.events });
+      queryClient.invalidateQueries({ queryKey: queryKeys.notifications });
     },
   });
 }

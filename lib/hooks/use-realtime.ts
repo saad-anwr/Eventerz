@@ -24,6 +24,10 @@ export const queryKeys = {
   event: (id: string) => ['events', id] as const,
   eventsByHost: (id: string) => ['events', 'host', id] as const,
   eventsAttending: (id: string) => ['events', 'attending', id] as const,
+  /** Prefix covering both guest lists and previews, for blanket invalidation. */
+  guests: ['guests'] as const,
+  eventGuests: (id: string) => ['guests', 'list', id] as const,
+  guestPreview: (id: string) => ['guests', 'preview', id] as const,
   people: ['people'] as const,
   friendRequests: (id: string) => ['friends', 'requests', id] as const,
   friends: (id: string) => ['friends', id] as const,
@@ -59,8 +63,23 @@ export function useRealtimeSync(profileId: string | null): void {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'rsvps' },
         () => {
-          // Attendee counts live on the event payload, so refresh both.
+          /*
+           * Counts ride on the `events` row (maintained by trigger), so the
+           * events keys cover the numbers. The guest keys cover the roster and
+           * the preview, which is what a host watching their approval queue is
+           * looking at while someone else requests to join.
+           */
           queryClient.invalidateQueries({ queryKey: queryKeys.events });
+          queryClient.invalidateQueries({ queryKey: queryKeys.guests });
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'tickets' },
+        () => {
+          // Check-in flips a ticket, which moves `checked_in_count`.
+          queryClient.invalidateQueries({ queryKey: queryKeys.events });
+          queryClient.invalidateQueries({ queryKey: queryKeys.guests });
         },
       )
       .on(
