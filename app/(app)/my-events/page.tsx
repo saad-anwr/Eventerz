@@ -3,7 +3,11 @@
 import * as React from "react";
 import Link from "next/link";
 import { CalendarClock, Plus, Ticket } from "lucide-react";
-import { useAppStore } from "@/lib/store/use-app-store";
+import {
+  useEventsAttending,
+  useEventsByHost,
+} from "@/lib/hooks/use-eventerz-data";
+import { eventRowToItem } from "@/lib/supabase/map-event";
 import { useSession } from "@/components/auth/use-session";
 import { PageHeader } from "@/components/app/page-header";
 import { EventCard } from "@/components/app/event-card";
@@ -16,24 +20,25 @@ type Tab = "hosting" | "attending" | "past";
 
 export default function MyEventsPage() {
   const { userId } = useSession();
-  const eventsMap = useAppStore((s) => s.events);
   const [tab, setTab] = React.useState<Tab>("hosting");
 
+  // Two scoped queries rather than fetching everything and filtering locally.
+  const { data: hostedRows = [] } = useEventsByHost(userId ?? undefined);
+  const { data: attendingRows = [] } = useEventsAttending(userId ?? undefined);
+
   const { hosting, attending, past, counts } = React.useMemo(() => {
-    const all = Object.values(eventsMap).sort(
+    const hosted = hostedRows.map(eventRowToItem);
+    const going = attendingRows.map(eventRowToItem);
+
+    // Union, de-duplicated: hosting an event also puts you on its roster.
+    const byId = new Map([...hosted, ...going].map((e) => [e.id, e]));
+    const all = Array.from(byId.values()).sort(
       (a, b) => +new Date(a.startsAt) - +new Date(b.startsAt)
     );
-    const mine = all.filter(
-      (e) => e.hostId === userId || e.attendeeIds.includes(userId ?? "")
-    );
-    const hosting = all.filter(
-      (e) => e.hostId === userId && isUpcoming(e.startsAt)
-    );
-    const attending = all.filter(
-      (e) =>
-        e.hostId !== userId &&
-        e.attendeeIds.includes(userId ?? "") &&
-        isUpcoming(e.startsAt)
+    const mine = all;
+    const hosting = hosted.filter((e) => isUpcoming(e.startsAt));
+    const attending = going.filter(
+      (e) => e.hostId !== userId && isUpcoming(e.startsAt)
     );
     const past = mine
       .filter((e) => !isUpcoming(e.startsAt))
@@ -48,7 +53,7 @@ export default function MyEventsPage() {
         past: past.length,
       },
     };
-  }, [eventsMap, userId]);
+  }, [hostedRows, attendingRows, userId]);
 
   const tabs: { key: Tab; label: string; count: number }[] = [
     { key: "hosting", label: "Hosting", count: counts.hosting },

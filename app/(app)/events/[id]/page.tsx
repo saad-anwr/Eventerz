@@ -14,8 +14,15 @@ import {
   MapPin,
   MessagesSquare,
   Users,
+  Loader2,
 } from "lucide-react";
-import { useAppStore } from "@/lib/store/use-app-store";
+import {
+  useEvent,
+  useProfile,
+  useProfiles,
+  useToggleRsvp,
+} from "@/lib/hooks/use-eventerz-data";
+import { eventRowToItem } from "@/lib/supabase/map-event";
 import { useSession } from "@/components/auth/use-session";
 import { EmptyState } from "@/components/app/empty-state";
 import { Avatar } from "@/components/app/avatar";
@@ -30,9 +37,21 @@ export default function EventDetailPage() {
   const eventId = params.id;
   const { userId } = useSession();
 
-  const event = useAppStore((s) => s.events[eventId]);
-  const users = useAppStore((s) => s.users);
-  const toggleRsvp = useAppStore((s) => s.toggleRsvp);
+  const { data: row, isLoading } = useEvent(eventId);
+  const event = React.useMemo(() => (row ? eventRowToItem(row) : null), [row]);
+  const toggleRsvp = useToggleRsvp(userId ?? undefined);
+
+  const { data: host } = useProfile(row?.host_id);
+  const { data: attendees = [] } = useProfiles(row?.attendee_ids ?? []);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center gap-2 py-20 text-sm text-muted-foreground">
+        <Loader2 className="size-4 animate-spin" />
+        Loading event…
+      </div>
+    );
+  }
 
   if (!event) {
     return (
@@ -49,7 +68,6 @@ export default function EventDetailPage() {
     );
   }
 
-  const host = users[event.hostId];
   const isHost = event.hostId === userId;
   const isAttending = !!userId && event.attendeeIds.includes(userId);
   const spotsLeft = event.capacity - event.attendeeIds.length;
@@ -58,7 +76,7 @@ export default function EventDetailPage() {
     Math.round((event.attendeeIds.length / event.capacity) * 100)
   );
   const upcoming = isUpcoming(event.startsAt);
-  const attendees = event.attendeeIds.map((id) => users[id]).filter(Boolean);
+
 
   return (
     <div>
@@ -227,7 +245,7 @@ export default function EventDetailPage() {
                 <Button
                   variant="secondary"
                   className="w-full"
-                  onClick={() => userId && toggleRsvp(event.id, userId)}
+                  onClick={() => userId && toggleRsvp.mutate(event.id)}
                 >
                   <Check className="size-4 text-brand-green" />
                   You&apos;re going · Cancel
@@ -241,7 +259,7 @@ export default function EventDetailPage() {
                 <Button
                   className="w-full"
                   disabled={spotsLeft <= 0}
-                  onClick={() => userId && toggleRsvp(event.id, userId)}
+                  onClick={() => userId && toggleRsvp.mutate(event.id)}
                 >
                   <BadgeCheck className="size-4" />
                   {event.requiresApproval ? "Request to join" : "RSVP on-chain"}

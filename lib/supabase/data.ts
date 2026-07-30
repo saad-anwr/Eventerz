@@ -16,6 +16,7 @@ import type {
   FriendRequestRow,
   MessageRow,
   ProfileRow,
+  ProfileUpdate,
 } from './types';
 
 function client() {
@@ -284,6 +285,20 @@ export async function fetchProfile(id: string): Promise<ProfileRow | null> {
   return data;
 }
 
+export async function updateProfile(
+  id: string,
+  patch: ProfileUpdate,
+): Promise<ProfileRow> {
+  const { data, error } = await client()
+    .from('profiles')
+    .update(patch)
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) fail('Saving your profile', error);
+  return data;
+}
+
 export async function fetchProfiles(ids: string[]): Promise<ProfileRow[]> {
   if (ids.length === 0) return [];
   const { data } = await client().from('profiles').select('*').in('id', ids);
@@ -297,6 +312,49 @@ export async function fetchProfiles(ids: string[]): Promise<ProfileRow[]> {
 /** Canonical DM key — sorted so both participants derive the same channel. */
 export function dmChannelId(a: string, b: string): string {
   return `dm:${[a, b].sort().join('__')}`;
+}
+
+export interface Conversation {
+  user: ProfileRow;
+  last: MessageRow | null;
+}
+
+/**
+ * The inbox: every friend, plus the most recent message with them.
+ *
+ * Three queries total regardless of friend count — friends, then all DM rows
+ * for those channels, then reduce. A per-friend query would be N+1.
+ */
+export async function fetchConversations(
+  profileId: string,
+): Promise<Conversation[]> {
+  const friends = await fetchFriends(profileId);
+  if (friends.length === 0) return [];
+
+  const channels = friends.map((f) => dmChannelId(profileId, f.id));
+
+  const { data: rows } = await client()
+    .from('messages')
+    .select('*')
+    .in('channel_id', channels)
+    .order('created_at', { ascending: false });
+
+  // Rows arrive newest-first, so the first hit per channel is the latest.
+  const latest = new Map<string, MessageRow>();
+  (rows ?? []).forEach((m) => {
+    if (!latest.has(m.channel_id)) latest.set(m.channel_id, m);
+  });
+
+  return friends
+    .map((user) => ({
+      user,
+      last: latest.get(dmChannelId(profileId, user.id)) ?? null,
+    }))
+    .sort((a, b) => {
+      const at = a.last ? Date.parse(a.last.created_at) : 0;
+      const bt = b.last ? Date.parse(b.last.created_at) : 0;
+      return bt - at;
+    });
 }
 
 export async function fetchMessages(channelId: string): Promise<MessageRow[]> {

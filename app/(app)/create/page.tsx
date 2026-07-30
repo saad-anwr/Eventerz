@@ -3,8 +3,9 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { CalendarPlus, Globe, Lock, MapPin, Sparkles } from "lucide-react";
-import { useAppStore, type CreateEventInput } from "@/lib/store/use-app-store";
+import { useCreateEvent } from "@/lib/hooks/use-eventerz-data";
 import { useSession } from "@/components/auth/use-session";
+import type { CreateEventInput } from "@/lib/supabase/data";
 import type { EventCategory } from "@/lib/store/types";
 import { PageHeader } from "@/components/app/page-header";
 import { Avatar } from "@/components/app/avatar";
@@ -101,7 +102,8 @@ function Toggle({
 export default function CreateEventPage() {
   const router = useRouter();
   const { user } = useSession();
-  const createEvent = useAppStore((s) => s.createEvent);
+  const { userId } = useSession();
+  const createEvent = useCreateEvent(userId ?? undefined);
 
   const [form, setForm] = React.useState({
     title: "",
@@ -150,8 +152,19 @@ export default function CreateEventPage() {
         .filter(Boolean),
       coverGradient: form.coverGradient,
     };
-    const event = createEvent(input);
-    router.push(`/events/${event.id}`);
+    if (!userId) {
+      return setError("Sign in before publishing an event.");
+    }
+
+    // Publishing writes to Supabase, so the event is visible to everyone —
+    // previously it only ever reached this browser's local store.
+    createEvent.mutate(input, {
+      onSuccess: (event) => router.push(`/events/${event.id}`),
+      onError: (err) =>
+        setError(
+          err instanceof Error ? err.message : "Could not publish the event.",
+        ),
+    });
   };
 
   return (

@@ -2,8 +2,13 @@
 
 import * as React from "react";
 import { Send } from "lucide-react";
-import { useAppStore } from "@/lib/store/use-app-store";
-import type { Message, MessageScope } from "@/lib/store/types";
+import {
+  useMessages,
+  useProfiles,
+  useSendMessage,
+} from "@/lib/hooks/use-eventerz-data";
+import { useRealtimeMessages } from "@/lib/hooks/use-realtime";
+import type { MessageScope } from "@/lib/store/types";
 import { useSession } from "@/components/auth/use-session";
 import { Avatar } from "./avatar";
 import { clockTime, dayLabel, fullTimestamp } from "@/lib/format";
@@ -32,16 +37,34 @@ export function ChatPanel({
   emptyHint = "No messages yet. Say hello 👋",
 }: ChatPanelProps) {
   const { userId } = useSession();
-  const allMessages = useAppStore((s) => s.messages);
-  const users = useAppStore((s) => s.users);
-  const sendMessage = useAppStore((s) => s.sendMessage);
+
+  const { data: rows = [] } = useMessages(channelId);
+  const send = useSendMessage(channelId, userId ?? undefined, scope);
+
+  // Live: an INSERT on this channel invalidates the query, so the other side's
+  // message appears without polling or a refresh.
+  useRealtimeMessages(channelId);
 
   const messages = React.useMemo(
     () =>
-      allMessages
-        .filter((m) => m.scope === scope && m.channelId === channelId)
-        .sort((a, b) => a.createdAt - b.createdAt),
-    [allMessages, scope, channelId]
+      rows.map((m) => ({
+        id: m.id,
+        senderId: m.sender_id,
+        text: m.body,
+        createdAt: Date.parse(m.created_at) || Date.now(),
+      })),
+    [rows]
+  );
+
+  // One batched lookup for every sender in the thread.
+  const senderIds = React.useMemo(
+    () => Array.from(new Set(messages.map((m) => m.senderId))),
+    [messages]
+  );
+  const { data: senders = [] } = useProfiles(senderIds);
+  const users = React.useMemo(
+    () => Object.fromEntries(senders.map((u) => [u.id, u])),
+    [senders]
   );
 
   const [text, setText] = React.useState("");
@@ -55,7 +78,7 @@ export function ChatPanel({
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
     if (!userId || !text.trim()) return;
-    sendMessage(scope, channelId, userId, text);
+    send.mutate(text);
     setText("");
   };
 
@@ -73,7 +96,7 @@ export function ChatPanel({
         )}
 
         {messages.map((m, i) => {
-          const prev = messages[i - 1] as Message | undefined;
+          const prev = messages[i - 1];
           const showDay = !prev || !sameDay(prev.createdAt, m.createdAt);
           const mine = m.senderId === userId;
           const sender = users[m.senderId];

@@ -19,15 +19,19 @@ import {
   fetchEventsByHost,
   fetchFriendRequests,
   fetchFriends,
+  fetchConversations,
   fetchMessages,
   fetchProfile,
+  fetchProfiles,
   removeFriend,
   respondToFriendRequest,
   sendFriendRequest,
   sendMessage,
   toggleRsvp,
+  updateProfile,
   type CreateEventInput,
 } from '@/lib/supabase/data';
+import type { ProfileUpdate } from '@/lib/supabase/types';
 import { isSupabaseConfigured } from '@/lib/supabase/config';
 
 import { queryKeys } from './use-realtime';
@@ -174,9 +178,49 @@ export function useProfile(id: string | undefined) {
   });
 }
 
+/**
+ * Save profile edits.
+ *
+ * Writes to `profiles`, so the change is visible to every other user rather
+ * than living in this browser only.
+ */
+export function useUpdateProfile(profileId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (patch: ProfileUpdate) => {
+      if (!profileId) throw new Error('Sign in to edit your profile.');
+      return updateProfile(profileId, patch);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.people });
+    },
+  });
+}
+
+/** Batch lookup — one request fills an entire attendee list. */
+export function useProfiles(ids: string[]) {
+  // Sorted so the key is stable regardless of roster ordering.
+  const key = [...ids].sort().join(',');
+  return useQuery({
+    queryKey: ['profiles', key],
+    queryFn: () => fetchProfiles(ids),
+    enabled: ids.length > 0 && isSupabaseConfigured,
+    staleTime: 60_000,
+  });
+}
+
 /* -------------------------------------------------------------------------- */
 /*  Messages                                                                   */
 /* -------------------------------------------------------------------------- */
+
+export function useConversations(profileId: string | undefined) {
+  return useQuery({
+    queryKey: ['conversations', profileId ?? ''],
+    queryFn: () => fetchConversations(profileId!),
+    enabled: Boolean(profileId) && isSupabaseConfigured,
+  });
+}
 
 export function useMessages(channelId: string | null) {
   return useQuery({

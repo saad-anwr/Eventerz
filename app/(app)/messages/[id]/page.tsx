@@ -4,11 +4,12 @@ import * as React from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowLeft, UserRound } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import {
-  useAppStore,
-  friendIdsOf,
   dmChannelId,
-} from "@/lib/store/use-app-store";
+  useFriendRequests,
+  useProfile,
+} from "@/lib/hooks/use-eventerz-data";
 import { useSession } from "@/components/auth/use-session";
 import { EmptyState } from "@/components/app/empty-state";
 import { Avatar } from "@/components/app/avatar";
@@ -21,13 +22,27 @@ export default function DirectMessagePage() {
   const otherId = params.id;
   const { userId: me } = useSession();
 
-  const other = useAppStore((s) => s.users[otherId]);
-  const requests = useAppStore((s) => s.friendRequests);
+  const { data: other, isLoading } = useProfile(otherId);
+  const { data: requests = [] } = useFriendRequests(me ?? undefined);
 
   const areFriends = React.useMemo(
-    () => (me ? friendIdsOf(requests, me).includes(otherId) : false),
-    [requests, me, otherId]
+    () =>
+      requests.some(
+        (r) =>
+          r.status === "accepted" &&
+          (r.requester_id === otherId || r.addressee_id === otherId)
+      ),
+    [requests, otherId]
   );
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center gap-2 py-20 text-sm text-muted-foreground">
+        <Loader2 className="size-4 animate-spin" />
+        Loading conversation…
+      </div>
+    );
+  }
 
   if (!other) {
     return (

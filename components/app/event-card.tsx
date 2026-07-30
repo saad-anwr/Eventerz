@@ -3,14 +3,16 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Globe, Lock, MapPin, Users } from "lucide-react";
-import { useAppStore } from "@/lib/store/use-app-store";
+import { useProfile } from "@/lib/hooks/use-eventerz-data";
 import type { EventItem } from "@/lib/store/types";
 import { Avatar } from "./avatar";
 import { eventDateParts, formatEventDate, isUpcoming } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export function EventCard({ event }: { event: EventItem }) {
-  const host = useAppStore((s) => s.users[event.hostId]);
+  // Host is fetched per-card but cached by id, so a grid of events sharing a
+  // host costs one request, not one per card.
+  const { data: host } = useProfile(event.hostId);
   const { month, day } = eventDateParts(event.startsAt);
   const upcoming = isUpcoming(event.startsAt);
 

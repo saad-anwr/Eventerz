@@ -15,7 +15,12 @@ import {
   Wallet,
   X,
 } from "lucide-react";
-import { useAppStore } from "@/lib/store/use-app-store";
+import {
+  useEventsAttending,
+  useEventsByHost,
+  useUpdateProfile,
+} from "@/lib/hooks/use-eventerz-data";
+import { eventRowToItem } from "@/lib/supabase/map-event";
 import { useSession } from "@/components/auth/use-session";
 import { useConnectModal } from "@/components/wallet/connect-modal-context";
 import { Avatar } from "@/components/app/avatar";
@@ -28,9 +33,10 @@ const inputCls =
   "h-11 w-full rounded-xl border border-white/10 bg-white/[0.03] px-3.5 text-sm text-white placeholder:text-muted-foreground focus:border-brand-purple/40 focus:outline-none";
 
 export default function ProfilePage() {
-  const { user } = useSession();
-  const updateProfile = useAppStore((s) => s.updateProfile);
-  const eventsMap = useAppStore((s) => s.events);
+  const { user, userId } = useSession();
+  const updateProfile = useUpdateProfile(userId ?? undefined);
+  const { data: hostedRows = [] } = useEventsByHost(userId ?? undefined);
+  const { data: attendingRows = [] } = useEventsAttending(userId ?? undefined);
   const { open: openWallet } = useConnectModal();
 
   const [editing, setEditing] = React.useState(false);
@@ -62,20 +68,20 @@ export default function ProfilePage() {
 
   if (!user) return null;
 
-  const hosted = Object.values(eventsMap).filter((e) => e.hostId === user.id);
-  const attending = Object.values(eventsMap).filter(
-    (e) => e.hostId !== user.id && e.attendeeIds.includes(user.id)
-  );
+  const hosted = hostedRows.map(eventRowToItem);
+  const attending = attendingRows
+    .map(eventRowToItem)
+    .filter((e) => e.hostId !== user.id);
 
   const save = () => {
-    updateProfile({
+    // `phone` is not a column on `profiles`; the form keeps it for future use.
+    updateProfile.mutate({
       name: form.name.trim() || user.name,
       handle:
         form.handle.trim().replace(/[^a-z0-9_]/gi, "").toLowerCase() ||
         user.handle,
       bio: form.bio.trim(),
       location: form.location.trim(),
-      phone: form.phone.trim(),
       website: form.website.trim(),
       twitter: form.twitter.trim().replace(/^@/, ""),
       interests: form.interests

@@ -12,10 +12,13 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import {
-  useAppStore,
-  friendIdsOf,
-  incomingRequests,
-} from "@/lib/store/use-app-store";
+  useEvents,
+  useEventsAttending,
+  useEventsByHost,
+  useFriendRequests,
+  useProfiles,
+} from "@/lib/hooks/use-eventerz-data";
+import { eventRowToItem } from "@/lib/supabase/map-event";
 import { useSession } from "@/components/auth/use-session";
 import { EventCard } from "@/components/app/event-card";
 import { EmptyState } from "@/components/app/empty-state";
@@ -55,32 +58,47 @@ function StatTile({
 
 export default function DashboardPage() {
   const { user, userId } = useSession();
-  const eventsMap = useAppStore((s) => s.events);
-  const usersMap = useAppStore((s) => s.users);
-  const requests = useAppStore((s) => s.friendRequests);
+
+  const { data: hostedRows = [] } = useEventsByHost(userId ?? undefined);
+  const { data: attendingRows = [] } = useEventsAttending(userId ?? undefined);
+  const { data: publicRows = [] } = useEvents({ upcomingOnly: true });
+  const { data: requests = [] } = useFriendRequests(userId ?? undefined);
 
   const data = React.useMemo(() => {
-    const all = Object.values(eventsMap);
-    const hosting = all.filter((e) => e.hostId === userId);
-    const attending = all.filter(
-      (e) => e.attendeeIds.includes(userId ?? "") && e.hostId !== userId
-    );
+    const hosting = hostedRows.map(eventRowToItem);
+    const attending = attendingRows
+      .map(eventRowToItem)
+      .filter((e) => e.hostId !== userId);
+
     const myUpcoming = [...hosting, ...attending]
       .filter((e) => isUpcoming(e.startsAt))
       .sort((a, b) => +new Date(a.startsAt) - +new Date(b.startsAt));
-    const suggested = all
-      .filter(
-        (e) =>
-          isUpcoming(e.startsAt) &&
-          e.visibility === "public" &&
-          !e.attendeeIds.includes(userId ?? "")
-      )
-      .sort((a, b) => +new Date(a.startsAt) - +new Date(b.startsAt))
+
+    // Suggestions exclude anything already on your calendar.
+    const mine = new Set(myUpcoming.map((e) => e.id));
+    const suggested = publicRows
+      .map(eventRowToItem)
+      .filter((e) => e.visibility === "public" && !mine.has(e.id))
       .slice(0, 3);
-    const friends = userId ? friendIdsOf(requests, userId) : [];
-    const incoming = userId ? incomingRequests(requests, userId) : [];
+
+    const friends = requests
+      .filter((r) => r.status === "accepted")
+      .map((r) => (r.requester_id === userId ? r.addressee_id : r.requester_id));
+    const incoming = requests.filter(
+      (r) => r.status === "pending" && r.addressee_id === userId
+    );
+
     return { hosting, attending, myUpcoming, suggested, friends, incoming };
-  }, [eventsMap, requests, userId]);
+  }, [hostedRows, attendingRows, publicRows, requests, userId]);
+
+  // Names for the request avatars, in one batched lookup.
+  const { data: requesters = [] } = useProfiles(
+    data.incoming.map((r) => r.requester_id),
+  );
+  const requesterNames = React.useMemo(
+    () => Object.fromEntries(requesters.map((u) => [u.id, u.name])),
+    [requesters],
+  );
 
   if (!user) return null;
 
@@ -154,12 +172,15 @@ export default function DashboardPage() {
             <UserPlus className="size-5" />
           </span>
           <div className="flex -space-x-2">
-            {data.incoming.slice(0, 4).map((r) => {
-              const u = usersMap[r.from];
-              return u ? (
-                <Avatar key={r.id} name={u.name} seed={u.id} size="sm" ring />
-              ) : null;
-            })}
+            {data.incoming.slice(0, 4).map((r) => (
+              <Avatar
+                key={r.id}
+                name={requesterNames[r.requester_id] ?? "Member"}
+                seed={r.requester_id}
+                size="sm"
+                ring
+              />
+            ))}
           </div>
           <p className="text-sm font-medium text-white">
             You have {data.incoming.length} new friend request

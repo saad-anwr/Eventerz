@@ -14,7 +14,14 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
-import { useAppStore, friendIdsOf } from "@/lib/store/use-app-store";
+import { Loader2 } from "lucide-react";
+import {
+  useEventsByHost,
+  useFriendRequests,
+  useProfile,
+} from "@/lib/hooks/use-eventerz-data";
+import { eventRowToItem } from "@/lib/supabase/map-event";
+import { profileToUser } from "@/lib/supabase/map-profile";
 import { useSession } from "@/components/auth/use-session";
 import { Avatar } from "@/components/app/avatar";
 import { EventCard } from "@/components/app/event-card";
@@ -28,14 +35,34 @@ export default function PublicProfilePage() {
   const id = params.id;
   const { userId: me } = useSession();
 
-  const user = useAppStore((s) => s.users[id]);
-  const eventsMap = useAppStore((s) => s.events);
-  const requests = useAppStore((s) => s.friendRequests);
+  const { data: row, isLoading } = useProfile(id);
+  const user = React.useMemo(() => (row ? profileToUser(row) : null), [row]);
+  const { data: hostedRows = [] } = useEventsByHost(id);
 
+  /*
+   * RLS only exposes friend_requests you are party to, so a visitor cannot see
+   * someone else's full friend list. This counts the connections *you* share
+   * with them, which is the honest number to show.
+   */
+  const { data: requests = [] } = useFriendRequests(me ?? undefined);
   const friendCount = React.useMemo(
-    () => friendIdsOf(requests, id).length,
+    () =>
+      requests.filter(
+        (r) =>
+          r.status === "accepted" &&
+          (r.requester_id === id || r.addressee_id === id)
+      ).length,
     [requests, id]
   );
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center gap-2 py-20 text-sm text-muted-foreground">
+        <Loader2 className="size-4 animate-spin" />
+        Loading profile…
+      </div>
+    );
+  }
 
   if (!user) {
     return (
@@ -53,7 +80,7 @@ export default function PublicProfilePage() {
   }
 
   const isMe = me === id;
-  const hosted = Object.values(eventsMap).filter((e) => e.hostId === id);
+  const hosted = hostedRows.map(eventRowToItem);
 
   return (
     <div>
