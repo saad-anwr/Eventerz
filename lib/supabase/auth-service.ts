@@ -113,30 +113,90 @@ export async function updateProfile(
 }
 
 /**
- * Bind a wallet to the signed-in account.
+ * Bind a wallet to the signed-in account, after proving it is theirs.
  *
- * Delegates to the `link_wallet` SQL function so the "is this wallet already
- * claimed?" check and the write happen atomically.
+ * Three steps, and none of them can be skipped:
+ *
+ *   1. `issue_wallet_link_nonce` mints a single-use challenge, bound to this
+ *      account and this address and valid for five minutes.
+ *   2. The wallet signs that exact text. This is what the old implementation
+ *      never did — it took an address on trust, so any signed-in user could
+ *      claim any unclaimed wallet they could read off the explorer, along with
+ *      its reputation and ticket history.
+ *   3. The `link-wallet` Edge Function verifies the signature (Postgres has no
+ *      Ed25519) and calls a function that is revoked from `authenticated`, so
+ *      there is no path to a linked wallet that bypasses the check.
+ *
+ * `signMessage` is injected rather than imported: the wallet adapter's version
+ * is a React hook value, and reaching for it from a plain module would either
+ * duplicate the adapter or force this file to become a component.
  */
 export async function linkWallet(
   walletAddress: string,
+  signMessage: (message: Uint8Array) => Promise<Uint8Array>,
 ): Promise<AuthResult<ProfileRow>> {
   const supabase = getSupabaseBrowserClient();
   if (!supabase) return { ok: false, error: NOT_CONFIGURED };
 
-  const { data, error } = await supabase.rpc('link_wallet', {
-    p_wallet_address: walletAddress,
-  });
+  const { data: challenge, error: challengeError } = await supabase.rpc(
+    'issue_wallet_link_nonce',
+    { p_wallet_address: walletAddress },
+  );
 
-  if (error) {
+  if (challengeError) {
     const friendly =
-      error.code === '23505'
+      challengeError.code === '23505'
         ? 'That wallet is already linked to another Eventerz account.'
-        : error.message;
+        : challengeError.message;
     return { ok: false, error: friendly };
   }
 
-  return { ok: true, data: data as ProfileRow };
+  let signature: string;
+  try {
+    const message = challenge as string;
+    const signed = await signMessage(new TextEncoder().encode(message));
+
+    // Base64 rather than base58: `btoa` is built in, and the Edge Function
+    // accepts either encoding precisely so neither client needs a base58
+    // implementation just to send a signature.
+    signature = btoa(String.fromCharCode(...signed));
+
+    const { data, error } = await supabase.functions.invoke('link-wallet', {
+      body: { walletAddress, message, signature },
+    });
+
+    if (error) {
+      /*
+       * `FunctionsHttpError.message` is always "Edge Function returned a
+       * non-2xx status code". The message worth showing is in the response
+       * body, which the function writes for exactly this purpose.
+       */
+      const response = (error as { context?: Response }).context;
+      let detail: string | null = null;
+      if (response && typeof response.json === 'function') {
+        try {
+          const body = await response.json();
+          if (typeof body?.error === 'string') detail = body.error;
+        } catch {
+          /* not JSON — fall through to the generic message */
+        }
+      }
+      return { ok: false, error: detail ?? 'Could not verify that wallet.' };
+    }
+
+    const profile = (data as { profile?: ProfileRow } | null)?.profile;
+    if (!profile) return { ok: false, error: 'Could not verify that wallet.' };
+    return { ok: true, data: profile };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Wallet verification failed.';
+    // Declining the signature is a choice, not a fault. Say what happened
+    // without dressing it as an error the user has to fix.
+    if (/user rejected|denied|declined/i.test(message)) {
+      return { ok: false, error: 'Wallet verification was cancelled.' };
+    }
+    return { ok: false, error: message };
+  }
 }
 
 /** Find the account that already owns a wallet, if any. */

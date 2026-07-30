@@ -1,0 +1,14 @@
+{
+  "//": "Deno config for the Edge Functions. The Next.js tsconfig excludes this directory — these files are a different runtime with a different module resolution, and typechecking them with the app's compiler reports errors that are not errors.",
+  "imports": {
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2",
+    "@noble/curves/ed25519": "npm:@noble/curves@1.9.7/ed25519"
+  },
+  "compilerOptions": {
+    "strict": true,
+    "lib": ["deno.window", "dom"]
+  },
+  "tasks": {
+    "check": "deno check link-wallet/index.ts verify-payment/index.ts"
+  }
+}

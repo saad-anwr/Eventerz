@@ -4,6 +4,7 @@ import * as React from "react";
 import { Send } from "lucide-react";
 import {
   useMessages,
+  usePayments,
   useProfiles,
   useSendMessage,
 } from "@/lib/hooks/use-eventerz-data";
@@ -11,6 +12,7 @@ import { useRealtimeMessages } from "@/lib/hooks/use-realtime";
 import type { MessageScope } from "@/lib/store/types";
 import { useSession } from "@/components/auth/use-session";
 import { Avatar } from "./avatar";
+import { PaymentReceipt } from "./payment-receipt";
 import { clockTime, dayLabel, fullTimestamp } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -22,6 +24,15 @@ interface ChatPanelProps {
   /** Disable input with a reason (e.g. must be friends / must RSVP). */
   disabledReason?: string;
   emptyHint?: string;
+  /**
+   * Rendered inside the composer, left of the input — the "send crypto" button
+   * on a DM thread.
+   *
+   * A slot rather than a prop for the feature itself: the dialog needs a wallet
+   * adapter, a recipient profile and a channel, none of which a chat renderer
+   * should know about. Event chat passes nothing and stays exactly as it was.
+   */
+  composerAction?: React.ReactNode;
 }
 
 function sameDay(a: number, b: number) {
@@ -35,6 +46,7 @@ export function ChatPanel({
   placeholder = "Write a message…",
   disabledReason,
   emptyHint = "No messages yet. Say hello 👋",
+  composerAction,
 }: ChatPanelProps) {
   const { userId } = useSession();
 
@@ -52,8 +64,32 @@ export function ChatPanel({
         senderId: m.sender_id,
         text: m.body,
         createdAt: Date.parse(m.created_at) || Date.now(),
+        kind: m.kind ?? "text",
+        paymentId: m.payment_id,
       })),
     [rows]
+  );
+
+  /*
+   * Receipts referenced by this thread, in one request. A thread with no
+   * payments in it makes no request at all — the hook is disabled on an empty
+   * id list.
+   */
+  const paymentIds = React.useMemo(
+    () =>
+      Array.from(
+        new Set(
+          messages
+            .map((m) => m.paymentId)
+            .filter((id): id is string => Boolean(id))
+        )
+      ),
+    [messages]
+  );
+  const { data: payments = [] } = usePayments(channelId, paymentIds);
+  const paymentById = React.useMemo(
+    () => new Map(payments.map((p) => [p.id, p])),
+    [payments]
   );
 
   // One batched lookup for every sender in the thread.
@@ -142,17 +178,41 @@ export function ChatPanel({
                       {sender?.name ?? "Unknown"}
                     </span>
                   )}
-                  <div
-                    title={fullTimestamp(m.createdAt)}
-                    className={cn(
-                      "rounded-2xl px-3.5 py-2 text-sm leading-relaxed",
-                      mine
-                        ? "rounded-br-md bg-brand-gradient text-white"
-                        : "rounded-bl-md border border-white/10 bg-white/[0.05] text-white/90"
-                    )}
-                  >
-                    {m.text}
-                  </div>
+                  {m.kind === "payment" && m.paymentId ? (
+                    /*
+                     * The receipt renders in place of the bubble. `m.text` is
+                     * the generated "Sent 0.4 SOL" line, which stays as the
+                     * fallback for the moment before the payment row loads —
+                     * and permanently for anyone who can see the message but
+                     * not the payment, which RLS on `payments` allows in an
+                     * event channel.
+                     */
+                    (() => {
+                      const payment = paymentById.get(m.paymentId);
+                      return payment ? (
+                        <PaymentReceipt payment={payment} mine={mine} />
+                      ) : (
+                        <div
+                          title={fullTimestamp(m.createdAt)}
+                          className="rounded-2xl border border-white/10 bg-white/[0.05] px-3.5 py-2 text-sm text-white/90"
+                        >
+                          {m.text}
+                        </div>
+                      );
+                    })()
+                  ) : (
+                    <div
+                      title={fullTimestamp(m.createdAt)}
+                      className={cn(
+                        "rounded-2xl px-3.5 py-2 text-sm leading-relaxed",
+                        mine
+                          ? "rounded-br-md bg-brand-gradient text-white"
+                          : "rounded-bl-md border border-white/10 bg-white/[0.05] text-white/90"
+                      )}
+                    >
+                      {m.text}
+                    </div>
+                  )}
                   <span className="mt-0.5 px-1 text-[10px] text-muted-foreground">
                     {clockTime(m.createdAt)}
                   </span>
@@ -171,8 +231,12 @@ export function ChatPanel({
       ) : (
         <form
           onSubmit={handleSend}
-          className="mt-2 flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] p-1.5 pl-4 backdrop-blur-md focus-within:border-brand-purple/40"
+          className={cn(
+            "mt-2 flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] p-1.5 backdrop-blur-md focus-within:border-brand-purple/40",
+            composerAction ? "pl-1.5" : "pl-4"
+          )}
         >
+          {composerAction}
           <input
             value={text}
             onChange={(e) => setText(e.target.value)}

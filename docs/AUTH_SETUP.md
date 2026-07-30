@@ -298,22 +298,58 @@ Large sessions are transparently chunked because SecureStore caps values at
 attendee lists and host cards need that — but only the owner can write their own
 row, enforced by `auth.uid() = id` on both `USING` and `WITH CHECK`.
 
-**Wallet linking is not yet proof of ownership.** `link_wallet` refuses a wallet
-already claimed by another account, so it cannot be stolen. But it currently
-trusts that the caller controls the address it passes. Before you handle real
-value, add signature verification:
+**Wallet linking is proof of ownership, as of migration `0011`.** It used not to
+be: `link_wallet` refused a wallet already claimed by another account, but
+otherwise trusted that the caller controlled the address it passed — so any
+signed-in user could claim any unclaimed wallet they could read off the explorer,
+along with its reputation and ticket history.
 
-1. Client signs a nonce with the wallet
-2. An Edge Function verifies the signature against the address
-3. Only then does it call `link_wallet`
+The flow now is:
 
-The seam is deliberate — `link_wallet` is already `SECURITY DEFINER` and
-callable only by `authenticated`, so the Edge Function slots in front without
-schema changes.
+1. `issue_wallet_link_nonce(address)` mints a single-use challenge bound to the
+   caller *and* the address, valid five minutes. It returns the whole message
+   text, not a bare nonce — a wallet popup showing an opaque UUID teaches users
+   to approve opaque UUIDs, which is what every signature-phishing attack needs.
+2. The wallet signs that exact text. Free, and touches no chain.
+3. The **`link-wallet` Edge Function** verifies the Ed25519 signature and calls
+   `link_wallet_verified(profile, address, nonce)` with the service-role key.
 
-**Definer functions pin `search_path`.** Both `handle_new_user` and
-`link_wallet` set `search_path = public` to defeat search-path hijacking, the
-standard hazard with `SECURITY DEFINER`.
+Postgres has no Ed25519, which is why step 3 is a function runtime rather than
+SQL. Deno's Web Crypto has it built in, so the function needs no dependencies.
+
+Two details that carry the security, not just the plumbing:
+
+- **`link_wallet_verified` is revoked from `authenticated`.** The only caller is
+  the Edge Function, so there is no path to a linked wallet that skips the
+  signature check. `link_wallet` still exists — dropping it would break installed
+  mobile builds with a confusing "function does not exist" — but now raises a
+  message pointing here.
+- **The nonce is server-side and consumed on use.** A stateless challenge can be
+  replayed for as long as it is valid; a row that is deleted can be replayed
+  exactly zero times. Passing the nonce back in step 3 is what ties the signature
+  the function verified to the row the database writes — verifying a signature
+  over an attacker-chosen message proves they can sign, not that they were
+  answering *our* challenge.
+
+**Deploy the function, or linking is broken.** `0011` closes the unverified path,
+so there is no fallback:
+
+```bash
+supabase functions deploy link-wallet
+supabase functions deploy verify-payment
+supabase secrets set ALLOWED_ORIGINS=https://www.eventerz.xyz,https://eventerz.xyz
+```
+
+`SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected automatically.
+`HELIUS_RPC_URL` is optional and only used by `verify-payment`.
+
+**`unlink_wallet()`** exists because linking became a deliberate act: a user who
+links the wrong wallet, or loses the key, needs a way back that does not involve
+deleting their account and their attendance history with it.
+
+**Definer functions pin `search_path`.** Every `SECURITY DEFINER` function in the
+schema sets `search_path = public` to defeat search-path hijacking, the standard
+hazard with definer functions.
 
 ---
 

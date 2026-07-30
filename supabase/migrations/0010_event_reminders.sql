@@ -92,9 +92,16 @@ begin
     where e.cancelled_at is null
       and e.starts_at between now() + interval '23 hours'
                           and now() + interval '25 hours'
-      -- Skip events created inside the window: the "reminder" would arrive
-      -- moments after the guest RSVP'd.
-      and e.created_at < now() + interval '23 hours'
+      /*
+       * Don't remind someone about an event they RSVP'd to minutes ago.
+       *
+       * The window above already excludes events too close to start, but it says
+       * nothing about *when the guest joined*. Someone who RSVPs to a
+       * tomorrow-evening event at 18:01 would otherwise be told "this is
+       * tomorrow" at 18:15 — a notification about something they are still
+       * looking at, which is how people learn to ignore the ones that matter.
+       */
+      and r.created_at < now() - interval '1 hour'
     on conflict do nothing
     returning event_id, profile_id
   )
@@ -102,8 +109,13 @@ begin
   select
     c.profile_id, 'reminder',
     format('%s is tomorrow', e.title),
+    /*
+     * Literal words inside a `to_char` pattern must be double-quoted, or the
+     * pattern matcher consumes them: an unquoted "at" is read as a format
+     * template rather than the word, and the output is quietly wrong.
+     */
     format('Starts %s · %s',
-           to_char(e.starts_at at time zone 'UTC', 'Mon DD at HH24:MI') || ' UTC',
+           to_char(e.starts_at at time zone 'UTC', 'Mon DD "at" HH24:MI') || ' UTC',
            case when e.is_online then 'Online' else e.location end),
     '/events/' || e.id
   from claimed c

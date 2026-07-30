@@ -117,15 +117,32 @@ begin
   values (me, trim(p_wallet_address))
   returning nonce into fresh;
 
+  /*
+   * Every literal carries its own `E` prefix.
+   *
+   * Adjacent string constants are concatenated by the parser, but each is
+   * *escaped* independently — so `E'a\n' 'b\n'` yields a real newline followed by
+   * a literal backslash-n. The wallet would have displayed "...funds.\n\nNonce:"
+   * verbatim, which is exactly the kind of malformed prompt that teaches users to
+   * approve signatures without reading them.
+   *
+   * The parenthesised `(now() + interval '5 minutes')` matters for the same
+   * reason: `AT TIME ZONE` binds tighter than `+`, so without them Postgres
+   * parses `interval AT TIME ZONE 'UTC'` and the expression does not mean what
+   * it reads as.
+   */
   return format(
     E'Eventerz — verify wallet ownership\n\n'
-    'Signing this message links %s to your Eventerz account.\n'
-    'It is free, does not touch the blockchain, and cannot move any funds.\n\n'
-    'Nonce: %s\n'
-    'Expires: %s',
+    E'Signing this message links %s to your Eventerz account.\n'
+    E'It is free, does not touch the blockchain, and cannot move any funds.\n\n'
+    E'Nonce: %s\n'
+    E'Expires: %s',
     trim(p_wallet_address),
     fresh,
-    to_char(now() + interval '5 minutes' at time zone 'UTC', 'YYYY-MM-DD HH24:MI:SS') || ' UTC'
+    to_char(
+      (now() + interval '5 minutes') at time zone 'UTC',
+      'YYYY-MM-DD HH24:MI:SS'
+    ) || ' UTC'
   );
 end;
 $$;

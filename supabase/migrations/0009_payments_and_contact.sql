@@ -238,10 +238,18 @@ begin
   )
   returning * into result;
 
-  -- Human-readable amount, trailing zeros trimmed: "0.4 SOL", not "0.400000000".
+  /*
+   * Human-readable amount, trailing zeros trimmed: "0.4 SOL", not
+   * "0.400000000".
+   *
+   * The divisor is `10::numeric ^ decimals`, not `power()`. `power()` returns
+   * double precision, which would drag the whole expression into binary floating
+   * point — and a receipt that says 0.30000000000000004 SOL is worse than no
+   * receipt. Staying in `numeric` keeps it exact.
+   */
   pretty := trim(trailing '.' from
               trim(trailing '0' from
-                to_char(result.amount::numeric / power(10, result.decimals),
+                to_char(result.amount::numeric / (10::numeric ^ result.decimals),
                         'FM9999999990.999999999')))
             || ' ' || result.symbol;
 

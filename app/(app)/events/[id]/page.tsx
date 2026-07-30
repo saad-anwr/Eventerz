@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
   AlertCircle,
+  AlertTriangle,
   ArrowLeft,
   BadgeCheck,
   CalendarDays,
@@ -14,8 +15,10 @@ import {
   Hourglass,
   Lock,
   MapPin,
+  MessageSquare,
   MessagesSquare,
   Loader2,
+  Pencil,
 } from "lucide-react";
 import {
   useCancelRsvp,
@@ -29,16 +32,22 @@ import { EmptyState } from "@/components/app/empty-state";
 import { Avatar } from "@/components/app/avatar";
 import { AttendeeList } from "@/components/app/attendee-list";
 import { ChatPanel } from "@/components/app/chat-panel";
+import { EventMap } from "@/components/app/event-map";
 import { GuestManager } from "@/components/app/guest-manager";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { formatEventDate, isUpcoming } from "@/lib/format";
+import { useOnChainActions } from "@/lib/solana/use-onchain-actions";
+import { formatEventDate } from "@/lib/format";
 import {
   RSVP_PRESENTATION,
   filledPercent,
   goingCount,
+  hasEnded as eventHasEnded,
+  isCancelled,
+  isEditable,
   myRsvpState,
   rsvpActionLabel,
+  rsvpDetail,
   spotsLeft,
 } from "@/lib/events";
 import { cn } from "@/lib/utils";
@@ -55,6 +64,30 @@ export default function EventDetailPage() {
   const cancelRsvp = useCancelRsvp();
 
   const { data: host } = useProfile(row?.host_id);
+  const onChain = useOnChainActions();
+
+  /**
+   * Claim the seat on-chain, then in the database.
+   *
+   * Deliberately not blocking: `claimSeat` returns null when no program is
+   * deployed, and a thrown error is swallowed on purpose. The RSVP is a real
+   * Postgres record either way, and refusing to seat someone because an RPC was
+   * slow would break a working feature to protect a promise that is additive.
+   * The reverse — claiming an on-chain ticket that does not exist — is the
+   * failure that would matter, and it cannot happen: the signature is only ever
+   * recorded after the cluster confirms it.
+   */
+  const handleJoin = React.useCallback(async () => {
+    if (!event) return;
+    if (onChain.available) {
+      try {
+        await onChain.claimSeat(event.id, host?.wallet_address);
+      } catch (err) {
+        console.warn('[eventerz] on-chain seat claim failed', err);
+      }
+    }
+    requestToJoin.mutate(event.id);
+  }, [event, host?.wallet_address, onChain, requestToJoin]);
 
   if (isLoading) {
     return (
@@ -91,9 +124,8 @@ export default function EventDetailPage() {
    * starts_at)` is past. Keying off `startsAt` alone would show "Event ended"
    * for an event that is currently running and still accepting guests.
    */
-  const hasEnded = event.endsAt
-    ? Date.parse(event.endsAt) < Date.now()
-    : !isUpcoming(event.startsAt);
+  const hasEnded = eventHasEnded(event);
+  const cancelled = isCancelled(event);
 
   /*
    * The roster is gated to the host and confirmed guests, matching the RLS in
@@ -113,13 +145,42 @@ export default function EventDetailPage() {
 
   return (
     <div>
-      <Link
-        href="/explore"
-        className="mb-5 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-white"
-      >
-        <ArrowLeft className="size-4" />
-        Back to events
-      </Link>
+      <div className="mb-5 flex items-center justify-between gap-3">
+        <Link
+          href="/explore"
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-white"
+        >
+          <ArrowLeft className="size-4" />
+          Back to events
+        </Link>
+
+        {/* The host's own entry point. Hidden once the event is cancelled or
+            over, because `update_event` refuses both and a button that only
+            produces an error is worse than no button. */}
+        {isHost && isEditable(event) && (
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/events/${event.id}/edit`}>
+              <Pencil className="size-3.5" />
+              Edit event
+            </Link>
+          </Button>
+        )}
+      </div>
+
+      {cancelled && (
+        <div className="mb-5 flex items-start gap-2.5 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3.5">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-red-400" />
+          <div>
+            <p className="text-sm font-semibold text-red-200">
+              This event has been cancelled
+            </p>
+            <p className="mt-0.5 text-xs text-red-200/80">
+              {event.cancelReason ??
+                "The host called it off. Everyone holding a spot has been notified."}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Cover */}
       <div
@@ -184,19 +245,43 @@ export default function EventDetailPage() {
           </div>
 
           {/* Host */}
-          <Link
-            href={`/u/${event.hostId}`}
-            className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3 transition-colors hover:border-white/20"
-          >
-            <Avatar name={host?.name ?? "Host"} seed={event.hostId} size="md" />
-            <div>
-              <p className="text-xs text-muted-foreground">Hosted by</p>
-              <p className="text-sm font-semibold text-white">
-                {host?.name ?? "Unknown"}
-              </p>
-            </div>
-            <span className="ml-auto text-xs text-brand-cyan">View profile →</span>
-          </Link>
+          <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+            <Link
+              href={`/u/${event.hostId}`}
+              className="flex min-w-0 flex-1 items-center gap-3 transition-opacity hover:opacity-80"
+            >
+              <Avatar name={host?.name ?? "Host"} seed={event.hostId} size="md" />
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">Hosted by</p>
+                <p className="truncate text-sm font-semibold text-white">
+                  {host?.name ?? "Unknown"}
+                </p>
+              </div>
+            </Link>
+
+            {/*
+             * Contact host. Deliberately not gated on friendship: someone
+             * deciding whether to attend usually has one question, and making
+             * them send a friend request first turns a thirty-second exchange
+             * into a two-step negotiation. DMs were already open to any two
+             * profiles under `can_access_channel`; what was missing was a way
+             * in, and an inbox that showed the reply.
+             */}
+            {!isHost && userId && (
+              <Button asChild variant="outline" size="sm">
+                <Link href={`/messages/${event.hostId}`}>
+                  <MessageSquare className="size-3.5" />
+                  Contact host
+                </Link>
+              </Button>
+            )}
+            <Link
+              href={`/u/${event.hostId}`}
+              className="text-xs text-brand-cyan hover:underline"
+            >
+              View profile →
+            </Link>
+          </div>
 
           {/* About */}
           {event.description && (
@@ -222,6 +307,18 @@ export default function EventDetailPage() {
               ))}
             </div>
           )}
+
+          {/* The venue. Renders nothing for an online event. */}
+          <EventMap
+            place={{
+              location: event.location,
+              latitude: event.latitude,
+              longitude: event.longitude,
+              placeId: event.placeId,
+              address: event.address,
+              isOnline: event.isOnline,
+            }}
+          />
 
           <AttendeeList event={event} canSeeRoster={canSeeRoster} />
         </div>
@@ -272,9 +369,22 @@ export default function EventDetailPage() {
                   )}
                   {RSVP_PRESENTATION[status].label}
                 </p>
+                {/*
+                 * `rsvpDetail` rather than the raw presentation string: the
+                 * waitlist case is specialised to include the guest's place in
+                 * the queue. "On the waitlist" alone is not actionable — third
+                 * in line means keep the evening free, fortieth means make
+                 * other plans.
+                 */}
                 <p className="mt-1 text-xs opacity-80">
-                  {RSVP_PRESENTATION[status].detail}
+                  {rsvpDetail(event, status)}
                 </p>
+                {status === "waitlist" && event.waitlistPosition ? (
+                  <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-black/25 px-2.5 py-1 text-[11px] font-semibold">
+                    <Clock className="size-3" />
+                    #{event.waitlistPosition} of {event.waitlistCount ?? 0} waiting
+                  </p>
+                ) : null}
               </div>
             )}
 
@@ -283,6 +393,11 @@ export default function EventDetailPage() {
                 <Button variant="secondary" className="w-full" disabled>
                   <BadgeCheck className="size-4" />
                   You&apos;re hosting
+                </Button>
+              ) : cancelled ? (
+                <Button variant="outline" className="w-full" disabled>
+                  <AlertTriangle className="size-4" />
+                  Event cancelled
                 </Button>
               ) : hasEnded ? (
                 <Button variant="outline" className="w-full" disabled>
@@ -314,7 +429,7 @@ export default function EventDetailPage() {
                 <Button
                   className="w-full"
                   disabled={busy}
-                  onClick={() => requestToJoin.mutate(event.id)}
+                  onClick={() => void handleJoin()}
                 >
                   {busy ? (
                     <Loader2 className="size-4 animate-spin" />

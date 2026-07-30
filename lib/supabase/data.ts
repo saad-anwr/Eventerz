@@ -756,7 +756,7 @@ export async function recordPayment(
     p_to_wallet: input.toWallet,
     // PostgREST accepts a numeric string for `bigint`, which is the only way
     // to send a value above 2^53 without losing precision on the way.
-    p_amount: input.amount.toString() as unknown as number,
+    p_amount: input.amount.toString(),
     p_channel_id: input.channelId ?? null,
     p_to_profile: input.toProfile ?? null,
     p_memo: input.memo ?? null,

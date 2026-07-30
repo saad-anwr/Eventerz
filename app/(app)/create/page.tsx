@@ -18,6 +18,10 @@ import { uploadEventBanner, type CreateEventInput } from "@/lib/supabase/data";
 import type { EventCategory } from "@/lib/store/types";
 import { PageHeader } from "@/components/app/page-header";
 import { Avatar } from "@/components/app/avatar";
+import {
+  LocationPicker,
+  type PickedLocation,
+} from "@/components/app/location-picker";
 import { Button } from "@/components/ui/button";
 import { formatEventDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -161,6 +165,13 @@ export default function CreateEventPage() {
   });
   const [error, setError] = React.useState("");
 
+  /*
+   * The structured location lives beside the form rather than inside it: the
+   * picker owns four fields that move together, and splitting them across the
+   * flat form state means four places to forget one.
+   */
+  const [place, setPlace] = React.useState<PickedLocation>({ location: "" });
+
   const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
 
@@ -190,6 +201,16 @@ export default function CreateEventPage() {
         .filter(Boolean),
       coverGradient: form.coverGradient,
       coverImage: bannerUrl || undefined,
+      // Only carried for in-person events. An online event with coordinates
+      // would render a map of a building nobody is going to.
+      ...(form.isOnline
+        ? {}
+        : {
+            latitude: place.latitude,
+            longitude: place.longitude,
+            placeId: place.placeId,
+            address: place.address,
+          }),
     };
     if (!userId) {
       return setError("Sign in before publishing an event.");
@@ -284,11 +305,12 @@ export default function CreateEventPage() {
 
           {!form.isOnline && (
             <Field label="Location">
-              <input
-                className={inputCls}
-                value={form.location}
-                onChange={(e) => set("location", e.target.value)}
-                placeholder="City, venue or address"
+              <LocationPicker
+                value={place}
+                onChange={(next) => {
+                  setPlace(next);
+                  set("location", next.location);
+                }}
               />
             </Field>
           )}

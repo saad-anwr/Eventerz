@@ -88,6 +88,27 @@ export function isUpcoming(iso: string): boolean {
   return new Date(iso).getTime() > Date.now();
 }
 
+/**
+ * ISO instant → the `YYYY-MM-DDTHH:mm` an `<input type="datetime-local">`
+ * expects, in the viewer's own timezone.
+ *
+ * `toISOString().slice(0, 16)` is the obvious version and it is wrong: it
+ * returns UTC, so an edit form in Delhi opens showing a start time five and a
+ * half hours earlier than the one on the page behind it. Saving without
+ * touching the field then moves the event.
+ */
+export function toDateTimeLocal(iso: string | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+    `T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  );
+}
+
 /** Truncate a wallet address — "9xQe…4dRt". */
 export function shortenAddress(address?: string | null): string {
   if (!address) return "";

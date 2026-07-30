@@ -150,3 +150,219 @@ the other is offline:
 
 The bell in the app shell subscribes to the table, so the host's decision
 reaches the guest without a refresh.
+
+---
+
+# Additions since the approval pipeline
+
+Everything above still holds. This section covers what `0006`–`0011` added.
+
+## Waitlist position
+
+A waitlisted guest sees their place in the queue — "#3 of 12 waiting".
+
+It cannot be computed on the client. The RLS above hands a waitlisted guest
+exactly one RSVP row, their own, so counting the people ahead of them means
+counting rows they may not read. `my_waitlist_position(event_id)` is a
+`SECURITY DEFINER` function that returns **one integer about the caller** and
+nothing about who else is in the queue.
+
+`my_waitlist_positions(event_id[])` is the batch form, so a "my events" list
+costs one call rather than one per waitlisted event.
+
+The ordering — `created_at, profile_id` — is identical to
+`promote_from_waitlist`. That is a contract between them, not an implementation
+detail: if the two disagreed, the app would promise a seat to the wrong person.
+
+`promote_from_waitlist` also notifies whoever inherits first place, once.
+Notifying the whole queue on every movement would send the fortieth person forty
+notifications to say they are still fortieth.
+
+## Editing and cancelling  (`0007`)
+
+| Function | Who | What it does |
+| --- | --- | --- |
+| `update_event(...)` | Host | Writes a fixed column list; notifies live guests on a move or a time change |
+| `cancel_event(id, reason)` | Host | Soft-cancels, closes every live RSVP, notifies everyone |
+
+Both are functions rather than direct UPDATEs even though RLS already restricted
+event writes to the host, for three reasons:
+
+1. RLS controls *which rows* you may write, never *which columns* or *which
+   values*. A direct UPDATE let a host rewrite `confirmed_count` to 500, or set
+   `host_id` to someone else.
+2. Notifying guests has to happen in the same transaction as the edit.
+   Client-side it becomes an edit that lands with nobody told, whenever the tab
+   closes between the two calls.
+3. Lowering capacity below the headcount has to be a decision, not a silent
+   corruption. The function refuses it.
+
+Every parameter defaults to null, and null means "leave alone", so a client sends
+only what it is changing. That is what makes two devices editing the same event
+safe — a full-row write would clobber the other device's change with a stale
+value it never intended to send. `p_ends_at` is the exception: an event can
+legitimately lose its end time, so `p_clear_ends_at` distinguishes "unchanged"
+from "cleared".
+
+**Cancellation is soft.** The row survives so ticket holders keep the record and
+the URL still resolves; a dead link where an event used to be is a worse answer
+than a page saying it was called off. Deleting would cascade to `rsvps` and
+`tickets` and erase the attendance of everyone who already checked in. Guests are
+moved to `cancelled` rather than `declined` — `declined` means the host rejected
+*that person*, and telling forty people they were individually turned down is the
+wrong story.
+
+`request_to_join` refuses a cancelled event, and so does `update_event`.
+
+## Reminders  (`0010`)
+
+Two windows, 24 hours and 1 hour, answering different questions: "is this still
+happening, and do I need to arrange anything?" and "leave now."
+
+In the database via `pg_cron`, not a Vercel cron route, because one
+implementation then serves both clients — both already render `notifications` and
+already stream that table over Realtime. The mobile app's local scheduler fires
+only on the phone that RSVP'd and never for someone who signed up on the website;
+a web-only cron could never reach the app.
+
+Idempotent **by construction**: the job inserts a claim row into
+`event_reminders` first, and a unique constraint is what stops a second send.
+Checking "did I already notify?" with a SELECT and then inserting is a race that
+duplicates every reminder the moment two workers overlap — and overlap is the
+normal state of a cron job whose previous run has not finished. So the job can run
+every fifteen minutes safely.
+
+Only **confirmed** guests are reminded. Someone still pending approval has not
+been told they are coming, and "your event starts in an hour" would be the app
+telling them they are in — a decision the host has not made.
+
+Guests who RSVP'd within the last hour are skipped for the 24-hour window.
+Otherwise someone who RSVPs at 18:01 to a tomorrow-evening event is told "this is
+tomorrow" at 18:15, about something they are still looking at.
+
+## Contacting a host  (`0009`)
+
+DMs were already open to any two profiles: `can_access_channel` requires only
+that you are a party to the channel. What was missing was the **inbox** — it was
+derived from the friend list, so a message from a non-friend arrived in a thread
+that appeared nowhere. It was delivered, readable, and invisible.
+
+`my_dm_partners()` returns everyone the caller has an actual DM thread with. The
+inbox is now that set **union** friends, so friends with no messages still appear
+(an empty thread with someone you know is a starting point) and strangers are
+labelled, because an unexplained name in an inbox reads as spam.
+
+The website's DM screen also used to disable its composer unless you were
+friends — a UI gate that contradicted the database, since the message would have
+sent fine.
+
+## Payments in a thread  (`0009`)
+
+The money moves on-chain; the receipt lands in the thread. The chain is the source
+of truth for *whether it happened*; `payments` is the source of truth for *what it
+was for* and *who it was between*, which the chain does not know — it sees two
+base58 strings, not two people.
+
+Order of operations, and it only works one way round:
+
+1. Build and send the transfer.
+2. Wait for the cluster to confirm it.
+3. `record_payment(...)` — writes the row **and** posts the receipt message in one
+   transaction.
+
+Recording first is tempting because it gives the UI something to render
+immediately, and it is wrong: a receipt for a transfer that then fails is a lie
+the recipient acts on. `record_payment` is idempotent on the signature, so the
+failure mode of this ordering is benign — if the app dies between confirmation
+and recording, the money moved and the receipt is missing, and calling again with
+the same signature files it exactly once.
+
+### What is enforced, and what is not
+
+`record_payment` **cannot** verify the signature: Postgres makes no outbound RPC
+calls. So:
+
+- Receipts are written `verified = false`.
+- Every surface renders an unverified receipt with a clock and no tick. An
+  unchecked claim must not look like a checked one, or the tick becomes
+  decorative.
+- The `verify-payment` Edge Function checks the recipient's **balance delta**
+  against the cluster and calls `mark_payment_verified`, which is revoked from
+  `authenticated` — the party who benefits from the flag cannot set it.
+
+A balance delta rather than an instruction walk, because reading the instruction
+list means understanding every program that might have moved the money. Before
+and after is the same question with one answer regardless of route. The check is
+`>=`, not `==`: the recipient may legitimately have gained more in the same
+transaction, and a receipt claiming *less* than moved is not a lie worth blocking.
+
+What `record_payment` *does* enforce is the part a lie would profit from:
+
+- You may only record a payment as yourself (`auth.uid()`).
+- If you name a recipient profile, that profile's wallet must be the wallet that
+  was actually paid. Without this, anyone could take a real signature off the
+  explorer and record it as "I paid you".
+- The receipt message is written **by the function**. `messages`'s insert policy
+  pins client writes to `kind = 'text'` with a null `payment_id`, so a client
+  cannot post a receipt for a transfer that never happened.
+
+Amounts are `bigint` base units end to end — never floats. `0.1 + 0.2 !== 0.3`
+in binary floating point, and a lamport value above ~9 million SOL already
+exceeds `Number.MAX_SAFE_INTEGER`. PostgREST serialises `bigint` as a string for
+exactly that reason; parse it with `BigInt`, never `Number`.
+
+## Wallet ownership  (`0011`)
+
+`link_wallet` took an address and wrote it to the caller's profile. It checked
+that no *other* profile had claimed that address, and nothing else — so any
+signed-in user could link any wallet they could read off the explorer, along with
+its reputation, its ticket history and, once payments existed, a receipt trail
+saying money went to a person it did not go to.
+
+The check it skipped is the only one that matters: **does this caller hold the
+private key?**
+
+1. `issue_wallet_link_nonce(address)` mints a single-use challenge bound to the
+   caller *and* the address, valid five minutes. It returns the full message text,
+   not a bare nonce — a wallet popup showing an opaque UUID teaches users to
+   approve opaque UUIDs, which is the habit every signature-phishing attack
+   depends on.
+2. The wallet signs that exact text. Free, and touches no chain.
+3. The `link-wallet` Edge Function verifies the Ed25519 signature, then calls
+   `link_wallet_verified(profile, address, nonce)` with the service-role key.
+
+The nonce is passed back in step 3 on purpose: the function verified a signature
+over a *specific challenge*, and handing that challenge to the database is what
+ties the verification to the row it writes. It is then consumed — deleted, not
+flagged — so the same signature cannot be presented twice. Verifying a signature
+over an attacker-chosen message proves they can sign; it does not prove they were
+answering our challenge, and a signature harvested from any other Solana dapp
+would otherwise sail straight through.
+
+`link_wallet_verified` is revoked from `authenticated`. `link_wallet` still
+exists — dropping it would break installed mobile builds with a confusing
+"function does not exist" — but now raises a message pointing at the Edge
+Function.
+
+`unlink_wallet()` exists because linking became a deliberate act: a user who links
+the wrong wallet, or loses the key, needs a way back that does not involve
+deleting their account and their attendance history with it.
+
+## Testing this
+
+The whole flow above is Postgres, so its suite is SQL:
+
+```bash
+supabase start && supabase db reset
+npm run test:db          # supabase/tests/guest_flow_test.sql
+```
+
+Eleven sections, run as several different users via `set local role` plus a forged
+`request.jwt.claims` — the same mechanism PostgREST uses, so the policies see
+exactly what they see in production. Half the assertions are about what a user
+*cannot* see or do, which is not expressible from a single-user client. It all
+runs in one transaction and rolls back.
+
+The TypeScript suites (`npm test` in each project) cover the pure logic either
+side of it: the state machine, the wording, lamport arithmetic and the Anchor
+instruction encoding.

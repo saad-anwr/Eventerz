@@ -374,7 +374,13 @@ export type Database = {
         Args: {
           p_signature: string;
           p_to_wallet: string;
-          p_amount: number;
+          /**
+           * A numeric *string*, not a number. The column is `bigint`, which
+           * exceeds `Number.MAX_SAFE_INTEGER`; PostgREST accepts a string and
+           * coerces it server-side, which is the only way to send a large
+           * lamport amount without losing precision on the wire.
+           */
+          p_amount: string;
           p_channel_id?: string | null;
           p_to_profile?: string | null;
           p_memo?: string | null;

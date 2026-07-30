@@ -8,7 +8,12 @@ import { useSession } from "@/components/auth/use-session";
 import type { EventItem } from "@/lib/store/types";
 import { Avatar } from "./avatar";
 import { eventDateParts, formatEventDate, isUpcoming } from "@/lib/format";
-import { RSVP_PRESENTATION, goingCount, myRsvpState } from "@/lib/events";
+import {
+  RSVP_PRESENTATION,
+  goingCount,
+  isCancelled,
+  myRsvpState,
+} from "@/lib/events";
 import { cn } from "@/lib/utils";
 
 export function EventCard({ event }: { event: EventItem }) {
@@ -21,6 +26,7 @@ export function EventCard({ event }: { event: EventItem }) {
   const { data: host } = useProfile(event.hostId);
   const { month, day } = eventDateParts(event.startsAt);
   const upcoming = isUpcoming(event.startsAt);
+  const cancelled = isCancelled(event);
 
   return (
     <motion.div whileHover={{ y: -4 }} transition={{ duration: 0.2 }}>
@@ -32,7 +38,11 @@ export function EventCard({ event }: { event: EventItem }) {
         <div
           className={cn(
             "relative h-32 overflow-hidden bg-gradient-to-br",
-            event.coverGradient
+            event.coverGradient,
+            // A cancelled event still appears in lists — a ticket holder needs
+            // to find it — but must not compete for attention with one that is
+            // actually happening.
+            cancelled && "saturate-50"
           )}
         >
           {/* Banner sits over the gradient, which stays as the fallback while
@@ -67,10 +77,16 @@ export function EventCard({ event }: { event: EventItem }) {
                 {day}
               </span>
             </div>
-            {!upcoming && (
-              <span className="rounded-full bg-black/40 px-2 py-1 text-[10px] font-medium text-white/80 backdrop-blur-md">
-                Ended
+            {cancelled ? (
+              <span className="rounded-full border border-red-400/30 bg-red-500/25 px-2 py-1 text-[10px] font-semibold text-red-100 backdrop-blur-md">
+                Cancelled
               </span>
+            ) : (
+              !upcoming && (
+                <span className="rounded-full bg-black/40 px-2 py-1 text-[10px] font-medium text-white/80 backdrop-blur-md">
+                  Ended
+                </span>
+              )
             )}
           </div>
           <span className="absolute bottom-3 right-3 rounded-full bg-black/40 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-md">
@@ -82,7 +98,7 @@ export function EventCard({ event }: { event: EventItem }) {
             Both matter from a list — otherwise a pending request or a waiting
             approval queue is only discoverable by opening the event.
           */}
-          {isHost ? (
+          {cancelled ? null : isHost ? (
             pendingCount > 0 && (
               <span className="absolute right-3 top-3 flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-400/15 px-2 py-0.5 text-[10px] font-semibold text-amber-200 backdrop-blur-md">
                 <Clock className="size-2.5" />
@@ -96,7 +112,9 @@ export function EventCard({ event }: { event: EventItem }) {
                 RSVP_PRESENTATION[status].tone
               )}
             >
-              {RSVP_PRESENTATION[status].label}
+              {status === "waitlist" && event.waitlistPosition
+                ? `Waitlist #${event.waitlistPosition}`
+                : RSVP_PRESENTATION[status].label}
             </span>
           ) : null}
         </div>

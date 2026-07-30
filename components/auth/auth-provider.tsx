@@ -50,6 +50,13 @@ interface AuthContextValue {
   loading: boolean;
   /** Signed in via Google but no wallet linked yet. */
   walletPending: boolean;
+  /**
+   * Why the last wallet-verification attempt failed, or null.
+   *
+   * Linking now needs a signature, so it is a step the user can decline. A
+   * connected-but-unlinked wallet with no explanation looks like a bug.
+   */
+  walletLinkError: string | null;
 
   /** Real Google OAuth. Navigates away on success. */
   signInWithGoogle: () => Promise<{ ok: boolean; error?: string }>;
@@ -63,9 +70,18 @@ interface AuthContextValue {
 const AuthContext = React.createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { connected, publicKey, disconnect } = useWallet();
+  const { connected, publicKey, disconnect, signMessage } = useWallet();
   const [authOpen, setAuthOpen] = React.useState(false);
   const prevConnected = React.useRef(false);
+  /**
+   * Why the last wallet-link attempt failed, when it did.
+   *
+   * Exposed on the context so a screen can render it. Wallet linking is now a
+   * step that can be declined, and a user who cancels the signature needs to be
+   * told the wallet is connected but not linked — otherwise the account looks
+   * broken for a reason they cannot see.
+   */
+  const [linkError, setLinkError] = React.useState<string | null>(null);
 
   const [supabaseUser, setSupabaseUser] = React.useState<SupabaseUser | null>(
     null
@@ -154,11 +170,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (connected && address) {
         void (async () => {
           if (supabaseUser) {
-            // Signed in via Google — bind this wallet to that account.
-            const result = await linkWalletRemote(address);
+            /*
+             * Signed in via Google — bind this wallet to that account, which
+             * now requires a signature (migration 0011). Two guards before
+             * asking for one:
+             *
+             *   • Skip if this exact wallet is already linked. Re-prompting on
+             *     every page load for a binding that already exists would
+             *     train the user to approve signature requests without
+             *     reading them, which is the habit every phishing attack
+             *     needs.
+             *   • Skip if the adapter cannot sign messages at all. A few
+             *     wallets omit `signMessage`; there is nothing to fall back
+             *     to, and failing loudly is better than linking unverified.
+             */
+            if (profile?.wallet_address === address) return;
+            if (!signMessage) {
+              setLinkError(
+                "This wallet cannot sign messages, so ownership cannot be verified. Try Phantom, Solflare or Backpack.",
+              );
+              return;
+            }
+
+            setLinkError(null);
+            const result = await linkWalletRemote(address, signMessage);
             if (result.ok) {
               setProfile(result.data);
               useAppStore.getState().syncRemoteUser(profileToUser(result.data));
+            } else {
+              // Surfaced rather than swallowed: the old code ignored failures,
+              // which is how "the wallet silently did not link" became a bug
+              // nobody could see.
+              setLinkError(result.error ?? "Could not verify that wallet.");
             }
           } else {
             /*
@@ -198,7 +241,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (me?.authMethod === "wallet") store.signOut();
     }
     prevConnected.current = connected;
-  }, [connected, publicKey, hasHydrated, supabaseUser]);
+    // `profile` and `signMessage` are read inside: without them the effect
+    // re-checks a stale linked address and re-prompts for a signature that has
+    // already been given.
+  }, [connected, publicKey, hasHydrated, supabaseUser, profile, signMessage]);
 
   /* --------------------------------------------------------------------- */
   /*  Actions                                                               */
@@ -248,6 +294,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       profile,
       loading,
       walletPending: Boolean(supabaseUser) && !profile?.wallet_address,
+      walletLinkError: linkError,
       signInWithGoogle,
       signInWithEmail,
       signIn,
@@ -258,6 +305,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       supabaseUser,
       profile,
       loading,
+      linkError,
       signInWithGoogle,
       signInWithEmail,
       signIn,
