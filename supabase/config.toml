@@ -1,4 +1,4 @@
-# Local Supabase stack — `supabase start` reads this file.
+# Local Supabase stack - `supabase start` reads this file.
 #
 # Without it the CLI stops at "open supabase/config.toml: no such file or
 # directory" before it starts anything, which is why this exists: the migrations
@@ -27,7 +27,7 @@ port = 54322
 shadow_port = 54320
 # Must match the hosted project, or a migration can pass locally and fail in
 # production on a version difference. Check yours at:
-#   Dashboard → Project Settings → Infrastructure → Postgres version
+#   Dashboard -> Project Settings -> Infrastructure -> Postgres version
 # and change this to match before trusting a local run.
 major_version = 17
 
@@ -42,7 +42,7 @@ default_pool_size = 20
 max_client_conn = 100
 
 [db.seed]
-# No seed.sql. Fixtures belong to the suite that asserts on them — a shared seed
+# No seed.sql. Fixtures belong to the suite that asserts on them - a shared seed
 # file makes every test depend on rows it did not create, and then one test's
 # change quietly breaks another. `guest_flow_test.sql` builds and rolls back its
 # own world.
@@ -59,7 +59,7 @@ port = 54323
 api_url = "http://127.0.0.1"
 
 [local_smtp]
-# Local mail catcher — signup confirmations and magic links land at
+# Local mail catcher - signup confirmations and magic links land at
 # http://127.0.0.1:54324 instead of a real inbox. (Was [inbucket]; renamed in
 # CLI 2.x, which warns on the old name.)
 enabled = true
@@ -82,7 +82,7 @@ refresh_token_reuse_interval = 10
 enable_signup = true
 double_confirm_changes = true
 # Off locally so a test account is usable the moment it is created. Production
-# keeps confirmations on — see docs/AUTH_SETUP.md.
+# keeps confirmations on - see docs/AUTH_SETUP.md.
 enable_confirmations = false
 
 [auth.external.google]

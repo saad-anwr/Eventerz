@@ -1,5 +1,5 @@
 -- ---------------------------------------------------------------------------
--- Eventerz — 0008: waitlist position
+-- Eventerz - 0008: waitlist position
 --
 -- Run after 0007. Safe to re-run.
 --
@@ -8,7 +8,7 @@
 -- tell which they are, and the difference is the whole decision.
 --
 -- The number cannot be computed client-side. RLS (0005) returns a waitlisted
--- guest exactly one row — their own — so counting the people ahead of them is
+-- guest exactly one row - their own - so counting the people ahead of them is
 -- counting rows they are not allowed to see. Hence a SECURITY DEFINER
 -- function, which is the same reason `event_guest_preview` exists.
 --
@@ -19,7 +19,7 @@
 /**
  * The caller's place in the queue for one event, 1-based.
  *
- * Null when the caller is not waitlisted — which reads correctly at every call
+ * Null when the caller is not waitlisted - which reads correctly at every call
  * site, because "no position" and "position 0" are different facts and only
  * one of them is true for a confirmed guest.
  *
@@ -59,7 +59,7 @@ grant execute on function public.my_waitlist_position(uuid) to authenticated;
  * Every column reference below is table-qualified, deliberately. A RETURNS
  * TABLE column is also an in-scope parameter name inside the body, so a bare
  * `event_id` matches both the output parameter and `rsvps.event_id` and
- * Postgres refuses the whole function with "column reference is ambiguous" —
+ * Postgres refuses the whole function with "column reference is ambiguous" -
  * at CREATE time if you are lucky, and it is easy to write it the ambiguous way
  * without noticing.
  */
@@ -147,7 +147,7 @@ begin
     insert into public.notifications (profile_id, kind, title, body, href)
     values (
       nxt, 'ticket', 'A spot opened up',
-      format('You are off the waitlist for %s — you are going.', ev.title),
+      format('You are off the waitlist for %s - you are going.', ev.title),
       '/events/' || p_event_id
     );
   end if;

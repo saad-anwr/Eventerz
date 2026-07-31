@@ -44,7 +44,7 @@ export function Roadmap() {
               <span className="text-gradient">event layer of Web3</span>
             </>
           }
-          description="A focused, three-phase rollout — from a wallet-native MVP to a full DAO and cross-chain ecosystem."
+          description="A focused, three-phase rollout - from a wallet-native MVP to a full DAO and cross-chain ecosystem."
         />
 
         <div className="relative mt-16">

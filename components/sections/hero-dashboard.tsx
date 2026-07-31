@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-/** Parallax layer — translates based on shared pointer motion values. */
+/** Parallax layer - translates based on shared pointer motion values. */
 function Layer({
   children,
   depth,

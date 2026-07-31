@@ -96,7 +96,7 @@ export type EventRow = {
 
   /*
    * Cancellation is soft (0007). The row survives so ticket holders keep the
-   * record and the URL still resolves — a dead link where an event used to be
+   * record and the URL still resolves - a dead link where an event used to be
    * is a worse answer than a page saying it was called off.
    */
   cancelled_at: string | null;
@@ -105,7 +105,7 @@ export type EventRow = {
   /*
    * Structured location (0006), alongside the free-text `location` the host
    * typed. Null on every event created before that migration, and on any event
-   * whose location never resolved to a place — both clients fall back to a
+   * whose location never resolved to a place - both clients fall back to a
    * plain map search in that case, so null is a supported state and not a gap.
    */
   latitude: number | null;
@@ -115,11 +115,11 @@ export type EventRow = {
 };
 
 /**
- * `confirmed` — going, holds a seat and a ticket.
- * `pending`   — asked to join, waiting on the host.
- * `waitlist`  — event was full; promoted automatically when a seat frees.
- * `declined`  — the host said no.
- * `cancelled` — the guest withdrew.
+ * `confirmed` - going, holds a seat and a ticket.
+ * `pending`   - asked to join, waiting on the host.
+ * `waitlist`  - event was full; promoted automatically when a seat frees.
+ * `declined`  - the host said no.
+ * `cancelled` - the guest withdrew.
  */
 export type RsvpStatus =
   | 'confirmed'
@@ -137,7 +137,7 @@ export type RsvpRow = {
   created_at: string;
 };
 
-/** `event_guests` view — an RSVP joined to its profile and ticket. */
+/** `event_guests` view - an RSVP joined to its profile and ticket. */
 export type EventGuestRow = {
   event_id: string;
   profile_id: string;
@@ -192,7 +192,7 @@ export type MessageRow = {
   body: string;
   created_at: string;
   /**
-   * `payment` messages are written only by `record_payment` — the insert
+   * `payment` messages are written only by `record_payment` - the insert
    * policy on `messages` pins client writes to `text`, so a client cannot
    * post a receipt for a transfer that never happened.
    */
@@ -206,7 +206,7 @@ export type MessageRow = {
  * `amount` is in the token's base units (lamports for SOL) and typed as a
  * string because Postgres `bigint` exceeds `Number.MAX_SAFE_INTEGER` and
  * PostgREST serialises it as a string for exactly that reason. Parse it with
- * `BigInt`, never `Number` — a silently truncated amount is the worst possible
+ * `BigInt`, never `Number` - a silently truncated amount is the worst possible
  * bug in a payment path.
  */
 export type PaymentRow = {
@@ -258,7 +258,7 @@ export type CommunityRow = {
   created_at: string;
 };
 
-/** `discoverable_people` view — a profile plus this viewer's relationship to it. */
+/** `discoverable_people` view - a profile plus this viewer's relationship to it. */
 export type DiscoverablePersonRow = ProfileRow & {
   friend_status: 'pending' | 'accepted' | 'declined' | null;
   request_sent_by_me: boolean | null;
@@ -396,19 +396,23 @@ export type Database = {
         Returns: { profile_id: string; last_message_at: string }[];
       };
       /**
-       * Returns the full challenge *text* to sign, not a bare nonce — a wallet
+       * Returns the full challenge *text* to sign, not a bare nonce - a wallet
        * popup showing an opaque UUID teaches users to approve opaque UUIDs.
        */
       issue_wallet_link_nonce: {
         Args: { p_wallet_address: string };
         Returns: string;
       };
+      subscribe_newsletter: {
+        Args: { p_email: string; p_source?: string };
+        Returns: void;
+      };
       unlink_wallet: {
         Args: Record<string, never>;
         Returns: ProfileRow;
       };
       /**
-       * @deprecated Revoked in 0011 — it linked a wallet without checking that
+       * @deprecated Revoked in 0011 - it linked a wallet without checking that
        * the caller held its key. Use the `link-wallet` Edge Function.
        */
       link_wallet: {

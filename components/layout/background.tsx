@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 
-// Particle canvas is client-only & non-critical — load lazily.
+// Particle canvas is client-only & non-critical - load lazily.
 const Particles = dynamic(
   () => import("@/components/ui/particles").then((m) => m.Particles),
   { ssr: false }

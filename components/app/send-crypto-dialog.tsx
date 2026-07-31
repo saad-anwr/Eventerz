@@ -36,7 +36,7 @@ import { cn } from "@/lib/utils";
 interface Recipient {
   id: string;
   name: string;
-  /** Null when they have never linked one — the blocking case. */
+  /** Null when they have never linked one - the blocking case. */
   walletAddress: string | null;
 }
 
@@ -58,7 +58,7 @@ const QUICK_AMOUNTS = ["0.01", "0.05", "0.1", "0.5"];
  * # The order of operations, and why it is this one
  *
  * The transfer happens on-chain **first**, and the receipt is written only
- * after the cluster has confirmed it. The other ordering — record, then send —
+ * after the cluster has confirmed it. The other ordering - record, then send -
  * is tempting because it gives the UI something to render immediately, and it
  * is wrong: a receipt for a transfer that then fails is a lie the recipient
  * acts on, and there is no way to un-tell someone they were paid.
@@ -70,9 +70,9 @@ const QUICK_AMOUNTS = ["0.01", "0.05", "0.1", "0.5"];
  *
  * # What this does not do
  *
- * SPL tokens. The plumbing is token-agnostic all the way down — `payments`
+ * SPL tokens. The plumbing is token-agnostic all the way down - `payments`
  * stores a mint, decimals and a symbol, and `verify-payment` checks token
- * balances — but the instruction here is a native transfer, because sending an
+ * balances - but the instruction here is a native transfer, because sending an
  * SPL token means resolving or creating an associated token account for the
  * recipient and paying its rent, which is a materially different conversation
  * to have in a chat window.
@@ -119,7 +119,7 @@ export function SendCryptoDialog({
         if (!cancelled) setBalance(BigInt(lamports));
       })
       .catch(() => {
-        // A balance we cannot read is not a reason to block the send — the
+        // A balance we cannot read is not a reason to block the send - the
         // wallet will refuse an over-spend anyway. It only costs the preview.
         if (!cancelled) setBalance(null);
       });
@@ -186,6 +186,16 @@ export function SendCryptoDialog({
       return;
     }
 
+    /*
+     * Tracked in a local, not read back off `signature` state, because the catch
+     * below needs it. `setSignature` schedules a re-render; it does not change
+     * the `signature` binding this closure already captured, so the catch would
+     * still see "" and would tell someone their transfer failed without
+     * mentioning it had been submitted - the exact mistake the message exists to
+     * prevent.
+     */
+    let sent = "";
+
     try {
       setPhase("signing");
 
@@ -206,7 +216,7 @@ export function SendCryptoDialog({
         }),
       );
 
-      const sent = await sendTransaction(transaction, connection);
+      sent = await sendTransaction(transaction, connection);
       setSignature(sent);
       setPhase("confirming");
 
@@ -240,7 +250,7 @@ export function SendCryptoDialog({
       const message =
         err instanceof Error ? err.message : "Could not send that transfer.";
       /*
-       * A user declining in their wallet is not an error worth a red box — they
+       * A user declining in their wallet is not an error worth a red box - they
        * did exactly what they meant to. Close quietly.
        */
       if (/user rejected|declined|denied/i.test(message)) {
@@ -248,10 +258,10 @@ export function SendCryptoDialog({
         return;
       }
       setError(
-        signature
-          ? // The money may have moved. Say so — telling someone a transfer
+        sent
+          ? // The money may have moved. Say so - telling someone a transfer
             // failed when it did not is the worse of the two mistakes.
-            `${message} The transaction was submitted — check the explorer before sending again.`
+            `${message} The transaction was submitted - check the explorer before sending again.`
           : message,
       );
       setPhase("form");
@@ -311,7 +321,7 @@ export function SendCryptoDialog({
             </div>
 
             <div className="p-5">
-              {/* Blocking states first — an amount field is pointless if the
+              {/* Blocking states first - an amount field is pointless if the
                   transfer cannot happen. */}
               {!recipient.walletAddress ? (
                 <div className="rounded-2xl border border-amber-400/30 bg-amber-400/10 p-4 text-sm text-amber-200">
@@ -431,10 +441,26 @@ export function SendCryptoDialog({
                   </label>
 
                   {(validationError || error) && (
-                    <p className="mt-3 flex items-start gap-1.5 rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
-                      <AlertCircle className="mt-0.5 size-3.5 shrink-0" />
-                      {validationError ?? error}
-                    </p>
+                    <div className="mt-3 rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+                      <p className="flex items-start gap-1.5">
+                        <AlertCircle className="mt-0.5 size-3.5 shrink-0" />
+                        {validationError ?? error}
+                      </p>
+                      {/* If it was submitted, "check the explorer" needs to be a
+                          link. Telling someone to go and look without saying
+                          where is the dead end this message was meant to avoid. */}
+                      {!validationError && signature && (
+                        <a
+                          href={explorerTxUrl(signature)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-1.5 inline-flex items-center gap-1 pl-5 font-medium text-red-200 underline underline-offset-2 hover:text-white"
+                        >
+                          View transaction
+                          <ArrowRight className="size-3" />
+                        </a>
+                      )}
+                    </div>
                   )}
 
                   <Button
@@ -449,11 +475,11 @@ export function SendCryptoDialog({
                       <ArrowRight className="size-4" />
                     )}
                     {phase === "signing"
-                      ? "Approve in your wallet…"
+                      ? "Approve in your wallet..."
                       : phase === "confirming"
-                        ? "Confirming on-chain…"
+                        ? "Confirming on-chain..."
                         : phase === "recording"
-                          ? "Filing the receipt…"
+                          ? "Filing the receipt..."
                           : `Send${amount ? ` ${amount} SOL` : ""}`}
                   </Button>
                 </>

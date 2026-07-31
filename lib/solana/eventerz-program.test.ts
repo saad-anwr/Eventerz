@@ -162,7 +162,7 @@ describe('argument encoding', () => {
         eventId: EVENT_ID,
         host: HOST,
         capacity: 10,
-        // 2026-08-01T18:00:00Z → 1785607200 seconds.
+        // 2026-08-01T18:00:00Z -> 1785607200 seconds.
         startsAt: '2026-08-01T18:00:00.000Z',
         endsAt: null,
         priceLamports: 50_000_000n,
@@ -248,7 +248,7 @@ describe('account decoding', () => {
   });
 
   it('returns null rather than throwing for foreign bytes', () => {
-    // The usual reason is an event published before the program was deployed —
+    // The usual reason is an event published before the program was deployed -
     // an expected answer, not an error.
     expect(decodeEventAccount(new Uint8Array(0))).toBeNull();
     expect(decodeEventAccount(new Uint8Array(120))).toBeNull();

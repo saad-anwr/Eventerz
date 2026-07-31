@@ -216,7 +216,7 @@ export default function CreateEventPage() {
       return setError("Sign in before publishing an event.");
     }
 
-    // Publishing writes to Supabase, so the event is visible to everyone —
+    // Publishing writes to Supabase, so the event is visible to everyone -
     // previously it only ever reached this browser's local store.
     createEvent.mutate(input, {
       onSuccess: (event) => router.push(`/events/${event.id}`),
@@ -404,7 +404,7 @@ export default function CreateEventPage() {
                   <ImagePlus className="size-5 text-muted-foreground" />
                 )}
                 <span className="text-sm font-medium text-white">
-                  {uploading ? "Uploading…" : "Upload a banner"}
+                  {uploading ? "Uploading..." : "Upload a banner"}
                 </span>
                 <span className="text-xs text-muted-foreground">
                   JPEG, PNG, WebP or AVIF · up to 5 MB · 16:9 looks best

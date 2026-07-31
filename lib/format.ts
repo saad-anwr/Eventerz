@@ -9,7 +9,7 @@ export function uid(prefix = ""): string {
   return prefix ? `${prefix}_${id}` : id;
 }
 
-/** "just now" · "4m" · "2h" · "3d" · "12 Aug" — compact relative time. */
+/** "just now" · "4m" · "2h" · "3d" · "12 Aug" - compact relative time. */
 export function timeAgo(ts: number): string {
   const diff = Date.now() - ts;
   const sec = Math.round(diff / 1000);
@@ -26,7 +26,7 @@ export function timeAgo(ts: number): string {
   });
 }
 
-/** Chat timestamp — "6:42 PM". */
+/** Chat timestamp - "6:42 PM". */
 export function clockTime(ts: number): string {
   return new Date(ts).toLocaleTimeString("en-US", {
     hour: "numeric",
@@ -34,7 +34,7 @@ export function clockTime(ts: number): string {
   });
 }
 
-/** Full timestamp for hover/labels — "14 Aug 2026, 6:42 PM". */
+/** Full timestamp for hover/labels - "14 Aug 2026, 6:42 PM". */
 export function fullTimestamp(ts: number): string {
   return new Date(ts).toLocaleString("en-US", {
     day: "numeric",
@@ -45,7 +45,7 @@ export function fullTimestamp(ts: number): string {
   });
 }
 
-/** Day separator label for chat — "Today" · "Yesterday" · "Thu, 14 Aug". */
+/** Day separator label for chat - "Today" · "Yesterday" · "Thu, 14 Aug". */
 export function dayLabel(ts: number): string {
   const d = new Date(ts);
   const today = new Date();
@@ -62,7 +62,7 @@ export function dayLabel(ts: number): string {
   });
 }
 
-/** Event date — "Thu, Aug 14 · 6:00 PM". */
+/** Event date - "Thu, Aug 14 · 6:00 PM". */
 export function formatEventDate(iso: string): string {
   const d = new Date(iso);
   return d.toLocaleDateString("en-US", {
@@ -74,7 +74,7 @@ export function formatEventDate(iso: string): string {
     d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
 
-/** Short event date parts — { month: "AUG", day: "14" }. */
+/** Short event date parts - { month: "AUG", day: "14" }. */
 export function eventDateParts(iso: string): { month: string; day: string } {
   const d = new Date(iso);
   return {
@@ -89,7 +89,7 @@ export function isUpcoming(iso: string): boolean {
 }
 
 /**
- * ISO instant → the `YYYY-MM-DDTHH:mm` an `<input type="datetime-local">`
+ * ISO instant -> the `YYYY-MM-DDTHH:mm` an `<input type="datetime-local">`
  * expects, in the viewer's own timezone.
  *
  * `toISOString().slice(0, 16)` is the obvious version and it is wrong: it
@@ -109,8 +109,8 @@ export function toDateTimeLocal(iso: string | undefined): string {
   );
 }
 
-/** Truncate a wallet address — "9xQe…4dRt". */
+/** Truncate a wallet address - "9xQe...4dRt". */
 export function shortenAddress(address?: string | null): string {
   if (!address) return "";
-  return `${address.slice(0, 4)}…${address.slice(-4)}`;
+  return `${address.slice(0, 4)}...${address.slice(-4)}`;
 }

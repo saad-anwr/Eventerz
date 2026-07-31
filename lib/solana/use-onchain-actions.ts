@@ -5,16 +5,16 @@
  *
  * Every action here is **additive and optional**. RSVPs, tickets and check-ins
  * are real Postgres records; the chain adds a proof anyone can verify without
- * trusting Eventerz. So when no program is deployed — the state until
- * `NEXT_PUBLIC_EVENTERZ_PROGRAM_ID` is set — these report "unavailable" and the
+ * trusting Eventerz. So when no program is deployed - the state until
+ * `NEXT_PUBLIC_EVENTERZ_PROGRAM_ID` is set - these report "unavailable" and the
  * database path runs untouched. Gating RSVP on a program that does not exist
  * would break a working feature to protect a promise nobody made yet.
  *
  * The same reasoning applies when a program *is* deployed but the on-chain leg
  * fails. `claimSeat` returning null is not an error the caller has to handle:
  * the guest still gets their seat, and the account can be claimed later. The
- * failure that matters is the reverse — telling someone their ticket is on-chain
- * when it is not — and that cannot happen here, because the signature is only
+ * failure that matters is the reverse - telling someone their ticket is on-chain
+ * when it is not - and that cannot happen here, because the signature is only
  * ever reported after the cluster confirms it.
  */
 
@@ -85,7 +85,7 @@ export function useOnChainActions() {
   );
 
   /**
-   * Publish the event account. Host only, and idempotent in practice — the PDA
+   * Publish the event account. Host only, and idempotent in practice - the PDA
    * already existing makes a second call fail in the runtime, which the caller
    * reads as "already published".
    */
@@ -112,7 +112,7 @@ export function useOnChainActions() {
    * Needs the host's wallet as well as the attendee's: a paid event settles the
    * price to the host inside the same instruction, so the host account has to be
    * writable in the transaction. A host with no linked wallet therefore cannot
-   * have on-chain seats — which is correct, since there would be nowhere to send
+   * have on-chain seats - which is correct, since there would be nowhere to send
    * the money.
    */
   const claimSeat = React.useCallback(

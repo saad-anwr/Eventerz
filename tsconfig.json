@@ -33,7 +33,7 @@
     "node_modules",
     /*
      * Edge Functions are Deno, not Next.js. They import with `.ts` extensions
-     * and `npm:` specifiers and expect a `Deno` global — all correct there and
+     * and `npm:` specifiers and expect a `Deno` global - all correct there and
      * all errors under this compiler. They are typechecked by `deno check`
      * (see `supabase/functions/deno.json`), which is the runtime that actually
      * runs them.

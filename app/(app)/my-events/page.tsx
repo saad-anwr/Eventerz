@@ -68,7 +68,7 @@ export default function MyEventsPage() {
       <PageHeader
         eyebrow="Your calendar"
         title="My Events"
-        description="Events you're hosting and attending — past and upcoming."
+        description="Events you're hosting and attending - past and upcoming."
         action={
           <Button asChild>
             <Link href="/create">

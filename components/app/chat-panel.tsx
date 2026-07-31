@@ -25,7 +25,7 @@ interface ChatPanelProps {
   disabledReason?: string;
   emptyHint?: string;
   /**
-   * Rendered inside the composer, left of the input — the "send crypto" button
+   * Rendered inside the composer, left of the input - the "send crypto" button
    * on a DM thread.
    *
    * A slot rather than a prop for the feature itself: the dialog needs a wallet
@@ -43,7 +43,7 @@ export function ChatPanel({
   scope,
   channelId,
   className,
-  placeholder = "Write a message…",
+  placeholder = "Write a message...",
   disabledReason,
   emptyHint = "No messages yet. Say hello 👋",
   composerAction,
@@ -72,7 +72,7 @@ export function ChatPanel({
 
   /*
    * Receipts referenced by this thread, in one request. A thread with no
-   * payments in it makes no request at all — the hook is disabled on an empty
+   * payments in it makes no request at all - the hook is disabled on an empty
    * id list.
    */
   const paymentIds = React.useMemo(
@@ -182,7 +182,7 @@ export function ChatPanel({
                     /*
                      * The receipt renders in place of the bubble. `m.text` is
                      * the generated "Sent 0.4 SOL" line, which stays as the
-                     * fallback for the moment before the payment row loads —
+                     * fallback for the moment before the payment row loads -
                      * and permanently for anyone who can see the message but
                      * not the payment, which RLS on `payments` allows in an
                      * event channel.

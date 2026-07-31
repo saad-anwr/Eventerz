@@ -8,7 +8,7 @@ interface LogoProps {
 }
 
 /**
- * Eventerz brand mark — a 3D isometric, folded-ribbon "E" with three purple
+ * Eventerz brand mark - a 3D isometric, folded-ribbon "E" with three purple
  * facets (light top, violet front, dark side). Pure vector: crisp at any size.
  */
 export function EventerzMark({ className }: { className?: string }) {

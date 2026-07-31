@@ -1,5 +1,5 @@
 -- ---------------------------------------------------------------------------
--- Eventerz — 0006: event editing and cancellation
+-- Eventerz - 0006: event editing and cancellation
 --
 -- Run after 0005. Safe to re-run.
 --
@@ -11,9 +11,9 @@
 --
 -- Two functions, both host-only and both SECURITY DEFINER:
 --
---   • `update_event()`   — edits the mutable fields and notifies live guests
+--   • `update_event()`   - edits the mutable fields and notifies live guests
 --                          when something they actually care about changed.
---   • `cancel_event()`   — soft-cancels. The row stays so ticket holders keep
+--   • `cancel_event()`   - soft-cancels. The row stays so ticket holders keep
 --                          a record and the URL keeps resolving; every live
 --                          RSVP is closed and everyone is told.
 --
@@ -62,7 +62,7 @@ create index if not exists events_cancelled_idx
  * edits from two devices: a full-row write would clobber the other device's
  * change with a stale value it never intended to send.
  *
- * `p_ends_at` is the exception — an event can legitimately have its end time
+ * `p_ends_at` is the exception - an event can legitimately have its end time
  * removed, so `p_clear_ends_at` distinguishes "unchanged" from "cleared".
  */
 create or replace function public.update_event(
@@ -118,7 +118,7 @@ begin
 
   /*
    * Capacity may be raised freely and lowered only to the current headcount.
-   * Going below it would leave more confirmed guests than seats — the counts
+   * Going below it would leave more confirmed guests than seats - the counts
    * would read "45 / 30 going" and `approve_guest` would start refusing for a
    * reason the host never chose.
    */
@@ -164,7 +164,7 @@ begin
 
   /*
    * Only a move or a time change is worth a notification. Fixing a typo in the
-   * description should not push a notification to two hundred people — an alert
+   * description should not push a notification to two hundred people - an alert
    * that fires for nothing trains everyone to ignore the ones that matter.
    */
   if moved or retimed then
@@ -213,7 +213,7 @@ grant execute on function public.update_event(
  * Call an event off. Host only.
  *
  * Soft, not a DELETE. Deleting cascades to `rsvps` and `tickets`, which would
- * erase the attendance record of everyone who already checked in — the exact
+ * erase the attendance record of everyone who already checked in - the exact
  * history the product exists to keep. The row stays, marked, and every live
  * RSVP is closed so it stops appearing under "my events" as if it were still
  * happening.
@@ -294,7 +294,7 @@ grant execute on function public.cancel_event(uuid, text) to authenticated;
    ---------------------------------------------------------------------------
    `request_to_join` is redefined here rather than in 0005 so the check lives
    next to the column it reads. Everything else about it is unchanged from
-   0005 — see that file for why capacity counts confirmed guests only and why
+   0005 - see that file for why capacity counts confirmed guests only and why
    a live RSVP is idempotent.
    =========================================================================== */
 

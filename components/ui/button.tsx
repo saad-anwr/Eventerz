@@ -10,13 +10,13 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        // Primary — Solana gradient with hover shine + glow
+        // Primary - Solana gradient with hover shine + glow
         primary:
           "text-white shadow-glow bg-brand-gradient bg-[length:200%_auto] hover:bg-[position:100%_0] hover:shadow-[0_0_50px_-6px_rgba(153,69,255,0.7)] hover:-translate-y-0.5",
-        // Secondary — glass
+        // Secondary - glass
         secondary:
           "glass text-white hover:bg-white/[0.08] hover:border-white/20 hover:-translate-y-0.5",
-        // Outline — gradient border look
+        // Outline - gradient border look
         outline:
           "border border-white/15 bg-white/[0.02] text-white hover:border-brand-purple/50 hover:bg-white/[0.05] hover:-translate-y-0.5",
         ghost: "text-muted-foreground hover:text-white hover:bg-white/[0.05]",
@@ -54,7 +54,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const [ripples, setRipples] = React.useState<Ripple[]>([]);
 
     if (asChild) {
-      // Slot requires a single child — no ripple layer for link-style usage.
+      // Slot requires a single child - no ripple layer for link-style usage.
       return (
         <Slot
           className={cn(buttonVariants({ variant, size, className }))}

@@ -39,8 +39,8 @@ export function EventCard({ event }: { event: EventItem }) {
           className={cn(
             "relative h-32 overflow-hidden bg-gradient-to-br",
             event.coverGradient,
-            // A cancelled event still appears in lists — a ticket holder needs
-            // to find it — but must not compete for attention with one that is
+            // A cancelled event still appears in lists - a ticket holder needs
+            // to find it - but must not compete for attention with one that is
             // actually happening.
             cancelled && "saturate-50"
           )}
@@ -95,7 +95,7 @@ export function EventCard({ event }: { event: EventItem }) {
           {/*
             Top-right corner reports whichever is relevant to this viewer: for a
             host, requests needing a decision; for a guest, their own state.
-            Both matter from a list — otherwise a pending request or a waiting
+            Both matter from a list - otherwise a pending request or a waiting
             approval queue is only discoverable by opening the event.
           */}
           {cancelled ? null : isHost ? (

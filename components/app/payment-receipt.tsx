@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 
 interface PaymentReceiptProps {
   payment: PaymentRow;
-  /** True when the viewer is the sender — flips the wording, not the amount. */
+  /** True when the viewer is the sender - flips the wording, not the amount. */
   mine: boolean;
 }
 
@@ -27,7 +27,7 @@ function explorerUrl(signature: string, cluster: string): string {
  * balance delta against the cluster and flips it.
  *
  * So an unverified receipt must not look like a verified one. It renders with a
- * clock instead of a tick and says "confirming" — which is true whether it is
+ * clock instead of a tick and says "confirming" - which is true whether it is
  * thirty seconds old or a fabrication, and either way the explorer link is one
  * tap away. Showing every receipt identically would make the tick decorative,
  * and a decorative trust signal is worse than none.
@@ -84,7 +84,7 @@ export function PaymentReceipt({ payment, mine }: PaymentReceiptProps) {
         ) : (
           <>
             <Clock3 className="size-3" />
-            Confirming — tap to check on Explorer
+            Confirming - tap to check on Explorer
           </>
         )}
       </p>

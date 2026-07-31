@@ -6,7 +6,7 @@
  * This is the channel the approval flow reports back through: the guest asks to
  * join, the host approves or declines, and a row appears here. Because
  * `notifications` streams over Realtime and the global subscription invalidates
- * this query, the decision arrives while the guest is looking at the page —
+ * this query, the decision arrives while the guest is looking at the page -
  * no refresh, no polling.
  *
  * Rows are written by the SECURITY DEFINER functions in migration 0005 rather
@@ -35,7 +35,7 @@ export function NotificationBell() {
 
   const unread = items.filter((n) => !n.read).length;
 
-  // Close on outside click and on Escape — a dropdown that traps the page is
+  // Close on outside click and on Escape - a dropdown that traps the page is
   // worse than no dropdown.
   React.useEffect(() => {
     if (!open) return;
@@ -93,7 +93,7 @@ export function NotificationBell() {
             {isLoading ? (
               <p className="flex items-center gap-2 px-4 py-6 text-sm text-muted-foreground">
                 <Loader2 className="size-4 animate-spin" />
-                Loading…
+                Loading...
               </p>
             ) : items.length === 0 ? (
               <p className="px-4 py-8 text-center text-sm text-muted-foreground">

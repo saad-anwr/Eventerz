@@ -1,11 +1,11 @@
 -- ---------------------------------------------------------------------------
--- Eventerz — 0009: in-chat payments, and contacting a host
+-- Eventerz - 0009: in-chat payments, and contacting a host
 --
 -- Run after 0008. Safe to re-run.
 --
 -- Two things live here because they are the same surface: the DM thread.
 --
---  1. **Sending crypto in a message.** A transfer already works — both clients
+--  1. **Sending crypto in a message.** A transfer already works - both clients
 --     have a wallet and Solana does not need our permission. What is missing
 --     is the *receipt*: without a record, "did you get the 0.4 SOL?" is a
 --     conversation neither person can settle, and the signature lives only in
@@ -14,13 +14,13 @@
 --     So the money moves on-chain and the receipt lands in the thread. The
 --     chain is the source of truth for whether it happened; this table is the
 --     source of truth for *what it was for* and *who it was between*, which
---     the chain does not know — it sees two base58 strings, not two people.
+--     the chain does not know - it sees two base58 strings, not two people.
 --
 --  2. **Contacting a host.** A guest deciding whether to attend often has one
 --     question, and requiring a friend request first turns a thirty-second
 --     exchange into a two-step negotiation. DMs were already open to any two
---     profiles under `can_access_channel` (0003) — a party to the channel is
---     the only requirement — so nothing needs loosening. What was missing is
+--     profiles under `can_access_channel` (0003) - a party to the channel is
+--     the only requirement - so nothing needs loosening. What was missing is
 --     the *inbox*: it listed friends, so a message from a non-friend arrived
 --     in a thread nobody would ever open. `my_dm_partners()` fixes that.
 --
@@ -28,7 +28,7 @@
 -- ----------------------------------
 -- `record_payment` does not verify the signature against the cluster. Postgres
 -- cannot make an outbound RPC call, and a client that lies gets a receipt row
--- whose `signature` resolves to nothing — every surface renders it as an
+-- whose `signature` resolves to nothing - every surface renders it as an
 -- explorer link, so the lie is one click from being caught, and the row is
 -- marked `verified = false` until something checks. Verification belongs in an
 -- Edge Function (see `supabase/functions/verify-payment/`), which is where the
@@ -57,7 +57,7 @@ exception when duplicate_object then null; end $$;
 
 /*
  * A payment message's body is generated, not typed, so the 1..2000 length
- * check from 0003 is the wrong rule for it — but relaxing that check for text
+ * check from 0003 is the wrong rule for it - but relaxing that check for text
  * would remove the only guard against empty messages. Instead the body is
  * always written by the function for payments, and the existing check still
  * holds because the generated body is never empty.
@@ -72,9 +72,9 @@ create table if not exists public.payments (
 
   /*
    * The transaction signature, unique. This is what makes the table
-   * idempotent: a client that retries after a timeout — the common case,
+   * idempotent: a client that retries after a timeout - the common case,
    * because the transfer confirms and the app is backgrounded before the
-   * insert lands — records the same payment once rather than twice.
+   * insert lands - records the same payment once rather than twice.
    */
   signature text unique not null,
   cluster   text not null default 'mainnet-beta',
@@ -108,7 +108,7 @@ create table if not exists public.payments (
 
   /**
    * False until something has actually looked at the cluster. Every client
-   * renders an unverified receipt with its explorer link and no green tick —
+   * renders an unverified receipt with its explorer link and no green tick -
    * an unchecked claim must not look like a checked one.
    */
   verified boolean not null default false,
@@ -138,7 +138,7 @@ create policy "payments visible to parties" on public.payments
   );
 
 /*
- * No INSERT or UPDATE policy — writes go through `record_payment` below.
+ * No INSERT or UPDATE policy - writes go through `record_payment` below.
  * A direct insert policy would let a client set `verified = true`, or record a
  * payment *from* someone else. RLS restricts which rows you may write, never
  * which values you may put in them.
@@ -152,8 +152,8 @@ drop policy if exists "payments self write" on public.payments;
 /**
  * Record a completed transfer and drop a receipt into the thread.
  *
- * Called after the transaction confirms on the cluster. Both halves — the
- * payment row and the message — land in one transaction, because a receipt
+ * Called after the transaction confirms on the cluster. Both halves - the
+ * payment row and the message - land in one transaction, because a receipt
  * with no message is invisible and a message with no receipt has nothing to
  * render.
  *
@@ -244,7 +244,7 @@ begin
    *
    * The divisor is `10::numeric ^ decimals`, not `power()`. `power()` returns
    * double precision, which would drag the whole expression into binary floating
-   * point — and a receipt that says 0.30000000000000004 SOL is worse than no
+   * point - and a receipt that says 0.30000000000000004 SOL is worse than no
    * receipt. Staying in `numeric` keeps it exact.
    */
   pretty := trim(trailing '.' from

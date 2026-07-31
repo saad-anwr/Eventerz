@@ -14,7 +14,7 @@ import {
  * These are the tests that matter most in the repository.
  *
  * Every other bug is a wrong pixel or a wrong sentence. A bug here sends the
- * wrong amount of someone's money, and it does so silently — floating point does
+ * wrong amount of someone's money, and it does so silently - floating point does
  * not throw.
  */
 describe('toBaseUnits', () => {

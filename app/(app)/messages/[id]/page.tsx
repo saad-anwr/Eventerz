@@ -41,7 +41,7 @@ export default function DirectMessagePage() {
     return (
       <div className="flex items-center gap-2 py-20 text-sm text-muted-foreground">
         <Loader2 className="size-4 animate-spin" />
-        Loading conversation…
+        Loading conversation...
       </div>
     );
   }
@@ -97,7 +97,7 @@ export default function DirectMessagePage() {
        *
        * The friendship gate that used to be here contradicted the database:
        * `can_access_channel` admits either party to a DM channel and always
-       * has, so the message would send fine — the UI just refused to let you
+       * has, so the message would send fine - the UI just refused to let you
        * type it. It also made "Contact host" impossible, since a guest asking
        * a question is by definition not yet a friend.
        */}
@@ -105,7 +105,7 @@ export default function DirectMessagePage() {
         scope="dm"
         channelId={channel}
         className="min-h-0 flex-1 pt-3"
-        placeholder={`Message ${other.name.split(" ")[0]}…`}
+        placeholder={`Message ${other.name.split(" ")[0]}...`}
         emptyHint={`This is the start of your conversation with ${other.name}.`}
         disabledReason={
           isSelf ? "This is you." : !me ? "Sign in to send messages." : undefined

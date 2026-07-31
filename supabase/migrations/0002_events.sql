@@ -1,5 +1,5 @@
 -- ---------------------------------------------------------------------------
--- Eventerz — events, communities, tickets, RSVPs, notifications
+-- Eventerz - events, communities, tickets, RSVPs, notifications
 --
 -- Run after 0001_profiles.sql. Safe to re-run.
 --
@@ -278,7 +278,7 @@ create policy "notifications own" on public.notifications
   with check ((select auth.uid()) = profile_id);
 
 /* -------------------------------------------------------------------------- */
-/*  RSVP — capacity, dedupe and ticket allocation in one atomic step           */
+/*  RSVP - capacity, dedupe and ticket allocation in one atomic step           */
 /* -------------------------------------------------------------------------- */
 
 create or replace function public.rsvp(p_event_id uuid)
@@ -340,7 +340,7 @@ begin
   on conflict (event_id, profile_id) do update set status = excluded.status;
 
   if taken >= ev.capacity then
-    raise exception 'this event is full — you have been added to the waitlist'
+    raise exception 'this event is full - you have been added to the waitlist'
       using errcode = '23514';
   end if;
 
@@ -394,7 +394,7 @@ revoke all on function public.cancel_rsvp(uuid) from public;
 grant execute on function public.cancel_rsvp(uuid) to authenticated;
 
 /* -------------------------------------------------------------------------- */
-/*  Check-in — only the host may redeem, and only once                         */
+/*  Check-in - only the host may redeem, and only once                         */
 /* -------------------------------------------------------------------------- */
 
 create or replace function public.check_in_ticket(

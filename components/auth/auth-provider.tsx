@@ -3,11 +3,11 @@
 /**
  * Auth provider.
  *
- * Identity model — the wallet is primary:
+ * Identity model - the wallet is primary:
  *   • Connecting a wallet creates or resumes the account. This is the main path.
  *   • Google is a secondary credential: it authenticates a real person and is
  *     used for recovery and cross-device profile sync. A Google-only account is
- *     "wallet pending" — it can browse, but on-chain actions need a wallet.
+ *     "wallet pending" - it can browse, but on-chain actions need a wallet.
  *
  * When Supabase is configured, Google runs a real OAuth flow and the session
  * comes back from the auth server. When it is not, the provider falls back to
@@ -60,7 +60,7 @@ interface AuthContextValue {
 
   /** Real Google OAuth. Navigates away on success. */
   signInWithGoogle: () => Promise<{ ok: boolean; error?: string }>;
-  /** Real passwordless email — sends a one-time link. */
+  /** Real passwordless email - sends a one-time link. */
   signInWithEmail: (email: string) => Promise<{ ok: boolean; error?: string }>;
   /** Demo-only local sign-in, used when Supabase is absent. */
   signIn: (method: SocialMethod, data: { name: string; email: string }) => User;
@@ -78,7 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    *
    * Exposed on the context so a screen can render it. Wallet linking is now a
    * step that can be declined, and a user who cancels the signature needs to be
-   * told the wallet is connected but not linked — otherwise the account looks
+   * told the wallet is connected but not linked - otherwise the account looks
    * broken for a reason they cannot see.
    */
   const [linkError, setLinkError] = React.useState<string | null>(null);
@@ -111,8 +111,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     setProfile(data ?? null);
 
-    // Mirror the real account into the app store so `useSession()` — and
-    // therefore the navbar, dashboard and every screen — reflects the actual
+    // Mirror the real account into the app store so `useSession()` - and
+    // therefore the navbar, dashboard and every screen - reflects the actual
     // signed-in person rather than a demo record.
     if (data) useAppStore.getState().syncRemoteUser(profileToUser(data));
   }, []);
@@ -145,7 +145,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setAuthOpen(false);
         } else {
           setProfile(null);
-          // Signed out of the real backend — drop the mirrored session too.
+          // Signed out of the real backend - drop the mirrored session too.
           useAppStore.getState().signOut();
         }
       }
@@ -171,7 +171,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         void (async () => {
           if (supabaseUser) {
             /*
-             * Signed in via Google — bind this wallet to that account, which
+             * Signed in via Google - bind this wallet to that account, which
              * now requires a signature (migration 0011). Two guards before
              * asking for one:
              *
@@ -206,7 +206,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           } else {
             /*
              * No session yet. The wallet is the primary credential, so adopt
-             * the account it already owns — that is a real sign-in, not a
+             * the account it already owns - that is a real sign-in, not a
              * prompt. Unknown wallets fall through to the demo store below.
              */
             const owner = await profileForWallet(address);
@@ -230,7 +230,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Demo fallback — the original local-store behaviour.
+    // Demo fallback - the original local-store behaviour.
     const store = useAppStore.getState();
     if (connected && address) {
       if (!store.currentUserId) store.ensureWalletUser(address);
@@ -278,7 +278,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSupabaseUser(null);
       setProfile(null);
     }
-    // Clear the mirrored session either way — live or demo, the app store is
+    // Clear the mirrored session either way - live or demo, the app store is
     // what `useSession()` reads.
     useAppStore.getState().signOut();
     if (connected) void disconnect();

@@ -59,7 +59,7 @@ export default function PublicProfilePage() {
     return (
       <div className="flex items-center gap-2 py-20 text-sm text-muted-foreground">
         <Loader2 className="size-4 animate-spin" />
-        Loading profile…
+        Loading profile...
       </div>
     );
   }

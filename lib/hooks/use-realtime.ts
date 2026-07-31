@@ -8,7 +8,7 @@
  * what "real-time" means for this app: one person RSVPs, everyone watching that
  * event sees the count move.
  *
- * A table only streams if it is in the `supabase_realtime` publication —
+ * A table only streams if it is in the `supabase_realtime` publication -
  * migration 0003 adds all of them. Without that the channel connects happily
  * and then stays silent forever, which is a confusing way to fail.
  */
@@ -130,7 +130,7 @@ export function useRealtimeSync(profileId: string | null): void {
 /**
  * Live subscription for a single chat channel.
  *
- * Separate from the global sync because chat is high-frequency and scoped —
+ * Separate from the global sync because chat is high-frequency and scoped -
  * subscribing to every message in the database to render one thread would be
  * wasteful and would leak other people's activity into this client.
  */

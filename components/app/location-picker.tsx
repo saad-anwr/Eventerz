@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * The structured half of a location. Undefined throughout means "the host
- * typed something a geocoder never saw", which is a supported outcome — see
+ * typed something a geocoder never saw", which is a supported outcome - see
  * `lib/geocode.ts` for why pinning is never mandatory.
  */
 export interface PickedLocation {
@@ -39,7 +39,7 @@ const inputCls =
  *
  * The text input is the primary control and always writable. Search is
  * additive: picking a suggestion attaches coordinates to what is already
- * there, and editing the text afterwards drops them — because a pin that no
+ * there, and editing the text afterwards drops them - because a pin that no
  * longer matches the words above it is worse than no pin, and silently keeping
  * the old coordinates is how an event ends up mapped to the venue the host
  * just decided against.
@@ -105,7 +105,7 @@ export function LocationPicker({
     setQuery("");
 
     if (!resolved) {
-      // Details lookup failed. Keep the name so the field is still useful —
+      // Details lookup failed. Keep the name so the field is still useful -
       // the event just has no pin, which is the same as never searching.
       onChange({ ...value, location: suggestion.name || value.location });
       return;
@@ -235,7 +235,7 @@ export function LocationPicker({
         </div>
       ) : (
         <p className="text-xs text-muted-foreground">
-          Optional — a pinned location gets a map and directions on the event
+          Optional - a pinned location gets a map and directions on the event
           page. Searching uses{" "}
           {geocoderName() === "google" ? "Google Places" : "OpenStreetMap"}.
         </p>

@@ -13,7 +13,7 @@ import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
  *
  * `ALLOWED_ORIGINS` is a comma-separated list set with
  * `supabase secrets set ALLOWED_ORIGINS=...`. It falls back to the production
- * hosts. Echoing back whatever `Origin` the caller sent — the usual shortcut —
+ * hosts. Echoing back whatever `Origin` the caller sent - the usual shortcut -
  * would make the allowlist decorative.
  *
  * Native clients send no `Origin` at all and are unaffected either way: CORS is
@@ -67,7 +67,7 @@ export function preflight(request: Request): Response | null {
  * The service-role client.
  *
  * This key bypasses RLS entirely. It is only ever used to call the two
- * functions that are explicitly revoked from `authenticated` — the ones whose
+ * functions that are explicitly revoked from `authenticated` - the ones whose
  * whole purpose is to do something the caller must not be able to do for
  * themselves.
  */

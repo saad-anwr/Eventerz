@@ -42,7 +42,7 @@ export function Hero() {
               New
             </span>
             <span className="text-muted-foreground transition-colors group-hover:text-white">
-              Live on Solana — the wallet-native event layer
+              Live on Solana - the wallet-native event layer
             </span>
             <ArrowUpRight className="size-3.5 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
           </Link>
@@ -72,7 +72,7 @@ export function Hero() {
           <span className="font-semibold text-white/90">
             Create. Discover. Attend.
           </span>{" "}
-          Own your event experience completely on-chain — NFT tickets,
+          Own your event experience completely on-chain - NFT tickets,
           proof-of-attendance and portable reputation, powered by Solana.
         </motion.p>
 

@@ -28,12 +28,12 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          // Write to the request so this render sees the fresh token…
+          // Write to the request so this render sees the fresh token...
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value),
           );
           response = NextResponse.next({ request });
-          // …and to the response so the browser stores it.
+          // ...and to the response so the browser stores it.
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options),
           );
@@ -51,7 +51,7 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Everything except static assets and image files — auth cookies are
+     * Everything except static assets and image files - auth cookies are
      * irrelevant there and the middleware would only add latency.
      */
     '/((?!_next/static|_next/image|favicon.ico|icon.svg|og.svg|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',

@@ -23,16 +23,16 @@ interface EventMapProps {
  * An `<iframe>` rather than the Maps JavaScript SDK: the SDK is ~300 KB and
  * takes over part of the page's DOM to draw what is, here, a static picture
  * with a pin in it. The embed is lazy, costs this bundle nothing, and renders
- * the venue's own Google card — name, rating, photo — when there is a place id.
+ * the venue's own Google card - name, rating, photo - when there is a place id.
  *
  * Three states, all of which have to look deliberate:
  *
- *   • **Pinned** — a real map, plus Open and Directions.
- *   • **Unpinned, with an address** — no map is possible without geocoding, so
+ *   • **Pinned** - a real map, plus Open and Directions.
+ *   • **Unpinned, with an address** - no map is possible without geocoding, so
  *     it shows the address and a search link. This is the common case for
  *     events created before the location fields existed, and it must not look
  *     like something failed to load.
- *   • **Online** — renders nothing. A map of an online event is a map of
+ *   • **Online** - renders nothing. A map of an online event is a map of
  *     nowhere.
  */
 export function EventMap({ place, className }: EventMapProps) {
@@ -86,7 +86,7 @@ export function EventMap({ place, className }: EventMapProps) {
           {!coords && (
             <p className="mt-0.5 text-xs text-muted-foreground">
               {hasGoogleMapsKey()
-                ? "Approximate — the host did not pin an exact spot."
+                ? "Approximate - the host did not pin an exact spot."
                 : "Open in Maps to search for this address."}
             </p>
           )}

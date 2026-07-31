@@ -1,13 +1,13 @@
 -- ---------------------------------------------------------------------------
--- Eventerz — identity schema
+-- Eventerz - identity schema
 --
--- Run once in the Supabase SQL editor (Dashboard → SQL → New query), or via
+-- Run once in the Supabase SQL editor (Dashboard -> SQL -> New query), or via
 -- `supabase db push` if you use the CLI. Safe to re-run: every statement is
 -- guarded.
 --
 -- Model: the wallet is the primary identity. A Google account is a secondary
 -- credential attached to the same profile, used for recovery and cross-device
--- sync. A profile with no `wallet_address` is "wallet pending" — it can browse
+-- sync. A profile with no `wallet_address` is "wallet pending" - it can browse
 -- and hold a profile, but cannot perform on-chain actions.
 -- ---------------------------------------------------------------------------
 
@@ -162,7 +162,7 @@ create policy "users update their own profile"
 -- rather than racing between a SELECT and an UPDATE on the client.
 --
 -- NOTE: this trusts that the caller proved wallet ownership. Signature
--- verification belongs in an Edge Function before production — see
+-- verification belongs in an Edge Function before production - see
 -- `docs/AUTH_SETUP.md`.
 -- ---------------------------------------------------------------------------
 

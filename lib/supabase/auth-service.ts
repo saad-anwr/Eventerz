@@ -17,13 +17,13 @@ export type AuthResult<T = void> =
   | { ok: false; error: string };
 
 const NOT_CONFIGURED =
-  'Sign-in is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY — see docs/AUTH_SETUP.md.';
+  'Sign-in is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY - see docs/AUTH_SETUP.md.';
 
 /**
  * Start the Google OAuth flow.
  *
  * On success the browser navigates away to Google, so this does not resolve
- * with a session — the callback route completes the exchange.
+ * with a session - the callback route completes the exchange.
  */
 export async function signInWithGoogle(next = '/'): Promise<AuthResult> {
   const supabase = getSupabaseBrowserClient();
@@ -120,7 +120,7 @@ export async function updateProfile(
  *   1. `issue_wallet_link_nonce` mints a single-use challenge, bound to this
  *      account and this address and valid for five minutes.
  *   2. The wallet signs that exact text. This is what the old implementation
- *      never did — it took an address on trust, so any signed-in user could
+ *      never did - it took an address on trust, so any signed-in user could
  *      claim any unclaimed wallet they could read off the explorer, along with
  *      its reputation and ticket history.
  *   3. The `link-wallet` Edge Function verifies the signature (Postgres has no
@@ -178,7 +178,7 @@ export async function linkWallet(
           const body = await response.json();
           if (typeof body?.error === 'string') detail = body.error;
         } catch {
-          /* not JSON — fall through to the generic message */
+          /* not JSON - fall through to the generic message */
         }
       }
       return { ok: false, error: detail ?? 'Could not verify that wallet.' };

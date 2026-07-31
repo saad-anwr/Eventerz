@@ -1,5 +1,5 @@
 -- ---------------------------------------------------------------------------
--- Eventerz — 0011: proving you own the wallet you are linking
+-- Eventerz - 0011: proving you own the wallet you are linking
 --
 -- Run after 0010. Safe to re-run.
 --
@@ -12,7 +12,7 @@
 --
 -- That is not a theoretical hole once anything on-chain is attached to an
 -- identity. Claiming a well-known address grants its reputation, its ticket
--- history and — the moment payments exist (0009) — a receipt trail saying
+-- history and - the moment payments exist (0009) - a receipt trail saying
 -- money went to a person it did not go to. The check the function skipped is
 -- the only one that matters: *does this caller hold the private key?*
 --
@@ -30,7 +30,7 @@
 -- Why the verification is not in Postgres: `pgcrypto` has no Ed25519. The
 -- signature check needs a real crypto library, which means a function runtime.
 -- Deno has `crypto.subtle` with Ed25519 built in, so the Edge Function needs
--- no dependencies at all — see `supabase/functions/link-wallet/`.
+-- no dependencies at all - see `supabase/functions/link-wallet/`.
 --
 -- Why the nonce is stored server-side rather than signed-and-stateless: a
 -- stateless challenge can be replayed for as long as it is valid, and "valid
@@ -60,7 +60,7 @@ create index if not exists wallet_link_nonces_expiry_idx
 alter table public.wallet_link_nonces enable row level security;
 
 /*
- * No policies. The client never reads this table — it receives its nonce as
+ * No policies. The client never reads this table - it receives its nonce as
  * the return value of the function that mints it, and the Edge Function reads
  * it with the service-role key. With RLS on and no policy, a client that goes
  * looking finds an empty table, so one user cannot enumerate another's
@@ -71,7 +71,7 @@ alter table public.wallet_link_nonces enable row level security;
  * Mint a challenge for the caller to sign.
  *
  * Returns the full message text rather than a bare nonce. The message says, in
- * words the wallet will display, what signing it authorises — a wallet popup
+ * words the wallet will display, what signing it authorises - a wallet popup
  * showing an opaque UUID teaches users to approve opaque UUIDs, which is the
  * habit every signature-phishing attack depends on.
  *
@@ -121,7 +121,7 @@ begin
    * Every literal carries its own `E` prefix.
    *
    * Adjacent string constants are concatenated by the parser, but each is
-   * *escaped* independently — so `E'a\n' 'b\n'` yields a real newline followed by
+   * *escaped* independently - so `E'a\n' 'b\n'` yields a real newline followed by
    * a literal backslash-n. The wallet would have displayed "...funds.\n\nNonce:"
    * verbatim, which is exactly the kind of malformed prompt that teaches users to
    * approve signatures without reading them.
@@ -132,7 +132,7 @@ begin
    * it reads as.
    */
   return format(
-    E'Eventerz — verify wallet ownership\n\n'
+    E'Eventerz - verify wallet ownership\n\n'
     E'Signing this message links %s to your Eventerz account.\n'
     E'It is free, does not touch the blockchain, and cannot move any funds.\n\n'
     E'Nonce: %s\n'
@@ -163,7 +163,7 @@ grant execute on function public.issue_wallet_link_nonce(text) to authenticated;
  * an address would let a bug in the caller link a wallet whose signature was
  * never checked.
  *
- * The nonce is consumed — deleted, not flagged — so the same signature cannot
+ * The nonce is consumed - deleted, not flagged - so the same signature cannot
  * be presented twice.
  */
 create or replace function public.link_wallet_verified(
@@ -217,7 +217,7 @@ begin
   insert into public.notifications (profile_id, kind, title, body)
   values (
     p_profile_id, 'security', 'Wallet linked',
-    format('%s…%s is now linked to your account. If this was not you, disconnect it in Settings.',
+    format('%s...%s is now linked to your account. If this was not you, disconnect it in Settings.',
            left(trim(p_wallet_address), 4), right(trim(p_wallet_address), 4))
   );
 
@@ -231,8 +231,8 @@ revoke all on function public.link_wallet_verified(uuid, text, uuid)
 /* ===========================================================================
    3. Close the unverified path
    ---------------------------------------------------------------------------
-   `link_wallet` stays defined — dropping it would break installed mobile
-   builds with a confusing "function does not exist" — but it is no longer
+   `link_wallet` stays defined - dropping it would break installed mobile
+   builds with a confusing "function does not exist" - but it is no longer
    callable by a client. It now raises a message that tells the developer where
    to go, which is the only useful thing an obsolete entry point can do.
    =========================================================================== */

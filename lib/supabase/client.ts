@@ -4,7 +4,7 @@
  * Browser Supabase client.
  *
  * Returns `null` when the project is not configured, so callers must handle the
- * unconfigured case explicitly rather than crashing on a half-built client —
+ * unconfigured case explicitly rather than crashing on a half-built client -
  * that is what keeps the demo running without a backend.
  */
 

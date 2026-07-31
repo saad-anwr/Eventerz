@@ -1,20 +1,20 @@
 /**
  * Converting between what a user types and what a chain moves.
  *
- * Every function here is string→BigInt or BigInt→string, and none of them go
+ * Every function here is string->BigInt or BigInt->string, and none of them go
  * through `Number`. That is not fastidiousness: `0.1 + 0.2 !== 0.3` in binary
  * floating point, `1e9 * 0.07` is `70000000.00000001`, and both of those errors
  * land in a transfer amount. A ledger that cannot add up is not a ledger.
  *
  * `Number.MAX_SAFE_INTEGER` is about 9.007e15, so a lamport value above roughly
- * 9 million SOL is already unrepresentable as a JS number — and SPL tokens with
+ * 9 million SOL is already unrepresentable as a JS number - and SPL tokens with
  * larger supplies and different decimals hit it far sooner.
  */
 
 export const LAMPORTS_PER_SOL = 1_000_000_000n;
 
 /**
- * A decimal string in whole units → base units.
+ * A decimal string in whole units -> base units.
  *
  * Throws on anything that is not a plain non-negative decimal. Silently
  * coercing "1,5" or "1 SOL" to something would be worse than refusing: the user
@@ -40,7 +40,7 @@ export function toBaseUnits(input: string, decimals: number): bigint {
 }
 
 /**
- * Base units → a decimal string, trailing zeros trimmed.
+ * Base units -> a decimal string, trailing zeros trimmed.
  *
  * "0.4 SOL", never "0.400000000". Long strings of zeros make two amounts hard
  * to compare at a glance, which is the only thing anyone does with a receipt.
@@ -60,7 +60,7 @@ export function fromBaseUnits(amount: bigint | string, decimals: number): string
   return `${negative ? '-' : ''}${whole}.${padded}`;
 }
 
-/** "0.4 SOL" — the amount and its ticker, formatted for display. */
+/** "0.4 SOL" - the amount and its ticker, formatted for display. */
 export function formatTokenAmount(
   amount: bigint | string,
   decimals: number,

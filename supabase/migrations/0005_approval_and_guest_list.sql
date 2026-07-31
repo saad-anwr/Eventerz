@@ -1,5 +1,5 @@
 -- ---------------------------------------------------------------------------
--- Eventerz — 0005: request-to-join approval pipeline & gated guest lists
+-- Eventerz - 0005: request-to-join approval pipeline & gated guest lists
 --
 -- Run after 0004. Safe to re-run.
 --
@@ -11,19 +11,19 @@
 --         42501 otherwise. A Google-only account therefore could not RSVP at
 --         all, and because the website never surfaced the mutation error the
 --         button simply appeared dead. The wallet is still the primary
---         identity, but it is only *required* to mint an on-chain ticket — not
+--         identity, but it is only *required* to mint an on-chain ticket - not
 --         to ask to attend. It is recorded when present.
 --
 --     (b) The waitlist branch inserted the RSVP row and *then* raised an
 --         exception. Raising rolls the transaction back, so the row it had
---         just written was discarded — the caller was told "you have been
+--         just written was discarded - the caller was told "you have been
 --         added to the waitlist" and nothing was added. Full events now
 --         return a waitlist row instead of raising.
 --
---  2. Adds the approval pipeline: request → pending → approved | declined,
+--  2. Adds the approval pipeline: request -> pending -> approved | declined,
 --     with the decision travelling back to the guest as a notification.
 --
---  3. Gates the guest list. Until now `rsvps` was `using (true)` — world
+--  3. Gates the guest list. Until now `rsvps` was `using (true)` - world
 --     readable. The full roster is now visible only to the host and to
 --     confirmed guests; everyone else gets counts plus a small preview.
 --
@@ -40,8 +40,8 @@
    to be able to see which of the two happened.
 
    Note: a new enum value cannot be *used* in the same transaction that adds it.
-   Nothing below uses it at DDL time — the function bodies are text, parsed when
-   they run — so this is safe as one script. If your SQL client wraps everything
+   Nothing below uses it at DDL time - the function bodies are text, parsed when
+   they run - so this is safe as one script. If your SQL client wraps everything
    in a transaction and still objects, run this single statement on its own
    first, then the rest of the file.
    =========================================================================== */
@@ -64,7 +64,7 @@ alter table public.events
  * Deliberately a full recount rather than an incremental +1/-1: the trigger
  * fires on INSERT, UPDATE and DELETE and a status can move between any two
  * values, so incremental arithmetic has far more ways to drift. At this row
- * count the recount is cheap and it is self-healing — a wrong counter fixes
+ * count the recount is cheap and it is self-healing - a wrong counter fixes
  * itself on the next write.
  */
 create or replace function public.recount_event(p_event_id uuid)
@@ -129,7 +129,7 @@ end $$;
    3. Guest-list visibility
    ---------------------------------------------------------------------------
    Confirmed guests and the host see the roster. Everyone else sees their own
-   row only — enough to render "you asked to join", not enough to enumerate
+   row only - enough to render "you asked to join", not enough to enumerate
    who else is attending. Counts come from the columns above, so a stranger
    still sees "42 going" without being able to list the 42.
    =========================================================================== */
@@ -171,7 +171,7 @@ create policy "rsvps readable" on public.rsvps
   );
 
 /*
- * No write policies on `rsvps` at all — deliberately.
+ * No write policies on `rsvps` at all - deliberately.
  *
  * 0002's "rsvps self write" policy let a client insert or update its own row
  * directly, which meant anyone could `update rsvps set status = 'confirmed'`
@@ -181,7 +181,7 @@ create policy "rsvps readable" on public.rsvps
  *
  * Every write therefore goes through the SECURITY DEFINER functions below.
  * Those run as the function owner and bypass RLS, so no policy is needed for
- * them — and with none present, a direct client write is refused outright.
+ * them - and with none present, a direct client write is refused outright.
  */
 drop policy if exists "rsvps self write" on public.rsvps;
 drop policy if exists "rsvps self cancel" on public.rsvps;
@@ -192,7 +192,7 @@ drop policy if exists "rsvps self cancel" on public.rsvps;
  * SECURITY DEFINER so it can aggregate rows the caller cannot select. It
  * returns at most `p_limit` profiles and never a status, so it cannot be used
  * to page through the full guest list. Profiles are world-readable already
- * (0001), so the preview leaks nothing new — it is the *association* with an
+ * (0001), so the preview leaks nothing new - it is the *association* with an
  * event that stays private, and a bounded sample is what the product wants:
  * "Ayush, Sara and 40 others are going".
  */
@@ -239,13 +239,13 @@ grant execute on function public.event_guest_preview(uuid, int) to anon, authent
  * Ask to attend an event.
  *
  * Outcome, in order of precedence:
- *   • already have a live RSVP  → that status, unchanged (double-tap is safe)
- *   • event full                → 'waitlist'
- *   • event requires approval   → 'pending'
- *   • otherwise                 → 'confirmed', and a ticket is issued
+ *   • already have a live RSVP  -> that status, unchanged (double-tap is safe)
+ *   • event full                -> 'waitlist'
+ *   • event requires approval   -> 'pending'
+ *   • otherwise                 -> 'confirmed', and a ticket is issued
  *
  * Capacity is counted from confirmed guests only. Pending requests do not
- * hold a seat — a host who approves more people than the venue fits is making
+ * hold a seat - a host who approves more people than the venue fits is making
  * a decision, not hitting a race, and holding seats for unapproved requests
  * would let anyone fill an event by requesting and never being approved.
  */
@@ -396,7 +396,7 @@ begin
   select count(*) into confirmed from public.rsvps
   where event_id = p_event_id and status = 'confirmed';
   if confirmed >= ev.capacity then
-    raise exception 'This event is at capacity — raise it to approve more guests.'
+    raise exception 'This event is at capacity - raise it to approve more guests.'
       using errcode = '23514';
   end if;
 
@@ -430,8 +430,8 @@ $$;
 /**
  * Decline a request, or remove a guest who was already confirmed.
  *
- * One function for both because they are the same host action — "this person
- * is not coming" — and because removing a confirmed guest has to free the
+ * One function for both because they are the same host action - "this person
+ * is not coming" - and because removing a confirmed guest has to free the
  * seat and pull in the next waitlister, which declining a pending request
  * does not.
  */
@@ -504,7 +504,7 @@ grant execute on function public.decline_guest(uuid, uuid) to authenticated;
    6. Waitlist promotion
    ---------------------------------------------------------------------------
    Called whenever a confirmed seat is freed. Declared before `cancel_rsvp`
-   and `decline_guest` use it — plpgsql resolves function calls at runtime, so
+   and `decline_guest` use it - plpgsql resolves function calls at runtime, so
    the ordering in this file does not matter, but it is defined here for the
    reader.
    =========================================================================== */
@@ -513,7 +513,7 @@ grant execute on function public.decline_guest(uuid, uuid) to authenticated;
  * Move the longest-waiting person off the waitlist into a freed seat.
  *
  * Only auto-promotes when the event does not require approval. If it does, a
- * freed seat becomes an approvable request instead — the host asked to vet
+ * freed seat becomes an approvable request instead - the host asked to vet
  * every guest, and silently admitting someone would override that.
  */
 create or replace function public.promote_from_waitlist(p_event_id uuid)
@@ -567,7 +567,7 @@ begin
   insert into public.notifications (profile_id, kind, title, body, href)
   values (
     nxt, 'ticket', 'A spot opened up',
-    format('You are off the waitlist for %s — you are going.', ev.title),
+    format('You are off the waitlist for %s - you are going.', ev.title),
     '/events/' || p_event_id
   );
 end;
@@ -640,7 +640,7 @@ grant execute on function public.rsvp(uuid) to authenticated;
    9. Event chat is for confirmed guests
    ---------------------------------------------------------------------------
    0003 admitted anyone with a non-cancelled RSVP, which included pending
-   requests — someone the host had not yet accepted, and might decline, could
+   requests - someone the host had not yet accepted, and might decline, could
    read and post in the attendee channel.
    =========================================================================== */
 
@@ -673,7 +673,7 @@ grant execute on function public.can_access_channel(text, uuid) to authenticated
    10. Guest list for the host
    ---------------------------------------------------------------------------
    The host panel needs the roster joined to profiles. RLS already grants the
-   host every RSVP row for their event, so this view is `security_invoker` —
+   host every RSVP row for their event, so this view is `security_invoker` -
    it inherits the caller's permissions rather than handing out a wider read.
    =========================================================================== */
 

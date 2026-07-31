@@ -6,8 +6,8 @@
  * Two modes, decided by what the viewer is entitled to see rather than by a
  * prop the caller picks:
  *
- *   • Host or confirmed guest → the full roster, names and links.
- *   • Anyone else            → a bounded preview: a few faces and a count.
+ *   • Host or confirmed guest -> the full roster, names and links.
+ *   • Anyone else            -> a bounded preview: a few faces and a count.
  *
  * The gate is enforced in Postgres (RLS on `rsvps`, plus a SECURITY DEFINER
  * function for the preview), so this component renders whatever came back
@@ -35,7 +35,7 @@ export function AttendeeList({
 }) {
   const total = goingCount(event);
 
-  // Only one of these actually fetches — the roster query would come back
+  // Only one of these actually fetches - the roster query would come back
   // empty for a non-attendee anyway, so asking for it would be a wasted round
   // trip rather than a leak.
   const { data: guests = [] } = useEventGuests(
@@ -56,7 +56,7 @@ export function AttendeeList({
 
       {total === 0 ? (
         <p className="text-sm text-muted-foreground">
-          Nobody has joined yet — be the first.
+          Nobody has joined yet - be the first.
         </p>
       ) : canSeeRoster ? (
         <div className="flex flex-wrap gap-3">

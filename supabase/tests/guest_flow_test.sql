@@ -1,5 +1,5 @@
 -- ---------------------------------------------------------------------------
--- Eventerz — guest-flow integration tests
+-- Eventerz - guest-flow integration tests
 --
 --   supabase db reset                            # apply every migration
 --   psql "$DATABASE_URL" -f supabase/tests/guest_flow_test.sql
@@ -19,7 +19,7 @@
 --
 -- It also has to run as several different users, because half the assertions are
 -- about what one user *cannot* see or do. `set local role` plus a forged
--- `request.jwt.claims` is how `auth.uid()` is impersonated — the same mechanism
+-- `request.jwt.claims` is how `auth.uid()` is impersonated - the same mechanism
 -- PostgREST uses, so the policies see exactly what they see in production.
 --
 -- Everything runs inside one transaction and rolls back, so a run leaves the
@@ -61,9 +61,9 @@ create or replace function eventerz_test.ok(p_condition boolean, p_what text)
 returns void language plpgsql as $$
 begin
   if p_condition then
-    raise notice '  ok   — %', p_what;
+    raise notice '  ok   - %', p_what;
   else
-    raise exception 'FAILED — %', p_what;
+    raise exception 'FAILED - %', p_what;
   end if;
 end $$;
 
@@ -72,9 +72,9 @@ create or replace function eventerz_test.eq(
 ) returns void language plpgsql as $$
 begin
   if p_actual is not distinct from p_expected then
-    raise notice '  ok   — % (%)', p_what, p_actual;
+    raise notice '  ok   - % (%)', p_what, p_actual;
   else
-    raise exception 'FAILED — %: expected %, got %', p_what, p_expected, p_actual;
+    raise exception 'FAILED - %: expected %, got %', p_what, p_expected, p_actual;
   end if;
 end $$;
 
@@ -83,11 +83,11 @@ create or replace function eventerz_test.raises(p_sql text, p_what text)
 returns void language plpgsql as $$
 begin
   execute p_sql;
-  raise exception 'FAILED — % : expected an error, none raised', p_what;
+  raise exception 'FAILED - % : expected an error, none raised', p_what;
 exception
   when others then
     if sqlerrm like 'FAILED%' then raise; end if;
-    raise notice '  ok   — % (%)', p_what, left(sqlerrm, 60);
+    raise notice '  ok   - % (%)', p_what, left(sqlerrm, 60);
 end $$;
 
 /**
@@ -257,7 +257,7 @@ declare
   result  public.rsvps;
 begin
   raise notice '';
-  raise notice '=== 2. capacity → waitlist ===';
+  raise notice '=== 2. capacity -> waitlist ===';
 
   -- Capacity is 2 and A + C are already in.
   perform eventerz_test.act_as_owner();
@@ -358,7 +358,7 @@ begin
     'waitlist', 'a gated event at capacity still waitlists');
 
   -- Free the seat. On a gated event the freed seat must become an approvable
-  -- request, not a silent admission — the host asked to vet every guest.
+  -- request, not a silent admission - the host asked to vet every guest.
   perform eventerz_test.act_as(a_id);
   perform public.cancel_rsvp(appr_ev);
 
@@ -507,7 +507,7 @@ begin
      where event_id = open_ev and status <> 'confirmed' and profile_id <> c_id),
     0, 'a confirmed guest sees no non-confirmed rows');
 
-  -- A stranger sees their own row only — but the counts are still public.
+  -- A stranger sees their own row only - but the counts are still public.
   perform eventerz_test.act_as(a_id);  -- A cancelled earlier, so is not a guest.
   perform eventerz_test.eq(
     (select count(*)::int from public.rsvps

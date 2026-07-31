@@ -1,5 +1,5 @@
 -- ---------------------------------------------------------------------------
--- Eventerz — 0010: "starting soon" reminders
+-- Eventerz - 0010: "starting soon" reminders
 --
 -- Run after 0009. Safe to re-run.
 --
@@ -16,9 +16,9 @@
 -- reach the web.
 --
 -- Two windows, chosen because they answer different questions:
---   • **24 hours** — "is this still happening, and do I need to arrange
+--   • **24 hours** - "is this still happening, and do I need to arrange
 --     anything?" Late enough to be accurate, early enough to act on.
---   • **1 hour** — "leave now."
+--   • **1 hour** - "leave now."
 --
 -- An event created three hours before it starts skips the 24-hour reminder
 -- entirely rather than firing it immediately, which would be a reminder about
@@ -31,7 +31,7 @@
    The job is idempotent by construction: it inserts a claim row first, and the
    unique constraint is what stops a second send. Checking "did I already
    notify?" with a SELECT and then inserting is a race that duplicates every
-   reminder the moment two workers overlap — and overlap is the normal state of
+   reminder the moment two workers overlap - and overlap is the normal state of
    a cron job whose previous run has not finished.
    =========================================================================== */
 
@@ -64,7 +64,7 @@ alter table public.event_reminders enable row level security;
  *
  * Only confirmed guests are reminded. Someone still pending approval has not
  * been told they are coming, and "your event starts in an hour" would be the
- * app telling them they are in — a decision the host has not made.
+ * app telling them they are in - a decision the host has not made.
  */
 create or replace function public.send_event_reminders()
 returns int
@@ -78,7 +78,7 @@ declare
 begin
   /*
    * One statement per window. The CTE claims the reminder rows and the outer
-   * INSERT notifies exactly the guests whose claim actually landed — so a
+   * INSERT notifies exactly the guests whose claim actually landed - so a
    * concurrent run that lost the race writes nothing rather than sending a
    * duplicate.
    */
@@ -98,7 +98,7 @@ begin
        * The window above already excludes events too close to start, but it says
        * nothing about *when the guest joined*. Someone who RSVPs to a
        * tomorrow-evening event at 18:01 would otherwise be told "this is
-       * tomorrow" at 18:15 — a notification about something they are still
+       * tomorrow" at 18:15 - a notification about something they are still
        * looking at, which is how people learn to ignore the ones that matter.
        */
       and r.created_at < now() - interval '1 hour'
@@ -160,7 +160,7 @@ revoke all on function public.send_event_reminders() from public, anon, authenti
    3. Schedule it
    ---------------------------------------------------------------------------
    Every 15 minutes. The windows above are ±1 hour and ±15 minutes wide, so a
-   quarter-hourly run cannot miss one — and because the claim row is what makes
+   quarter-hourly run cannot miss one - and because the claim row is what makes
    the job idempotent, running it more often than necessary is harmless.
    =========================================================================== */
 
@@ -170,7 +170,7 @@ begin
 exception when others then
   raise notice
     'pg_cron is unavailable (%). Reminders will not fire on a schedule. '
-    'Enable it under Database → Extensions, then re-run this migration, or '
+    'Enable it under Database -> Extensions, then re-run this migration, or '
     'call public.send_event_reminders() from an external scheduler.',
     sqlerrm;
 end $$;

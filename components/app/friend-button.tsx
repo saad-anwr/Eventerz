@@ -3,7 +3,7 @@
 /**
  * Friend action button.
  *
- * Reads real `friend_requests` rows from Supabase — previously this used the
+ * Reads real `friend_requests` rows from Supabase - previously this used the
  * local demo store, which is why people who actually signed up never appeared
  * as addable and requests never reached anyone.
  */

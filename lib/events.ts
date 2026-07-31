@@ -19,7 +19,7 @@ export function goingCount(event: EventItem): number {
  * The viewer's own state for this event.
  *
  * `myStatus` is authoritative when present. The roster fallback exists for the
- * demo store, where membership is the only signal — and it can only ever mean
+ * demo store, where membership is the only signal - and it can only ever mean
  * `confirmed`, since the demo store has no approval concept.
  */
 export function myRsvpState(
@@ -31,7 +31,7 @@ export function myRsvpState(
   return undefined;
 }
 
-/** Seats left, floored at zero — capacity can be lowered below the headcount. */
+/** Seats left, floored at zero - capacity can be lowered below the headcount. */
 export function spotsLeft(event: EventItem): number {
   return Math.max(0, event.capacity - goingCount(event));
 }
@@ -46,7 +46,7 @@ export function filledPercent(event: EventItem): number {
   return Math.min(100, Math.round((goingCount(event) / event.capacity) * 100));
 }
 
-/** True when the viewer holds a seat — the gate for chat and the guest list. */
+/** True when the viewer holds a seat - the gate for chat and the guest list. */
 export function isConfirmed(
   event: EventItem,
   userId: string | null | undefined,
@@ -54,7 +54,7 @@ export function isConfirmed(
   return myRsvpState(event, userId) === 'confirmed';
 }
 
-/** The host called it off. Soft — the row and its page survive. */
+/** The host called it off. Soft - the row and its page survive. */
 export function isCancelled(event: EventItem): boolean {
   return Boolean(event.cancelledAt);
 }
@@ -93,7 +93,7 @@ export interface RsvpPresentation {
  * How each RSVP state reads to the guest.
  *
  * Centralised so the wording is identical on a card, on the event page and in
- * the mobile app — a guest who sees "Requested" in one place and "Pending" in
+ * the mobile app - a guest who sees "Requested" in one place and "Pending" in
  * another has to work out whether they are the same thing.
  */
 export const RSVP_PRESENTATION: Record<RsvpState, RsvpPresentation> = {
@@ -129,7 +129,7 @@ export const RSVP_PRESENTATION: Record<RsvpState, RsvpPresentation> = {
  *
  * `requiresApproval` and fullness change the promise the button makes, and
  * making a promise the server will not keep is what made the old button feel
- * broken — it said "RSVP" and produced a pending request, or nothing at all.
+ * broken - it said "RSVP" and produced a pending request, or nothing at all.
  */
 export function rsvpActionLabel(event: EventItem): string {
   if (isFull(event)) return 'Join the waitlist';
@@ -143,7 +143,7 @@ export function rsvpActionLabel(event: EventItem): string {
  * "On the waitlist" alone is not actionable: third in line means keep the
  * evening free, fortieth means make other plans, and the difference is the
  * entire decision. Falls back to the generic sentence when the position has
- * not loaded — an unknown position must not render as "you are 0th".
+ * not loaded - an unknown position must not render as "you are 0th".
  */
 export function waitlistDetail(event: EventItem): string {
   const position = event.waitlistPosition;
@@ -156,7 +156,7 @@ export function waitlistDetail(event: EventItem): string {
   return `You are ${ordinal} in line. You will be let in automatically if enough spots open.`;
 }
 
-/** 1 → "1st", 2 → "2nd", 11 → "11th", 22 → "22nd". */
+/** 1 -> "1st", 2 -> "2nd", 11 -> "11th", 22 -> "22nd". */
 export function formatOrdinal(n: number): string {
   // The teens are the exception every naive implementation gets wrong: 11, 12
   // and 13 take "th" even though 1, 2 and 3 take "st", "nd", "rd".

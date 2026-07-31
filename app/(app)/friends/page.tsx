@@ -5,7 +5,7 @@
  *
  * Reads real profiles from Supabase. Previously this listed the seeded demo
  * users from the local store, so anyone who actually signed up was invisible
- * to everyone else — which is exactly the bug this fixes.
+ * to everyone else - which is exactly the bug this fixes.
  */
 
 import * as React from "react";
@@ -67,7 +67,7 @@ export default function FriendsPage() {
       <PageHeader
         eyebrow="Community"
         title="Friends"
-        description="Connect with people in the ecosystem — add friends and start chatting."
+        description="Connect with people in the ecosystem - add friends and start chatting."
       />
 
       {/* Search */}
@@ -76,7 +76,7 @@ export default function FriendsPage() {
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search people…"
+          placeholder="Search people..."
           className="h-12 w-full rounded-2xl border border-white/10 bg-white/[0.03] pl-11 pr-4 text-sm text-white placeholder:text-muted-foreground focus:border-brand-purple/40 focus:outline-none"
         />
       </div>
@@ -84,7 +84,7 @@ export default function FriendsPage() {
       {isLoading && (
         <div className="flex items-center gap-2 py-10 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" />
-          Loading people…
+          Loading people...
         </div>
       )}
 

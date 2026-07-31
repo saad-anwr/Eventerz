@@ -3,7 +3,7 @@
 import { useAppStore } from "@/lib/store/use-app-store";
 import { useHydrated } from "@/hooks/use-hydrated";
 
-/** Unified session — the current app user (from wallet or social/email auth). */
+/** Unified session - the current app user (from wallet or social/email auth). */
 export function useSession() {
   const hydrated = useHydrated();
   const user = useAppStore((s) =>

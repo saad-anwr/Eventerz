@@ -20,7 +20,7 @@ for (let i = 0; i < BASE58_ALPHABET.length; i++) {
  *
  * Throws on any character outside the alphabet rather than skipping it. Solana
  * addresses are routinely copied by hand, and `0`/`O` and `I`/`l` are exactly
- * the pairs base58 omits — silently dropping a bad character would produce a
+ * the pairs base58 omits - silently dropping a bad character would produce a
  * different, valid-looking key.
  */
 export function base58Decode(input: string): Uint8Array {
@@ -85,7 +85,7 @@ export function decodeSignature(signature: string): Uint8Array {
     const bytes = base58Decode(signature);
     if (bytes.length === 64) return bytes;
   } catch {
-    // Not base58 — fall through.
+    // Not base58 - fall through.
   }
 
   const bytes = base64Decode(signature);
@@ -100,7 +100,7 @@ export function decodeSignature(signature: string): Uint8Array {
  *
  * Deno's Web Crypto implements Ed25519, so the common path needs nothing
  * installed. The `@noble/curves` fallback exists because that support is a
- * runtime capability rather than a language guarantee — if the function is
+ * runtime capability rather than a language guarantee - if the function is
  * ever deployed on a runtime without it, a wallet-linking feature that fails
  * closed with "unsupported algorithm" is a worse outcome than one extra
  * import.

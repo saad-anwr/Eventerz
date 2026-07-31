@@ -1,4 +1,4 @@
-# Guest flow — requests, approval and the guest list
+# Guest flow - requests, approval and the guest list
 
 How someone goes from "interested" to "holding a ticket", who can see whom, and
 where each rule is enforced. The website and the mobile app both drive the same
@@ -19,7 +19,7 @@ Run these in order in the Supabase SQL editor. Each is safe to re-run.
 | `0005_approval_and_guest_list.sql` | RSVP does nothing, no approval flow, guest counts read 0. |
 
 `0005` adds one enum value (`declined`). A new enum value cannot be *used* in
-the same transaction that adds it — nothing in the file does, but if your SQL
+the same transaction that adds it - nothing in the file does, but if your SQL
 client wraps the whole script in a transaction and objects, run that first
 statement alone, then the rest.
 
@@ -38,18 +38,18 @@ An RSVP is one row in `rsvps`, unique per (event, person).
 | `cancelled` | The guest withdrew. | No | No |
 
 Capacity counts **confirmed only**. Pending requests deliberately do not hold
-seats — otherwise anyone could fill an event by requesting and never being
+seats - otherwise anyone could fill an event by requesting and never being
 approved.
 
 ## Requesting
 
 `request_to_join(event_id)` decides the outcome server-side, in this order:
 
-1. Already `confirmed`/`pending`/`waitlist` → returns that, unchanged. A
+1. Already `confirmed`/`pending`/`waitlist` -> returns that, unchanged. A
    double-tap is harmless.
-2. Event full → `waitlist`.
-3. Event requires approval → `pending`, and the **host** is notified.
-4. Otherwise → `confirmed`, and a ticket is issued.
+2. Event full -> `waitlist`.
+3. Event requires approval -> `pending`, and the **host** is notified.
+4. Otherwise -> `confirmed`, and a ticket is issued.
 
 The client renders whatever status comes back, so the button never promises an
 outcome the server did not produce.
@@ -61,10 +61,10 @@ Google-only account could click RSVP and have nothing happen.)
 
 ## Host decisions
 
-- `approve_guest(event_id, profile_id)` — `pending`/`waitlist` → `confirmed`,
+- `approve_guest(event_id, profile_id)` - `pending`/`waitlist` -> `confirmed`,
   issues the ticket at that moment, notifies the guest. Refuses if the event is
   already at capacity.
-- `decline_guest(event_id, profile_id)` — → `declined`, deletes any ticket,
+- `decline_guest(event_id, profile_id)` - -> `declined`, deletes any ticket,
   notifies the guest. If they had been confirmed, the freed seat triggers
   waitlist promotion. The same function handles "decline a request" and "remove
   a confirmed guest" because they are the same host intent.
@@ -74,7 +74,7 @@ panel is not what authorises anything.
 
 ## Waitlist promotion
 
-`promote_from_waitlist(event_id)` runs whenever a confirmed seat is freed —
+`promote_from_waitlist(event_id)` runs whenever a confirmed seat is freed -
 a guest cancelling, or the host removing someone. The longest-waiting person is
 pulled in.
 
@@ -111,7 +111,7 @@ server-side, so a caller cannot widen it and page out the full roster.
    viewer without a second subscription.
 
 The trigger does a full recount per event rather than incremental arithmetic:
-statuses can move between any two values, and a recount is self-healing — a
+statuses can move between any two values, and a recount is self-healing - a
 wrong counter fixes itself on the next write.
 
 ## Writes never come from the client
@@ -122,13 +122,13 @@ with none present, a direct client write is refused.
 
 This is deliberate. `0002` had a self-write policy, which let anyone run
 `update rsvps set status = 'confirmed'` and walk past capacity, approval and
-ticket allocation. A cancel-only UPDATE policy has the same hole — RLS restricts
+ticket allocation. A cancel-only UPDATE policy has the same hole - RLS restricts
 *which rows* you may touch, never *which values* you may set.
 
 ## Event chat
 
 Gated to the host and `confirmed` guests via `can_access_channel()`. `0003`
-admitted anyone with a non-cancelled RSVP, which included pending requests —
+admitted anyone with a non-cancelled RSVP, which included pending requests -
 someone the host had not yet accepted, and might decline, could read and post in
 the attendee channel.
 
@@ -155,11 +155,11 @@ reaches the guest without a refresh.
 
 # Additions since the approval pipeline
 
-Everything above still holds. This section covers what `0006`–`0011` added.
+Everything above still holds. This section covers what `0006`-`0011` added.
 
 ## Waitlist position
 
-A waitlisted guest sees their place in the queue — "#3 of 12 waiting".
+A waitlisted guest sees their place in the queue - "#3 of 12 waiting".
 
 It cannot be computed on the client. The RLS above hands a waitlisted guest
 exactly one RSVP row, their own, so counting the people ahead of them means
@@ -170,7 +170,7 @@ nothing about who else is in the queue.
 `my_waitlist_positions(event_id[])` is the batch form, so a "my events" list
 costs one call rather than one per waitlisted event.
 
-The ordering — `created_at, profile_id` — is identical to
+The ordering - `created_at, profile_id` - is identical to
 `promote_from_waitlist`. That is a contract between them, not an implementation
 detail: if the two disagreed, the app would promise a seat to the wrong person.
 
@@ -199,7 +199,7 @@ event writes to the host, for three reasons:
 
 Every parameter defaults to null, and null means "leave alone", so a client sends
 only what it is changing. That is what makes two devices editing the same event
-safe — a full-row write would clobber the other device's change with a stale
+safe - a full-row write would clobber the other device's change with a stale
 value it never intended to send. `p_ends_at` is the exception: an event can
 legitimately lose its end time, so `p_clear_ends_at` distinguishes "unchanged"
 from "cleared".
@@ -208,7 +208,7 @@ from "cleared".
 the URL still resolves; a dead link where an event used to be is a worse answer
 than a page saying it was called off. Deleting would cascade to `rsvps` and
 `tickets` and erase the attendance of everyone who already checked in. Guests are
-moved to `cancelled` rather than `declined` — `declined` means the host rejected
+moved to `cancelled` rather than `declined` - `declined` means the host rejected
 *that person*, and telling forty people they were individually turned down is the
 wrong story.
 
@@ -220,7 +220,7 @@ Two windows, 24 hours and 1 hour, answering different questions: "is this still
 happening, and do I need to arrange anything?" and "leave now."
 
 In the database via `pg_cron`, not a Vercel cron route, because one
-implementation then serves both clients — both already render `notifications` and
+implementation then serves both clients - both already render `notifications` and
 already stream that table over Realtime. The mobile app's local scheduler fires
 only on the phone that RSVP'd and never for someone who signed up on the website;
 a web-only cron could never reach the app.
@@ -228,13 +228,13 @@ a web-only cron could never reach the app.
 Idempotent **by construction**: the job inserts a claim row into
 `event_reminders` first, and a unique constraint is what stops a second send.
 Checking "did I already notify?" with a SELECT and then inserting is a race that
-duplicates every reminder the moment two workers overlap — and overlap is the
+duplicates every reminder the moment two workers overlap - and overlap is the
 normal state of a cron job whose previous run has not finished. So the job can run
 every fifteen minutes safely.
 
 Only **confirmed** guests are reminded. Someone still pending approval has not
 been told they are coming, and "your event starts in an hour" would be the app
-telling them they are in — a decision the host has not made.
+telling them they are in - a decision the host has not made.
 
 Guests who RSVP'd within the last hour are skipped for the 24-hour window.
 Otherwise someone who RSVPs at 18:01 to a tomorrow-evening event is told "this is
@@ -243,7 +243,7 @@ tomorrow" at 18:15, about something they are still looking at.
 ## Contacting a host  (`0009`)
 
 DMs were already open to any two profiles: `can_access_channel` requires only
-that you are a party to the channel. What was missing was the **inbox** — it was
+that you are a party to the channel. What was missing was the **inbox** - it was
 derived from the friend list, so a message from a non-friend arrived in a thread
 that appeared nowhere. It was delivered, readable, and invisible.
 
@@ -253,27 +253,27 @@ inbox is now that set **union** friends, so friends with no messages still appea
 labelled, because an unexplained name in an inbox reads as spam.
 
 The website's DM screen also used to disable its composer unless you were
-friends — a UI gate that contradicted the database, since the message would have
+friends - a UI gate that contradicted the database, since the message would have
 sent fine.
 
 ## Payments in a thread  (`0009`)
 
 The money moves on-chain; the receipt lands in the thread. The chain is the source
 of truth for *whether it happened*; `payments` is the source of truth for *what it
-was for* and *who it was between*, which the chain does not know — it sees two
+was for* and *who it was between*, which the chain does not know - it sees two
 base58 strings, not two people.
 
 Order of operations, and it only works one way round:
 
 1. Build and send the transfer.
 2. Wait for the cluster to confirm it.
-3. `record_payment(...)` — writes the row **and** posts the receipt message in one
+3. `record_payment(...)` - writes the row **and** posts the receipt message in one
    transaction.
 
 Recording first is tempting because it gives the UI something to render
 immediately, and it is wrong: a receipt for a transfer that then fails is a lie
 the recipient acts on. `record_payment` is idempotent on the signature, so the
-failure mode of this ordering is benign — if the app dies between confirmation
+failure mode of this ordering is benign - if the app dies between confirmation
 and recording, the money moved and the receipt is missing, and calling again with
 the same signature files it exactly once.
 
@@ -288,7 +288,7 @@ calls. So:
   decorative.
 - The `verify-payment` Edge Function checks the recipient's **balance delta**
   against the cluster and calls `mark_payment_verified`, which is revoked from
-  `authenticated` — the party who benefits from the flag cannot set it.
+  `authenticated` - the party who benefits from the flag cannot set it.
 
 A balance delta rather than an instruction walk, because reading the instruction
 list means understanding every program that might have moved the money. Before
@@ -306,7 +306,7 @@ What `record_payment` *does* enforce is the part a lie would profit from:
   pins client writes to `kind = 'text'` with a null `payment_id`, so a client
   cannot post a receipt for a transfer that never happened.
 
-Amounts are `bigint` base units end to end — never floats. `0.1 + 0.2 !== 0.3`
+Amounts are `bigint` base units end to end - never floats. `0.1 + 0.2 !== 0.3`
 in binary floating point, and a lamport value above ~9 million SOL already
 exceeds `Number.MAX_SAFE_INTEGER`. PostgREST serialises `bigint` as a string for
 exactly that reason; parse it with `BigInt`, never `Number`.
@@ -314,7 +314,7 @@ exactly that reason; parse it with `BigInt`, never `Number`.
 ## Wallet ownership  (`0011`)
 
 `link_wallet` took an address and wrote it to the caller's profile. It checked
-that no *other* profile had claimed that address, and nothing else — so any
+that no *other* profile had claimed that address, and nothing else - so any
 signed-in user could link any wallet they could read off the explorer, along with
 its reputation, its ticket history and, once payments existed, a receipt trail
 saying money went to a person it did not go to.
@@ -324,7 +324,7 @@ private key?**
 
 1. `issue_wallet_link_nonce(address)` mints a single-use challenge bound to the
    caller *and* the address, valid five minutes. It returns the full message text,
-   not a bare nonce — a wallet popup showing an opaque UUID teaches users to
+   not a bare nonce - a wallet popup showing an opaque UUID teaches users to
    approve opaque UUIDs, which is the habit every signature-phishing attack
    depends on.
 2. The wallet signs that exact text. Free, and touches no chain.
@@ -333,15 +333,15 @@ private key?**
 
 The nonce is passed back in step 3 on purpose: the function verified a signature
 over a *specific challenge*, and handing that challenge to the database is what
-ties the verification to the row it writes. It is then consumed — deleted, not
-flagged — so the same signature cannot be presented twice. Verifying a signature
+ties the verification to the row it writes. It is then consumed - deleted, not
+flagged - so the same signature cannot be presented twice. Verifying a signature
 over an attacker-chosen message proves they can sign; it does not prove they were
 answering our challenge, and a signature harvested from any other Solana dapp
 would otherwise sail straight through.
 
 `link_wallet_verified` is revoked from `authenticated`. `link_wallet` still
-exists — dropping it would break installed mobile builds with a confusing
-"function does not exist" — but now raises a message pointing at the Edge
+exists - dropping it would break installed mobile builds with a confusing
+"function does not exist" - but now raises a message pointing at the Edge
 Function.
 
 `unlink_wallet()` exists because linking became a deliberate act: a user who links
@@ -358,7 +358,7 @@ npm run test:db          # supabase/tests/guest_flow_test.sql
 ```
 
 Eleven sections, run as several different users via `set local role` plus a forged
-`request.jwt.claims` — the same mechanism PostgREST uses, so the policies see
+`request.jwt.claims` - the same mechanism PostgREST uses, so the policies see
 exactly what they see in production. Half the assertions are about what a user
 *cannot* see or do, which is not expressible from a single-user client. It all
 runs in one transaction and rolls back.

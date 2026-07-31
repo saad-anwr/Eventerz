@@ -110,7 +110,7 @@ function Toggle({
   );
 }
 
-/** The editable shape, as strings — what the form fields actually hold. */
+/** The editable shape, as strings - what the form fields actually hold. */
 interface Draft {
   title: string;
   description: string;
@@ -162,7 +162,7 @@ export default function EditEventPage() {
   /*
    * Seed the form once, from the first load. Re-seeding on every refetch would
    * throw away whatever the host was typing the moment a Realtime event landed
-   * — and this page is subscribed to the very table it is editing, so that
+   * - and this page is subscribed to the very table it is editing, so that
    * happens constantly.
    */
   const seeded = React.useRef(false);
@@ -183,7 +183,7 @@ export default function EditEventPage() {
     return (
       <div className="flex items-center gap-2 py-20 text-sm text-muted-foreground">
         <Loader2 className="size-4 animate-spin" />
-        Loading event…
+        Loading event...
       </div>
     );
   }
@@ -243,7 +243,7 @@ export default function EditEventPage() {
    * Only what actually changed.
    *
    * The RPC treats an omitted field as "leave alone", which is what makes two
-   * devices editing the same event safe — sending the whole row back would
+   * devices editing the same event safe - sending the whole row back would
    * overwrite the other device's change with a value this form never touched.
    */
   const buildPatch = (current: Draft, original: EventItem): UpdateEventInput => {
@@ -454,7 +454,7 @@ export default function EditEventPage() {
         <div className="grid gap-5 sm:grid-cols-2">
           <Field
             label="Capacity"
-            hint={going > 0 ? `${going} confirmed — cannot go below this.` : undefined}
+            hint={going > 0 ? `${going} confirmed - cannot go below this.` : undefined}
           >
             <input
               type="number"
@@ -510,7 +510,7 @@ export default function EditEventPage() {
             ) : (
               <Save className="size-4" />
             )}
-            {update.isPending ? "Saving…" : "Save changes"}
+            {update.isPending ? "Saving..." : "Save changes"}
           </Button>
           <Button
             type="button"
@@ -531,7 +531,7 @@ export default function EditEventPage() {
         </h2>
         <p className="mt-1.5 text-sm text-muted-foreground">
           Everyone holding a spot is notified and their RSVP is closed. The event
-          page stays up so ticket holders keep the record — it cannot be
+          page stays up so ticket holders keep the record - it cannot be
           un-cancelled.
         </p>
 
@@ -542,7 +542,7 @@ export default function EditEventPage() {
                 className={inputCls}
                 value={cancelReason}
                 onChange={(e) => setCancelReason(e.target.value)}
-                placeholder="Venue fell through — we'll reschedule."
+                placeholder="Venue fell through - we'll reschedule."
               />
             </Field>
             <div className="flex flex-wrap gap-3">
@@ -559,7 +559,7 @@ export default function EditEventPage() {
                   <Trash2 className="size-4" />
                 )}
                 {cancel.isPending
-                  ? "Cancelling…"
+                  ? "Cancelling..."
                   : going > 0
                     ? `Yes, cancel and notify ${going} ${going === 1 ? "guest" : "guests"}`
                     : "Yes, cancel this event"}

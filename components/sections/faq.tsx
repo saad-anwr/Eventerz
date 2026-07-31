@@ -18,7 +18,7 @@ export function FAQ() {
     <section id="faq" className="section">
       <div className="container">
         <div className="grid gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:gap-16">
-          {/* Left — heading + support */}
+          {/* Left - heading + support */}
           <div className="lg:sticky lg:top-28 lg:self-start">
             <span className="chip">
               <HelpCircle className="size-3.5 text-brand-purple" />
@@ -54,7 +54,7 @@ export function FAQ() {
             </div>
           </div>
 
-          {/* Right — accordion */}
+          {/* Right - accordion */}
           <motion.div
             initial={{ opacity: 0, y: 24 }}
             whileInView={{ opacity: 1, y: 0 }}

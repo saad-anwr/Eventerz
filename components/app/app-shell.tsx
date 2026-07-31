@@ -75,7 +75,7 @@ function Gate() {
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Create and discover events, build reputation and connect with your
-          community — sign in with a social account or your Solana wallet.
+          community - sign in with a social account or your Solana wallet.
         </p>
         <div className="mt-6 flex flex-col gap-2.5">
           <Button size="lg" onClick={openAuth} className="w-full">
@@ -104,7 +104,7 @@ function Gate() {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Sidebar footer — user + wallet                                            */
+/*  Sidebar footer - user + wallet                                            */
 /* -------------------------------------------------------------------------- */
 
 function WalletChip() {
@@ -140,8 +140,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const nav = useNav();
 
   /*
-   * One subscription for the whole app section. Changes another user makes —
-   * publishing an event, sending a friend request, RSVPing — invalidate the
+   * One subscription for the whole app section. Changes another user makes -
+   * publishing an event, sending a friend request, RSVPing - invalidate the
    * matching queries here, so the UI updates without a refresh.
    */
   useRealtimeSync(userId);

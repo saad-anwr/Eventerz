@@ -15,7 +15,7 @@ import {
  *
  * A Maps key is optional, and most events in the database predate the location
  * columns entirely. So the interesting cases are not "does it build a Google URL"
- * — they are "what happens with no key", "what happens with no coordinates", and
+ * - they are "what happens with no key", "what happens with no coordinates", and
  * "does a half-set coordinate pair ever produce a confident pin in the wrong
  * ocean".
  */
@@ -42,7 +42,7 @@ const okhla: MappableLocation = {
   placeId: 'ChIJTest',
 };
 
-const unpinned: MappableLocation = { location: 'Someone’s rooftop, Delhi' };
+const unpinned: MappableLocation = { location: "Someone's rooftop, Delhi" };
 
 describe('coordinatesOf', () => {
   it('returns the pair when both halves are finite', () => {
@@ -66,7 +66,7 @@ describe('coordinatesOf', () => {
   });
 
   it('treats a genuine zero as a coordinate', () => {
-    // 0,0 is in the Gulf of Guinea, but it is a real place — the guard is about
+    // 0,0 is in the Gulf of Guinea, but it is a real place - the guard is about
     // *missing* values, not falsy ones.
     expect(coordinatesOf({ location: 'x', latitude: 0, longitude: 0 })).toEqual({
       lat: 0,
@@ -90,7 +90,7 @@ describe('mapEmbedUrl', () => {
   it('prefers the place id, which renders the venue card', () => {
     withKey();
     expect(mapEmbedUrl(okhla)).toContain('/embed/v1/place');
-    // `place_id:` stays literal — that prefix is Embed API syntax, not part of
+    // `place_id:` stays literal - that prefix is Embed API syntax, not part of
     // the id, so encoding the colon would make Google read the whole thing as a
     // search string and drop the venue card.
     expect(mapEmbedUrl(okhla)).toContain('q=place_id:ChIJTest');
@@ -113,7 +113,7 @@ describe('mapEmbedUrl', () => {
     const url = mapEmbedUrl(okhla);
     expect(url).toContain('openstreetmap.org');
     expect(url).toContain('marker=28.5355%2C77.2731');
-    // A bounding box, not a centre-and-zoom — OSM's embed takes the former.
+    // A bounding box, not a centre-and-zoom - OSM's embed takes the former.
     expect(url).toContain('bbox=');
   });
 

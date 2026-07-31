@@ -1,5 +1,5 @@
 -- ---------------------------------------------------------------------------
--- Eventerz — 0006: structured event location
+-- Eventerz - 0006: structured event location
 --
 -- Run after 0005. Safe to re-run.
 --
@@ -9,8 +9,8 @@
 -- "Okhla Industrial Estate, New Delhi" even though a human reads them as one
 -- venue.
 --
--- This adds the structured half alongside it — coordinates, a Google Place id
--- and a normalised address — while keeping `location` as the display string.
+-- This adds the structured half alongside it - coordinates, a Google Place id
+-- and a normalised address - while keeping `location` as the display string.
 -- Both clients render the map from the coordinates and fall back to a plain
 -- search link when the host typed something a geocoder could not resolve, so
 -- an event created before this migration keeps working untouched.
@@ -31,7 +31,7 @@ alter table public.events
   add column if not exists address   text;
 
 comment on column public.events.latitude is
-  'WGS84 latitude of the venue. Null when the host typed a location that was never geocoded — the UI falls back to a plain map search link.';
+  'WGS84 latitude of the venue. Null when the host typed a location that was never geocoded - the UI falls back to a plain map search link.';
 comment on column public.events.place_id is
   'Google Places id. Stored for deep links and re-resolution; never required to render the map, because coordinates already do that.';
 comment on column public.events.address is
@@ -39,7 +39,7 @@ comment on column public.events.address is
 
 /*
  * Refuse impossible coordinates outright. A swapped lat/lng pair is the
- * classic mapping bug — it puts a Delhi event in the Indian Ocean and looks
+ * classic mapping bug - it puts a Delhi event in the Indian Ocean and looks
  * plausible enough in a form field to ship. 77.2 is a valid longitude and an
  * invalid latitude, so the constraint catches exactly that transposition.
  */
@@ -74,7 +74,7 @@ create index if not exists events_coordinates_idx
  *
  * Events are inserted directly by the client under the "events host writes"
  * policy rather than through a function, so there is nothing to redefine here
- * — the new columns are simply writable by the host like every other column
+ * - the new columns are simply writable by the host like every other column
  * on the row. This block exists to say that explicitly, because the RSVP path
  * next door is function-only and the asymmetry looks like an oversight
  * otherwise: an event's own fields are the host's to set, while a guest's RSVP

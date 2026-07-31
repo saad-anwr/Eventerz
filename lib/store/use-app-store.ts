@@ -176,7 +176,7 @@ export const useAppStore = create<AppState>()(
         const id = uid("u");
         const user: User = {
           id,
-          name: `${address.slice(0, 4)}…${address.slice(-4)}`,
+          name: `${address.slice(0, 4)}...${address.slice(-4)}`,
           handle: `sol${address.slice(0, 6).toLowerCase()}`,
           walletAddress: address,
           authMethod: "wallet",
@@ -315,7 +315,7 @@ export const useAppStore = create<AppState>()(
 );
 
 /* --------------------------------------------------------------------- */
-/*  Derived selectors (pure — call inside useAppStore(s => ...))          */
+/*  Derived selectors (pure - call inside useAppStore(s => ...))          */
 /* --------------------------------------------------------------------- */
 
 export const dmChannelId = (a: string, b: string) =>

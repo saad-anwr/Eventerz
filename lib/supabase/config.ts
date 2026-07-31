@@ -2,7 +2,7 @@
  * Supabase configuration and the "is this wired up yet?" guard.
  *
  * Eventerz ships with a working demo that needs no backend. Real auth turns on
- * only when both env vars are present, so a fresh clone still runs — it just
+ * only when both env vars are present, so a fresh clone still runs - it just
  * falls back to the simulated session. Every auth entry point checks
  * `isSupabaseConfigured` before assuming a client exists.
  */
@@ -18,7 +18,7 @@ export const isSupabaseConfigured =
 
 /**
  * Where Google returns the user after consent. Must exactly match an entry in
- * Supabase → Authentication → URL Configuration → Redirect URLs.
+ * Supabase -> Authentication -> URL Configuration -> Redirect URLs.
  */
 export function authCallbackUrl(origin: string, next = '/'): string {
   const url = new URL('/auth/callback', origin);

@@ -31,7 +31,7 @@ export function CommunitySection() {
               <span className="text-gradient">community</span>
             </>
           }
-          description="From DAOs to hackathons to campus clubs — Eventerz is lightweight for local organizers and scalable for global ecosystems."
+          description="From DAOs to hackathons to campus clubs - Eventerz is lightweight for local organizers and scalable for global ecosystems."
         />
 
         <motion.div

@@ -48,7 +48,7 @@ export interface EventItem {
   requiresApproval: boolean;
   tokenGated: boolean;
   /**
-   * Confirmed guests, and only when the viewer is allowed to see them — the
+   * Confirmed guests, and only when the viewer is allowed to see them - the
    * host or a confirmed guest. Empty for everyone else, which is why counts
    * below are separate rather than derived from this array's length.
    */
@@ -59,7 +59,7 @@ export interface EventItem {
   /**
    * Live counts, visible to everyone, maintained server-side by trigger.
    *
-   * Optional because the local demo store has no server to maintain them —
+   * Optional because the local demo store has no server to maintain them -
    * there `attendeeIds` is the whole truth. Read these through `goingCount()`
    * and `myRsvpState()` in `lib/events.ts`, which handle both cases.
    */
@@ -74,7 +74,7 @@ export interface EventItem {
    * The viewer's 1-based place in the waitlist queue, when they are on it.
    *
    * Cannot be derived on the client: RLS returns a waitlisted guest exactly
-   * one RSVP row — their own — so counting the people ahead of them means
+   * one RSVP row - their own - so counting the people ahead of them means
    * counting rows they may not read. It comes from `my_waitlist_position`.
    */
   waitlistPosition?: number;
@@ -85,7 +85,7 @@ export interface EventItem {
 
   /**
    * Structured location, when the host's input resolved to a place. Undefined
-   * is a supported state, not a gap — the UI falls back to a map search on the
+   * is a supported state, not a gap - the UI falls back to a map search on the
    * `location` string.
    */
   latitude?: number;

@@ -4,8 +4,8 @@
  * Google redirects here with a one-time `code`. We exchange it for a session
  * (which sets the auth cookies) and bounce the user back where they started.
  *
- * This URL must be registered in Supabase → Authentication → URL Configuration
- * → Redirect URLs, for every origin you run on.
+ * This URL must be registered in Supabase -> Authentication -> URL Configuration
+ * -> Redirect URLs, for every origin you run on.
  */
 
 import { NextResponse, type NextRequest } from 'next/server';
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
   const isLocal = process.env.NODE_ENV === 'development';
   const base = isLocal || !forwardedHost ? origin : `https://${forwardedHost}`;
 
-  // `next` is attacker-controllable — only ever redirect to a relative path.
+  // `next` is attacker-controllable - only ever redirect to a relative path.
   const safeNext = next.startsWith('/') && !next.startsWith('//') ? next : '/';
 
   return NextResponse.redirect(`${base}${safeNext}`);

@@ -124,7 +124,7 @@ export function buildSeedEvents(): EventItem[] {
       id: "e_summit",
       title: "Solana Superteam Summit",
       description:
-        "A full day of talks, workshops and demos from the best builders in the Solana ecosystem. Network with founders, devs and investors — and grab your proof-of-attendance NFT on the way out.",
+        "A full day of talks, workshops and demos from the best builders in the Solana ecosystem. Network with founders, devs and investors - and grab your proof-of-attendance NFT on the way out.",
       hostId: "u_maya",
       category: "Conference",
       startsAt: new Date(now + 6 * DAY + 10 * HOUR).toISOString(),
@@ -279,7 +279,7 @@ export function buildSeedMessages(): Message[] {
       scope: "event",
       channelId: "e_hack",
       senderId: "u_priya",
-      text: "Team formation thread — drop your skills and what you want to build!",
+      text: "Team formation thread - drop your skills and what you want to build!",
       createdAt: now - 2 * HOUR,
     },
     {

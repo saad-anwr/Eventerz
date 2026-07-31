@@ -112,7 +112,7 @@ function useGuestStateInvalidation() {
  * Ask to attend.
  *
  * Returns the resulting RSVP row so the caller can tell the three outcomes
- * apart — confirmed, pending approval, waitlisted. Errors are deliberately not
+ * apart - confirmed, pending approval, waitlisted. Errors are deliberately not
  * swallowed: the previous version of this had no error path at all, so a
  * server-side rejection made the button look broken rather than saying why.
  */
@@ -339,7 +339,7 @@ export function useUpdateProfile(profileId: string | undefined) {
   });
 }
 
-/** Batch lookup — one request fills an entire attendee list. */
+/** Batch lookup - one request fills an entire attendee list. */
 export function useProfiles(ids: string[]) {
   // Sorted so the key is stable regardless of roster ordering.
   const key = [...ids].sort().join(',');
@@ -418,7 +418,7 @@ export function usePayments(channelId: string | null, paymentIds: string[]) {
  * File a receipt for a transfer that has already confirmed on-chain.
  *
  * Verification is fired off but not awaited. The receipt is useful the moment
- * it exists — it carries an explorer link — and making the user watch a
+ * it exists - it carries an explorer link - and making the user watch a
  * spinner while an RPC catches up with a transaction they already saw confirm
  * would be waiting for nothing. The tick appears over Realtime when the Edge
  * Function is done.
@@ -451,8 +451,8 @@ export function useRecordPayment(channelId: string | null) {
  * Link a wallet by proving you hold its key.
  *
  * `signMessage` is supplied by the caller because the two platforms sign
- * differently — the browser wallet adapter's `signMessage` returns bytes, and
- * Mobile Wallet Adapter needs an association intent — and neither belongs in a
+ * differently - the browser wallet adapter's `signMessage` returns bytes, and
+ * Mobile Wallet Adapter needs an association intent - and neither belongs in a
  * data hook.
  */
 export function useLinkWallet(profileId: string | undefined) {

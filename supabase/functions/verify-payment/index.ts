@@ -1,5 +1,5 @@
 /**
- * verify-payment — confirm an in-chat payment receipt against the cluster.
+ * verify-payment - confirm an in-chat payment receipt against the cluster.
  *
  *   POST /functions/v1/verify-payment
  *   Authorization: Bearer <the user's Supabase JWT>
@@ -8,8 +8,8 @@
  * `record_payment` (migration 0009) writes receipts with `verified = false`,
  * because Postgres cannot make an outbound RPC call and therefore cannot know
  * whether the transaction the client described actually happened. Every client
- * renders an unverified receipt without a tick — an unchecked claim must not
- * look like a checked one — and this is what turns the tick on.
+ * renders an unverified receipt without a tick - an unchecked claim must not
+ * look like a checked one - and this is what turns the tick on.
  *
  * The check is a balance delta, not an instruction walk. Reading the
  * instruction list means understanding every program that might have moved the
@@ -17,7 +17,7 @@
  * batching. The recipient's balance before and after is the same question
  * asked in a way that has one answer regardless of how the money got there.
  *
- * Idempotent, and safe to call from either party — the transaction is already
+ * Idempotent, and safe to call from either party - the transaction is already
  * public, so letting the recipient trigger the check leaks nothing and means
  * a receipt still gets verified when the sender's app is closed.
  */
@@ -73,7 +73,7 @@ async function getTransaction(cluster: string, signature: string) {
 /**
  * Lamports the address gained in this transaction.
  *
- * Uses the account index from the message key list — the same ordering
+ * Uses the account index from the message key list - the same ordering
  * `preBalances` and `postBalances` are indexed by. Versioned transactions with
  * address-lookup tables put the extra keys in `meta.loadedAddresses`, which the
  * balance arrays cover in the order writable-then-readonly, so those are
@@ -150,7 +150,7 @@ Deno.serve(async (request: Request) => {
   /*
    * Only the two parties may ask. The service-role client above bypasses RLS,
    * so the policy on `payments` does not apply here and this check has to be
-   * made explicitly — a service-role query with no authorisation of its own is
+   * made explicitly - a service-role query with no authorisation of its own is
    * the standard way an Edge Function turns a private table into a public one.
    */
   if (payment.from_profile !== user.id && payment.to_profile !== user.id) {
@@ -205,7 +205,7 @@ Deno.serve(async (request: Request) => {
 
   /*
    * `>=` rather than `===`. The recipient may legitimately have gained more in
-   * the same transaction — a wallet batching two transfers, or rent returned
+   * the same transaction - a wallet batching two transfers, or rent returned
    * from a closed account. What matters is that at least the recorded amount
    * arrived; a receipt claiming *less* than actually moved is not a lie worth
    * blocking.

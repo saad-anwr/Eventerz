@@ -1,5 +1,5 @@
 /**
- * Central site configuration — used across metadata, navigation and the footer.
+ * Central site configuration - used across metadata, navigation and the footer.
  * Update these values in one place when wiring the real product.
  */
 
@@ -8,7 +8,7 @@
  *
  * `NEXT_PUBLIC_SITE_URL` wins so preview deployments can advertise their own
  * origin; the literal is the production fallback. This value drives
- * `metadataBase`, OG tags, the sitemap, robots.txt and — importantly — the
+ * `metadataBase`, OG tags, the sitemap, robots.txt and - importantly - the
  * OAuth redirect, so it must match the domain the user is actually browsing.
  */
 const canonicalUrl =

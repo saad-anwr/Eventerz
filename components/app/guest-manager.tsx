@@ -3,7 +3,7 @@
 /**
  * Host-side guest management.
  *
- * Requests needing a decision come first and stay expanded — the whole point
+ * Requests needing a decision come first and stay expanded - the whole point
  * of the panel is that a host lands on the event and immediately sees what is
  * waiting on them. Confirmed and closed guests collapse below.
  *
@@ -72,7 +72,7 @@ export function GuestManager({ event }: { event: EventItem }) {
       {isLoading ? (
         <p className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" />
-          Loading guests…
+          Loading guests...
         </p>
       ) : guests.length === 0 ? (
         <p className="py-6 text-sm text-muted-foreground">

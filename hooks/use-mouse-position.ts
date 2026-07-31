@@ -5,14 +5,14 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 interface RelativeMouse {
   x: number;
   y: number;
-  /** Normalised (-0.5 → 0.5) coordinates, useful for tilt/parallax. */
+  /** Normalised (-0.5 -> 0.5) coordinates, useful for tilt/parallax. */
   nx: number;
   ny: number;
 }
 
 /**
  * Tracks the mouse position relative to a referenced element.
- * Returns both raw (px) and normalised (-0.5 → 0.5) coordinates.
+ * Returns both raw (px) and normalised (-0.5 -> 0.5) coordinates.
  */
 export function useMousePosition<T extends HTMLElement>(): {
   ref: RefObject<T | null>;

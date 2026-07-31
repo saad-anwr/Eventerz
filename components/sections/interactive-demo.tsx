@@ -81,8 +81,8 @@ export function InteractiveDemo() {
 
   const walletLabel =
     connected && publicKey
-      ? `${publicKey.toBase58().slice(0, 4)}…${publicKey.toBase58().slice(-4)}`
-      : "9xQe…4dRt";
+      ? `${publicKey.toBase58().slice(0, 4)}...${publicKey.toBase58().slice(-4)}`
+      : "9xQe...4dRt";
 
   const selected = demoEvents.find((e) => e.id === selectedId)!;
   const state = rsvp[selectedId] ?? "idle";
@@ -147,7 +147,7 @@ export function InteractiveDemo() {
 
             {/* body */}
             <div className="grid gap-4 p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)_minmax(0,0.85fr)]">
-              {/* Column 1 — Upcoming events */}
+              {/* Column 1 - Upcoming events */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-semibold text-white">
@@ -199,7 +199,7 @@ export function InteractiveDemo() {
                 </div>
               </div>
 
-              {/* Column 2 — Event detail + RSVP */}
+              {/* Column 2 - Event detail + RSVP */}
               <motion.div
                 key={selected.id}
                 initial={{ opacity: 0, y: 10 }}
@@ -291,7 +291,7 @@ export function InteractiveDemo() {
                         className="flex items-center gap-2"
                       >
                         <Loader2 className="size-4 animate-spin" />
-                        Minting ticket…
+                        Minting ticket...
                       </motion.span>
                     )}
                     {state === "done" && (
@@ -310,7 +310,7 @@ export function InteractiveDemo() {
                 </button>
               </motion.div>
 
-              {/* Column 3 — Reputation, ticket, QR */}
+              {/* Column 3 - Reputation, ticket, QR */}
               <div className="space-y-4">
                 {/* Reputation + wallet */}
                 <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">

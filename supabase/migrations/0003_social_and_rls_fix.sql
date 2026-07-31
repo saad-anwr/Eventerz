@@ -1,5 +1,5 @@
 -- ---------------------------------------------------------------------------
--- Eventerz — 0003
+-- Eventerz - 0003
 --
 --  1. Fixes recursive RLS on events/rsvps/tickets (they returned HTTP 500)
 --  2. Adds friend_requests and messages
@@ -11,7 +11,7 @@
 /* ===========================================================================
    1. RLS recursion fix
    ---------------------------------------------------------------------------
-   0002 had `events` policy → subquery on `rsvps`, and `rsvps` policy →
+   0002 had `events` policy -> subquery on `rsvps`, and `rsvps` policy ->
    subquery on `events`. Each policy triggered the other's policy, so Postgres
    raised `infinite recursion detected in policy` (42P17) and every SELECT
    failed with a 500.
@@ -160,7 +160,7 @@ grant execute on function public.friend_ids(uuid) to authenticated;
    ---------------------------------------------------------------------------
    Two scopes: `event` channels (anyone who can see the event) and `dm`
    channels between two people. `channel_id` is the event id for event chat,
-   or the sorted pair "dm:<a>__<b>" for a DM — sorted so both participants
+   or the sorted pair "dm:<a>__<b>" for a DM - sorted so both participants
    derive the same key.
    =========================================================================== */
 
@@ -213,7 +213,7 @@ begin
   return public.is_event_host(p_channel_id::uuid, p_profile_id)
       or public.is_event_attendee(p_channel_id::uuid, p_profile_id);
 exception when others then
-  -- Malformed channel id — deny rather than leak.
+  -- Malformed channel id - deny rather than leak.
   return false;
 end;
 $$;
@@ -242,8 +242,8 @@ create policy "delete own message" on public.messages
    4. Realtime
    ---------------------------------------------------------------------------
    A table only streams changes if it is in the `supabase_realtime`
-   publication. Without this, `.on('postgres_changes', …)` silently receives
-   nothing — the subscription connects and then stays quiet forever.
+   publication. Without this, `.on('postgres_changes', ...)` silently receives
+   nothing - the subscription connects and then stays quiet forever.
 
    REPLICA IDENTITY FULL makes the old row available on UPDATE/DELETE, which
    clients need to reconcile their cache.

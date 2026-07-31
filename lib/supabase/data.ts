@@ -9,6 +9,7 @@
  * round trip.
  */
 
+import { SOLANA_CLUSTER } from '../solana/cluster';
 import { getSupabaseBrowserClient } from './client';
 import type {
   DiscoverablePersonRow,
@@ -70,7 +71,7 @@ export type EventWithMeta = EventRow & {
  * Three queries regardless of how many events, rather than one per event. A
  * `.select('*, host:profiles(*)')` embed would also work, but PostgREST embeds
  * come back null when RLS hides the joined row, and the host must always
- * resolve — the card is meaningless without a host name.
+ * resolve - the card is meaningless without a host name.
  */
 async function hydrateEvents(rows: EventRow[]): Promise<EventWithMeta[]> {
   if (rows.length === 0) return [];
@@ -144,7 +145,7 @@ async function waitlistPositions(
   );
 }
 
-/** The signed-in user's id, or null. Cheap — reads the cached session. */
+/** The signed-in user's id, or null. Cheap - reads the cached session. */
 async function currentUserId(): Promise<string | null> {
   const { data } = await client().auth.getSession();
   return data.session?.user.id ?? null;
@@ -200,7 +201,7 @@ export async function fetchEventsByHost(hostId: string) {
 /**
  * Events the viewer has a live relationship with.
  *
- * Includes pending and waitlisted, not just confirmed — someone who has asked
+ * Includes pending and waitlisted, not just confirmed - someone who has asked
  * to join needs somewhere to watch for the host's answer. Declined and
  * cancelled are excluded: those are closed, and listing them under "my events"
  * would read as still being in the running.
@@ -239,7 +240,7 @@ const BANNER_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/avif'];
  * same limits server-side, because a client check is a convenience and not a
  * control.
  *
- * The path is `<uid>/<random>.<ext>` — the uid prefix is what the storage
+ * The path is `<uid>/<random>.<ext>` - the uid prefix is what the storage
  * policy checks, and the random name avoids one upload clobbering another.
  */
 export async function uploadEventBanner(
@@ -335,7 +336,7 @@ export async function createEvent(input: CreateEventInput, hostId: string) {
 /**
  * Fields a host may change after publishing.
  *
- * Every field is optional and undefined means "leave alone" — the RPC treats
+ * Every field is optional and undefined means "leave alone" - the RPC treats
  * null the same way. That is what makes two devices editing the same event
  * safe: a full-row write would send back stale values for everything the user
  * did not touch and clobber the other device's change with them.
@@ -414,13 +415,13 @@ export async function cancelEvent(
 }
 
 /* -------------------------------------------------------------------------- */
-/*  RSVP — request, cancel, and the host's decision                            */
+/*  RSVP - request, cancel, and the host's decision                            */
 /* -------------------------------------------------------------------------- */
 
 /**
  * Ask to attend.
  *
- * The server decides the outcome — confirmed, pending approval, or waitlisted —
+ * The server decides the outcome - confirmed, pending approval, or waitlisted -
  * because capacity and approval have to be evaluated atomically with the seat
  * being granted. The returned status is what the UI renders, so a caller never
  * has to guess which of the three happened.
@@ -459,7 +460,7 @@ export async function declineGuest(eventId: string, profileId: string) {
 }
 
 /**
- * The full guest list. Only returns rows for a host or a confirmed guest —
+ * The full guest list. Only returns rows for a host or a confirmed guest -
  * RLS decides, so there is no separate permission check to keep in sync here.
  */
 export async function fetchEventGuests(eventId: string): Promise<EventGuestRow[]> {
@@ -564,7 +565,7 @@ export async function sendFriendRequest(requesterId: string, addresseeId: string
   const { error } = await client()
     .from('friend_requests')
     .insert({ requester_id: requesterId, addressee_id: addresseeId });
-  // A duplicate just means they already asked — not worth surfacing.
+  // A duplicate just means they already asked - not worth surfacing.
   if (error && error.code !== '23505') fail('Sending the request', error);
 }
 
@@ -617,7 +618,7 @@ export async function fetchProfiles(ids: string[]): Promise<ProfileRow[]> {
 /*  Messages                                                                   */
 /* -------------------------------------------------------------------------- */
 
-/** Canonical DM key — sorted so both participants derive the same channel. */
+/** Canonical DM key - sorted so both participants derive the same channel. */
 export function dmChannelId(a: string, b: string): string {
   return `dm:${[a, b].sort().join('__')}`;
 }
@@ -638,7 +639,7 @@ export interface Conversation {
  *
  * The set is friends **union** everyone who has actually messaged them. It
  * used to be friends alone, which meant a host contacted through "Contact
- * host" — by definition someone they are not friends with — received the
+ * host" - by definition someone they are not friends with - received the
  * message into a thread that appeared nowhere. The message arrived, was
  * readable, and was invisible.
  *
@@ -726,7 +727,7 @@ export async function sendMessage(
 /* -------------------------------------------------------------------------- */
 
 export interface RecordPaymentInput {
-  /** The confirmed transaction signature. Unique — retrying is safe. */
+  /** The confirmed transaction signature. Unique - retrying is safe. */
   signature: string;
   toWallet: string;
   /** Base units. Lamports for SOL. */
@@ -763,7 +764,7 @@ export async function recordPayment(
     p_mint: input.mint ?? null,
     p_symbol: input.symbol ?? 'SOL',
     p_decimals: input.decimals ?? 9,
-    p_cluster: input.cluster ?? process.env.NEXT_PUBLIC_SOLANA_NETWORK ?? 'mainnet-beta',
+    p_cluster: input.cluster ?? SOLANA_CLUSTER,
   });
 
   if (error) fail('Saving the receipt', error);
@@ -798,6 +799,30 @@ export async function verifyPayment(signature: string): Promise<boolean> {
 }
 
 /* -------------------------------------------------------------------------- */
+/*  Newsletter                                                                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Add an address to the newsletter list.
+ *
+ * Works signed-out - the form lives in the marketing footer. The function is
+ * idempotent and silent about whether the address was already there, so a
+ * caller cannot use it to test who is subscribed; the UI therefore shows the
+ * same confirmation either way, which is also the truthful answer to "am I on
+ * the list?".
+ */
+export async function subscribeToNewsletter(
+  email: string,
+  source = 'website',
+): Promise<void> {
+  const { error } = await client().rpc('subscribe_newsletter', {
+    p_email: email,
+    p_source: source,
+  });
+  if (error) fail('Subscribing', error);
+}
+
+/* -------------------------------------------------------------------------- */
 /*  Wallet ownership                                                           */
 /* -------------------------------------------------------------------------- */
 
@@ -822,7 +847,7 @@ export async function issueWalletLinkChallenge(
  * Step two: submit the signature for verification.
  *
  * Postgres has no Ed25519, so the check happens in the `link-wallet` Edge
- * Function, which then calls a function revoked from `authenticated` — the
+ * Function, which then calls a function revoked from `authenticated` - the
  * caller cannot link a wallet without going through the signature check.
  */
 export async function linkWalletWithSignature(args: {

@@ -31,7 +31,7 @@ export function HowItWorks() {
               <span className="text-gradient">six steps</span>
             </>
           }
-          description="A frictionless, on-chain journey — every step is verifiable, ownable and permanent."
+          description="A frictionless, on-chain journey - every step is verifiable, ownable and permanent."
         />
 
         <div ref={containerRef} className="relative mx-auto mt-16 max-w-4xl">

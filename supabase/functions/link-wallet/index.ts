@@ -1,5 +1,5 @@
 /**
- * link-wallet — prove ownership of a Solana address, then bind it to a profile.
+ * link-wallet - prove ownership of a Solana address, then bind it to a profile.
  *
  *   POST /functions/v1/link-wallet
  *   Authorization: Bearer <the user's Supabase JWT>
@@ -8,7 +8,7 @@
  * The client obtains `message` from `issue_wallet_link_nonce()` (migration
  * 0011), has the wallet sign that exact text, and posts all three back.
  *
- * What this checks, in order — each one is load-bearing:
+ * What this checks, in order - each one is load-bearing:
  *
  *   1. **The caller is signed in**, from their JWT rather than the body. See
  *      `requireUser`.
@@ -17,7 +17,7 @@
  *   3. **The nonce came out of the message we issued**, and the database
  *      confirms it was issued to *this* profile for *this* address, then
  *      consumes it. Verifying a signature over an attacker-chosen message
- *      proves they can sign — it does not prove they were answering our
+ *      proves they can sign - it does not prove they were answering our
  *      challenge, and a signature harvested from any other Solana dapp would
  *      otherwise sail straight through.
  *
@@ -78,7 +78,7 @@ Deno.serve(async (request: Request) => {
   /*
    * The address has to appear in the text the user actually approved. Without
    * this, a challenge issued for wallet A could be answered with a signature
-   * from wallet A and then submitted as a claim on wallet B — the signature
+   * from wallet A and then submitted as a claim on wallet B - the signature
    * would verify against B's key only if B signed it, so the attack needs both
    * keys and is not a hole today. It becomes one the moment the message format
    * changes and the address stops being implied. Checking it costs nothing.
@@ -120,7 +120,7 @@ Deno.serve(async (request: Request) => {
   /*
    * `link_wallet_verified` re-checks that the nonce was issued to this profile
    * for this address, and consumes it. Both facts live in the database, so the
-   * check belongs there — this function proving the signature and the database
+   * check belongs there - this function proving the signature and the database
    * proving the challenge is what makes the pair non-replayable.
    */
   const { data, error } = await serviceClient().rpc('link_wallet_verified', {

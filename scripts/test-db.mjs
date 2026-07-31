@@ -12,18 +12,18 @@
  *
  * It also does not require `psql` on your PATH. The normal way to have a local
  * Supabase is `supabase start`, which runs Postgres in a container that already
- * contains psql — so demanding a second, host-side copy of the client is asking
+ * contains psql - so demanding a second, host-side copy of the client is asking
  * for an install nobody needs. If psql is on the PATH we use it; otherwise we run
  * the one inside the container. Both paths execute the identical file.
  *
  * psql specifically, and not a generic client: the suite opens with `\set
  * ON_ERROR_STOP on` and uses `\echo`. Those are psql meta-commands, parsed by the
  * client rather than the server, so a driver that only speaks SQL silently skips
- * them — and the suite would then report success after a failed assertion.
+ * them - and the suite would then report success after a failed assertion.
  *
  * The suite itself is `supabase/tests/guest_flow_test.sql`. It runs in one
  * transaction and rolls back, so it is safe against a database you are also
- * using by hand — though `supabase db reset` first is what makes a run
+ * using by hand - though `supabase db reset` first is what makes a run
  * reproducible.
  */
 
@@ -43,7 +43,7 @@ const bold = (s) => `\x1b[1m${s}\x1b[0m`;
 /**
  * The local stack's default. Supabase pins this port and password for every
  * `supabase start`, so hard-coding it is the documented behaviour rather than a
- * guess — and `DATABASE_URL` overrides it for anyone running elsewhere.
+ * guess - and `DATABASE_URL` overrides it for anyone running elsewhere.
  */
 const LOCAL_URL = 'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
 const url = process.env.DATABASE_URL || LOCAL_URL;
@@ -62,7 +62,7 @@ function have(bin) {
 /**
  * The Supabase database container, if one is running.
  *
- * Named `supabase_db_<project_id>`, where project_id comes from config.toml — so
+ * Named `supabase_db_<project_id>`, where project_id comes from config.toml - so
  * we match on the prefix rather than assuming this project's name, which also
  * means a developer with two Supabase projects gets told about the ambiguity
  * instead of silently testing against the wrong one.
@@ -82,7 +82,7 @@ function supabaseContainer(engine) {
 }
 
 const hasPsql = have('psql');
-// The Supabase CLI runs on either engine, so this should too — they are
+// The Supabase CLI runs on either engine, so this should too - they are
 // command-line compatible for `ps` and `exec`.
 const engine = ['docker', 'podman'].find(have);
 
@@ -90,7 +90,7 @@ let result;
 let ranVia;
 
 if (hasPsql) {
-  ranVia = `psql → ${url}`;
+  ranVia = `psql -> ${url}`;
   result = spawnSync('psql', [url, '-v', 'ON_ERROR_STOP=1', '-f', suite], {
     stdio: 'inherit',
     encoding: 'utf8',
@@ -120,7 +120,7 @@ if (hasPsql) {
   console.log(dim(`Using the psql inside ${container} (none on PATH).\n`));
 
   // -f cannot be used here: the file lives on the host, not in the container.
-  // Piping it to stdin is equivalent — psql still parses the \set and \echo
+  // Piping it to stdin is equivalent - psql still parses the \set and \echo
   // meta-commands, which is the whole reason this has to be psql.
   result = spawnSync(
     engine,
@@ -132,15 +132,15 @@ if (hasPsql) {
   // tool and leaving the developer to discover the other is absent too.
   console.error(red('\nCannot run the suite: no Postgres client available.'));
   console.error('This machine has neither of the two things that could run it:\n');
-  console.error(`  ${red('✗')} ${bold('docker')} (or podman) — needed by ${dim('supabase start')}, which is how you get a local database`);
-  console.error(`  ${red('✗')} ${bold('psql')}             — the PostgreSQL client, if you would rather point at a database yourself\n`);
+  console.error(`  ${red('✗')} ${bold('docker')} (or podman) - needed by ${dim('supabase start')}, which is how you get a local database`);
+  console.error(`  ${red('✗')} ${bold('psql')}             - the PostgreSQL client, if you would rather point at a database yourself\n`);
   console.error(bold('The shorter path is a container engine:'));
   console.error(dim('  1. Install Docker Desktop (or Podman) and start it'));
   console.error(dim('  2. npm run db:start'));
   console.error(dim('  3. npm run db:reset'));
   console.error(dim('  4. npm run test:db\n'));
   console.error(
-    `That also gets you psql for free — step 2 runs a container that contains one,\nand this script will find and use it.\n`,
+    `That also gets you psql for free - step 2 runs a container that contains one,\nand this script will find and use it.\n`,
   );
   console.error(
     dim('Already have a database elsewhere? Set DATABASE_URL and install the psql client.\n'),

@@ -47,7 +47,7 @@ export function Features() {
               <span className="text-gradient">on-chain events</span>
             </>
           }
-          description="A complete, wallet-native toolkit — from discovery and RSVP to NFT ticketing, proof-of-attendance and portable reputation."
+          description="A complete, wallet-native toolkit - from discovery and RSVP to NFT ticketing, proof-of-attendance and portable reputation."
         />
 
         <motion.div

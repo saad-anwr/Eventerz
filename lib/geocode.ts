@@ -4,17 +4,17 @@
  * Two providers behind one interface, chosen by whether
  * `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` is set:
  *
- *   • **Google Places (New)** — better results, better data, costs money, needs
+ *   • **Google Places (New)** - better results, better data, costs money, needs
  *     a key. Both endpoints used here support CORS, so this runs in the browser
  *     with no proxy route to maintain.
- *   • **Nominatim (OpenStreetMap)** — free, keyless, no signup. Rate-limited to
+ *   • **Nominatim (OpenStreetMap)** - free, keyless, no signup. Rate-limited to
  *     roughly one request a second by its usage policy, which is why the caller
  *     debounces rather than searching on every keystroke.
  *
  * The fallback is not a degraded mode nobody should use. A self-hosted
  * instance, a preview deploy or a fork gets working location search without
  * anyone having to open a Google Cloud console first, and the shape of the
- * result is identical either way — so the picker has no idea which one
+ * result is identical either way - so the picker has no idea which one
  * answered.
  *
  * Geocoding is always optional. A host who types "Ayush's rooftop" and picks
@@ -27,9 +27,9 @@
 export interface PlaceSuggestion {
   /** Stable id for the provider that produced it. Google place id, or an OSM key. */
   id: string;
-  /** Short name — "Ademzweb". */
+  /** Short name - "Ademzweb". */
   name: string;
-  /** Full line — "B-272, Pocket B, Okhla Phase I, New Delhi, Delhi 110020". */
+  /** Full line - "B-272, Pocket B, Okhla Phase I, New Delhi, Delhi 110020". */
   address: string;
   /** Present immediately from Nominatim; needs a details call for Google. */
   latitude?: number;
@@ -59,7 +59,7 @@ export const geocoderName = (): 'google' | 'openstreetmap' =>
  * Suggestions for a partial query.
  *
  * Returns an empty array rather than throwing on any provider failure. A
- * geocoder being down must not stop someone publishing an event — they can
+ * geocoder being down must not stop someone publishing an event - they can
  * still type an address, which is what the field did before this existed.
  */
 export async function searchPlaces(
@@ -149,7 +149,7 @@ async function searchNominatim(
  * Turn a suggestion into coordinates.
  *
  * Nominatim already returned them, so this is a no-op there. Google's
- * autocomplete deliberately does not include coordinates — they are a separate,
+ * autocomplete deliberately does not include coordinates - they are a separate,
  * separately-billed Place Details call, which is why this is a second step and
  * only happens for the one suggestion the host actually picked.
  */
@@ -178,7 +178,7 @@ export async function resolvePlace(
         headers: {
           'X-Goog-Api-Key': key(),
           // Field mask is required by Places (New) and is what keeps this on
-          // the cheapest billing tier — asking for photos or reviews here would
+          // the cheapest billing tier - asking for photos or reviews here would
           // silently cost several times more per event created.
           'X-Goog-FieldMask': 'location,formattedAddress,displayName',
         },

@@ -1,5 +1,5 @@
 -- ---------------------------------------------------------------------------
--- Eventerz — 0004: event banner storage
+-- Eventerz - 0004: event banner storage
 --
 -- A public bucket for event cover images. Public because banners appear on
 -- event cards to signed-out visitors; if these were private every card would

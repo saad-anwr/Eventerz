@@ -158,7 +158,7 @@ export default function ProfilePage() {
               className={cn(inputCls, "h-auto py-3 leading-relaxed")}
               value={form.bio}
               onChange={(e) => set("bio", e.target.value)}
-              placeholder="Tell people what you're about…"
+              placeholder="Tell people what you're about..."
             />
           </label>
           <div className="grid gap-4 sm:grid-cols-2">

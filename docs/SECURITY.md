@@ -1,6 +1,6 @@
 # Security notes
 
-What is enforced, where, and — the part that matters more — what is **not**.
+What is enforced, where, and - the part that matters more - what is **not**.
 
 Referenced from `package.json` (the `//overrides` note) and from
 `docs/GUEST_FLOW.md`.
@@ -30,9 +30,10 @@ column list:
 | `events` | host-only UPDATE **plus** function paths | The policy exists for compatibility; `update_event` is what the UI uses |
 | `wallet_link_nonces` | none, and no SELECT either | One user must not enumerate another's outstanding challenges |
 | `event_reminders` | none | Bookkeeping; the job writes it as the definer |
+| `newsletter_subscribers` | none, and no SELECT either | A list of email addresses belonging to people who did not agree to be published |
 
 With RLS on and no policy present, a direct write is refused outright. That is
-the mechanism — not an oversight.
+the mechanism - not an oversight.
 
 Every definer function sets `search_path = public`, which is the standard defence
 against search-path hijacking.
@@ -41,7 +42,7 @@ against search-path hijacking.
 
 ## Trust boundaries, stated plainly
 
-### Wallet ownership — **verified**
+### Wallet ownership - **verified**
 
 Ed25519 signature over a server-minted, single-use, five-minute challenge, checked
 in the `link-wallet` Edge Function, which then calls a function revoked from
@@ -49,10 +50,10 @@ in the `link-wallet` Edge Function, which then calls a function revoked from
 
 Before migration `0011` this was unverified, and it was the most serious hole in
 the schema: claiming a well-known address granted its reputation, its ticket
-history and — once payments existed — a receipt trail saying money went to a
+history and - once payments existed - a receipt trail saying money went to a
 person it did not go to.
 
-### Payment receipts — **verified asynchronously, and labelled until then**
+### Payment receipts - **verified asynchronously, and labelled until then**
 
 `record_payment` cannot check a signature: Postgres makes no outbound RPC calls.
 So a receipt is written `verified = false`, every surface renders it with a clock
@@ -74,7 +75,7 @@ What is enforced synchronously, because it is the part a lie would profit from:
 identically would make the tick decorative, and a decorative trust signal is
 worse than none.
 
-### Guest-list privacy — **enforced in Postgres**
+### Guest-list privacy - **enforced in Postgres**
 
 | Viewer | Sees |
 | --- | --- |
@@ -89,7 +90,7 @@ enumerate rejections would publish the host's moderation decisions.
 cannot select, and clamps its limit to `[0, 12]` **server-side** so it cannot be
 widened into a full roster dump.
 
-### On-chain capacity — **enforced twice, on purpose**
+### On-chain capacity - **enforced twice, on purpose**
 
 The Anchor program checks capacity as well as Postgres. It would be reasonable to
 argue the chain should trust the backend, since the backend decides who gets in.
@@ -97,12 +98,12 @@ It should not: a seat account creatable past capacity makes the on-chain record
 say something the host never agreed to, and "the database would have stopped it"
 is not a property anyone reading the chain can verify.
 
-### Signatures — **never fabricated**
+### Signatures - **never fabricated**
 
 `MobileWalletAdapter.signAndSendTransaction` refuses an Eventerz-program intent
 while no program is deployed. It used to send a zero-lamport self-transfer as a
 stand-in, which produced a real, confirmable signature for a transaction that did
-nothing — the UI would report a minted ticket and the explorer would appear to
+nothing - the UI would report a minted ticket and the explorer would appear to
 agree. An honest failure beats that comfortably.
 
 The one intent that always works is `transfer`: it is a System Program
@@ -123,7 +124,7 @@ Three values are exposed to clients and are **meant** to be:
 One value must never be: **`SUPABASE_SERVICE_ROLE_KEY`** bypasses RLS entirely.
 It must never carry a `NEXT_PUBLIC_` or `EXPO_PUBLIC_` prefix. It is set as an
 Edge Function secret and used only to call the two functions explicitly revoked
-from `authenticated` — the ones whose whole purpose is to do something the caller
+from `authenticated` - the ones whose whole purpose is to do something the caller
 must not do for themselves.
 
 A service-role query has **no authorisation of its own**, which is the standard way
@@ -142,7 +143,7 @@ Listed because an unlisted gap is a gap nobody fixes.
    `v3/v5/v6` **when the caller supplies its own buffer**; jayson only calls
    `v4()` with no buffer, so the vulnerable code is unreachable from here.
    Forcing uuid 11 would be a major bump across a CJS/ESM boundary to fix a path
-   that cannot be hit — trading real breakage risk for a cosmetic audit number.
+   that cannot be hit - trading real breakage risk for a cosmetic audit number.
    The permanent fix is the `@solana/web3.js` v2 migration.
 
    The other 22 (postcss path traversal + arbitrary file read + `</style>` XSS,
@@ -154,6 +155,14 @@ Listed because an unlisted gap is a gap nobody fixes.
    stranger messaging every host on the platform. DMs are open by design; open and
    unmetered is a different thing.
 
+   `subscribe_newsletter` is the one endpoint callable by **`anon`**, so it is the
+   most exposed of these. It is written to be safe as an unauthenticated write -
+   fixed column list, shape and length validation, `on conflict do nothing`, and
+   an identical return whether or not the address was already present, so it
+   cannot be used to test who is subscribed - but nothing stops someone calling
+   it in a loop. Postgres is the wrong layer for that; the fix is a rate limit at
+   the edge.
+
 3. **No host-side audit trail** for approve / decline / remove / edit decisions.
    The notifications are the only record, and they live in the recipient's row.
 
@@ -163,8 +172,35 @@ Listed because an unlisted gap is a gap nobody fixes.
 5. **The two hand-written Anchor clients must agree with the Rust by hand.**
    `npm run idl:sync` in the program workspace recomputes every discriminator from
    the built IDL and exits non-zero on a mismatch, and the website's test suite
-   recomputes them too — but neither runs automatically yet. See the CI item in
+   recomputes them too - but neither runs automatically yet. See the CI item in
    `HANDOFF.md`.
+
+6. **The public RPC is the fallback on both platforms.** With
+   `NEXT_PUBLIC_HELIUS_RPC_URL` / `EXPO_PUBLIC_HELIUS_RPC_URL` unset, both fall
+   back to `api.mainnet-beta.solana.com`, which is shared, aggressively
+   rate-limited, and explicitly not intended for production traffic. It works in
+   testing and degrades under load in the worst possible place: balance reads
+   fail and a transfer sits at "confirming" while the user wonders whether their
+   money moved. **Set a dedicated RPC before launch.**
+
+7. ~~**`Eventerz Program/` is not under version control.**~~ Fixed - the folder
+   is now a git repo with an initial commit and a `.gitattributes` pinning LF,
+   so the Rust that builds under WSL2 does not churn against CRLF checkouts.
+
+8. **The generated Android project can drift from `app.json`, silently.**
+   `android/` is produced by `expo prebuild` and is gitignored, so it is not
+   regenerated by a normal build. It had fallen behind: `app.json` set
+   `recordAudioAndroid: false`, and the installed APK requested the microphone
+   anyway, along with `SYSTEM_ALERT_WINDOW`. Reading the config told you nothing
+   reliable about the artefact users install.
+
+   Now blocked explicitly via `android.blockedPermissions`, and
+   `npm run android:smoke` asserts on the **installed package** rather than the
+   config, so a future drift fails a test instead of reaching a store listing.
+   After any change to `app.json`, `app.config.*` or a config plugin:
+   ```bash
+   npx expo prebuild -p android --clean
+   ```
 
 ---
 

@@ -89,13 +89,13 @@ export function WalletModal() {
     [wallets]
   );
 
-  // Curated wallets that aren't already detected → offer install links.
+  // Curated wallets that aren't already detected -> offer install links.
   const discover = React.useMemo(() => {
     const names = new Set(detected.map((w) => w.adapter.name.toLowerCase()));
     return CURATED.filter((c) => !names.has(c.name.toLowerCase()));
   }, [detected]);
 
-  // Drive the select → connect handshake.
+  // Drive the select -> connect handshake.
   React.useEffect(() => {
     if (!pending) return;
     if (wallet?.adapter.name === pending && !connected && !connecting) {

@@ -115,7 +115,7 @@ export function AuthModal() {
       return;
     }
 
-    // Offline demo path — no backend configured.
+    // Offline demo path - no backend configured.
     window.setTimeout(() => {
       const rnd = DEMO_NAMES[Math.floor(Math.random() * DEMO_NAMES.length)];
       const handle = rnd.toLowerCase().replace(/\s+/g, ".");
@@ -194,7 +194,7 @@ export function AuthModal() {
               <p className="mt-1 text-sm text-muted-foreground">
                 {sentTo
                   ? `We sent a one-time sign-in link to ${sentTo}.`
-                  : "Your wallet is your identity — Google keeps it recoverable."}
+                  : "Your wallet is your identity - Google keeps it recoverable."}
               </p>
             </div>
 
@@ -242,7 +242,7 @@ export function AuthModal() {
               <form onSubmit={submitEmail} className="space-y-2.5 pt-1">
                 {/*
                   Live, the display name comes from the provider or the profile
-                  editor — asking for it here would be a field we then ignore.
+                  editor - asking for it here would be a field we then ignore.
                 */}
                 {!isLive && (
                   <input
@@ -309,13 +309,13 @@ export function AuthModal() {
               <span>
                 {isLive ? (
                   <>
-                    Your wallet stays the primary identity — Google and email
+                    Your wallet stays the primary identity - Google and email
                     only make the account recoverable. By continuing you agree to
                     our Terms &amp; Privacy Policy.
                   </>
                 ) : (
                   <>
-                    Demo mode — social sign-in is simulated. Configure Supabase to
+                    Demo mode - social sign-in is simulated. Configure Supabase to
                     enable real accounts (see docs/AUTH_SETUP.md).
                   </>
                 )}

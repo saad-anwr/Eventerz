@@ -13,6 +13,7 @@ import {
   Wallet as WalletIcon,
 } from "lucide-react";
 import { Button, type ButtonProps } from "@/components/ui/button";
+import { explorerClusterSuffix } from "@/lib/solana/cluster";
 import { useConnectModal } from "./connect-modal-context";
 import { cn } from "@/lib/utils";
 
@@ -25,14 +26,10 @@ interface ConnectWalletButtonProps {
 }
 
 function shorten(address: string) {
-  return `${address.slice(0, 4)}…${address.slice(-4)}`;
+  return `${address.slice(0, 4)}...${address.slice(-4)}`;
 }
 
-const cluster =
-  process.env.NEXT_PUBLIC_SOLANA_NETWORK &&
-  process.env.NEXT_PUBLIC_SOLANA_NETWORK !== "mainnet-beta"
-    ? `?cluster=${process.env.NEXT_PUBLIC_SOLANA_NETWORK}`
-    : "";
+const cluster = explorerClusterSuffix();
 
 export function ConnectWalletButton({
   variant = "primary",
@@ -83,7 +80,7 @@ export function ConnectWalletButton({
         className={cn(fullWidth && "w-full", className)}
       >
         <WalletIcon className="size-4" />
-        {connecting ? "Connecting…" : label}
+        {connecting ? "Connecting..." : label}
       </Button>
     );
   }

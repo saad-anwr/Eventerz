@@ -50,7 +50,7 @@ export const features: Feature[] = [
     icon: Wallet,
     title: "Wallet Authentication",
     description:
-      "No emails, no passwords. Sign in with Phantom, Backpack or Solflare in a single tap — your wallet is your identity.",
+      "No emails, no passwords. Sign in with Phantom, Backpack or Solflare in a single tap - your wallet is your identity.",
     accent: "purple",
   },
   {
@@ -64,7 +64,7 @@ export const features: Feature[] = [
     icon: Ticket,
     title: "NFT Ticketing",
     description:
-      "Mint compressed NFT tickets for fractions of a cent. Soulbound or transferable — you decide the rules.",
+      "Mint compressed NFT tickets for fractions of a cent. Soulbound or transferable - you decide the rules.",
     accent: "cyan",
   },
   {
@@ -85,7 +85,7 @@ export const features: Feature[] = [
     icon: LayoutDashboard,
     title: "Organizer Dashboard",
     description:
-      "Real-time analytics on RSVPs, mints, check-ins and revenue — with wallet-level insights you can export.",
+      "Real-time analytics on RSVPs, mints, check-ins and revenue - with wallet-level insights you can export.",
     accent: "blue",
   },
   {
@@ -106,7 +106,7 @@ export const features: Feature[] = [
     icon: Zap,
     title: "Fast Solana Transactions",
     description:
-      "Sub-second finality and near-zero fees mean RSVPs, mints and check-ins feel instant — even at scale.",
+      "Sub-second finality and near-zero fees mean RSVPs, mints and check-ins feel instant - even at scale.",
     accent: "purple",
   },
   {
@@ -148,7 +148,7 @@ export const steps: Step[] = [
     index: "03",
     title: "RSVP On-chain",
     description:
-      "Confirm your spot with a signed transaction — bot-proof, verifiable and permanent.",
+      "Confirm your spot with a signed transaction - bot-proof, verifiable and permanent.",
     icon: BadgeCheck,
   },
   {
@@ -282,7 +282,7 @@ export const dashboardStats: DashboardStat[] = [
   { label: "Revenue", value: 1840, prefix: "◎", delta: "+21%", icon: Trophy, accent: "green" },
 ];
 
-/** Monthly ticket mints — used for the analytics chart (values 0–100 scale). */
+/** Monthly ticket mints - used for the analytics chart (values 0-100 scale). */
 export const analyticsSeries = [
   { month: "Jan", value: 32 },
   { month: "Feb", value: 41 },
@@ -296,9 +296,9 @@ export const analyticsSeries = [
 ];
 
 export const recentEvents = [
-  { name: "cNFT Night", attendees: 118, status: "Completed", wallet: "9xQe…4dRt" },
-  { name: "Superteam Summit", attendees: 258, status: "Live", wallet: "3pKm…8sLp" },
-  { name: "Devs & Draughts", attendees: 344, status: "Upcoming", wallet: "7vNa…2wQz" },
+  { name: "cNFT Night", attendees: 118, status: "Completed", wallet: "9xQe...4dRt" },
+  { name: "Superteam Summit", attendees: 258, status: "Live", wallet: "3pKm...8sLp" },
+  { name: "Devs & Draughts", attendees: 344, status: "Upcoming", wallet: "7vNa...2wQz" },
 ];
 
 /* -------------------------------------------------------------------------- */
@@ -368,7 +368,7 @@ export const faqs: FAQItem[] = [
   {
     question: "Why Solana?",
     answer:
-      "Solana gives us sub-second finality, near-zero fees and native support for compressed NFTs — the exact primitives needed to make on-chain RSVPs, ticket mints and check-ins feel instant and cost effectively nothing, even for events with thousands of attendees.",
+      "Solana gives us sub-second finality, near-zero fees and native support for compressed NFTs - the exact primitives needed to make on-chain RSVPs, ticket mints and check-ins feel instant and cost effectively nothing, even for events with thousands of attendees.",
   },
   {
     question: "Why wallet login instead of email?",
@@ -383,12 +383,12 @@ export const faqs: FAQItem[] = [
   {
     question: "What is on-chain reputation?",
     answer:
-      "Every event you attend contributes to a portable reputation score recorded on-chain. Communities can gate access, unlock perks or reward loyal members based on real, verifiable participation — reputation that follows you everywhere, owned by you.",
+      "Every event you attend contributes to a portable reputation score recorded on-chain. Communities can gate access, unlock perks or reward loyal members based on real, verifiable participation - reputation that follows you everywhere, owned by you.",
   },
   {
     question: "How does Proof of Attendance (POAP) work?",
     answer:
-      "At check-in, a QR scan writes your attendance to the chain and drops a Proof-of-Attendance NFT into your wallet. It's a permanent, tamper-proof record of where you actually showed up — perfect for building reputation and unlocking token-gated experiences.",
+      "At check-in, a QR scan writes your attendance to the chain and drops a Proof-of-Attendance NFT into your wallet. It's a permanent, tamper-proof record of where you actually showed up - perfect for building reputation and unlocking token-gated experiences.",
   },
   {
     question: "Can organizers monetize their events?",

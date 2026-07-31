@@ -204,7 +204,7 @@ describe('formatOrdinal', () => {
 describe('isConfirmed', () => {
   it('is the gate for chat and the roster', () => {
     expect(isConfirmed(event({ myStatus: 'confirmed' }), 'me')).toBe(true);
-    // A pending requester is not yet a guest — the host may still decline them.
+    // A pending requester is not yet a guest - the host may still decline them.
     expect(isConfirmed(event({ myStatus: 'pending' }), 'me')).toBe(false);
     expect(isConfirmed(event({ myStatus: 'waitlist' }), 'me')).toBe(false);
     expect(isConfirmed(event({ myStatus: 'declined' }), 'me')).toBe(false);

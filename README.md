@@ -1,8 +1,8 @@
-# Eventerz — Wallet-native Event Infrastructure on Solana
+# Eventerz - Wallet-native Event Infrastructure on Solana
 
 > **Everything is On-chain. Why not your events?**
 
-A production-quality, premium marketing site for **Eventerz** — the wallet-native
+A production-quality, premium marketing site for **Eventerz** - the wallet-native
 event platform on Solana. Discover events, RSVP on-chain, mint NFT tickets,
 collect proof-of-attendance, build portable reputation and join token-gated
 communities.
@@ -15,15 +15,15 @@ gradient glows, Framer-Motion animations and a fully interactive product demo.
 ## ✨ Highlights
 
 - **Next.js 15 (App Router)** + **React 19** + **TypeScript**
-- **TailwindCSS** design system (deep-space `#050816`, Solana purple → blue → cyan)
-- **Framer Motion** — scroll reveals, parallax, tilt, magnetic buttons, animated counters
-- **shadcn/ui-style** components (Radix accordion, CVA button) — fully component-based
+- **TailwindCSS** design system (deep-space `#050816`, Solana purple -> blue -> cyan)
+- **Framer Motion** - scroll reveals, parallax, tilt, magnetic buttons, animated counters
+- **shadcn/ui-style** components (Radix accordion, CVA button) - fully component-based
 - **Lucide** icons
-- **Interactive demo** — pick an event, RSVP on-chain, watch an NFT ticket mint
-- **Organizer dashboard** — animated analytics chart, stat counters, wallet insights
-- **SEO-ready** — metadata, Open Graph, JSON-LD (Organization / WebSite / FAQ), `sitemap.xml`, `robots.txt`, PWA manifest
-- **Fully responsive** — mobile, tablet, desktop; animated hamburger menu
-- **Accessible** — keyboard focus rings, reduced-motion support, semantic landmarks
+- **Interactive demo** - pick an event, RSVP on-chain, watch an NFT ticket mint
+- **Organizer dashboard** - animated analytics chart, stat counters, wallet insights
+- **SEO-ready** - metadata, Open Graph, JSON-LD (Organization / WebSite / FAQ), `sitemap.xml`, `robots.txt`, PWA manifest
+- **Fully responsive** - mobile, tablet, desktop; animated hamburger menu
+- **Accessible** - keyboard focus rings, reduced-motion support, semantic landmarks
 - **Vercel-ready**
 
 ---
@@ -82,19 +82,19 @@ Hero · Trusted By · Features · How it Works · Why Eventerz (comparison) ·
 Interactive Demo · Organizer Dashboard · Communities · Roadmap · FAQ · CTA · Footer.
 
 All copy lives in [`lib/data.ts`](lib/data.ts) and site-wide config in
-[`lib/site.ts`](lib/site.ts) — edit these to re-theme the content in one place.
+[`lib/site.ts`](lib/site.ts) - edit these to re-theme the content in one place.
 
 ---
 
-## 🧑‍🚀 The application (`/dashboard`, `/explore`, …)
+## 🧑‍🚀 The application (`/dashboard`, `/explore`, ...)
 
 Beyond the marketing site, Eventerz ships a full, working app (routes under the
 `app/(app)` group). It runs entirely on a **persisted local store**
 ([zustand](https://github.com/pmndrs/zustand) + `localStorage`) seeded with demo
-users, events and chats — so everything works immediately, and the seams are
+users, events and chats - so everything works immediately, and the seams are
 ready to swap for a real backend (Supabase / Anchor).
 
-**Auth** — sign in with **Google, Apple or Email** (via the auth modal) _or_
+**Auth** - sign in with **Google, Apple or Email** (via the auth modal) _or_
 **Connect Wallet** (Solana wallet adapter). A unified session
 ([`useSession`](components/auth/use-session.ts)) merges both.
 > ⚠️ Social sign-in is **simulated** for the demo. Wire NextAuth/Auth.js or
@@ -104,14 +104,14 @@ ready to swap for a real backend (Supabase / Anchor).
 
 | Route              | What it does                                                        |
 | ------------------ | ------------------------------------------------------------------- |
-| `/dashboard`       | Personalised home — upcoming events, stats, friend requests         |
+| `/dashboard`       | Personalised home - upcoming events, stats, friend requests         |
 | `/explore`         | Browse/search events with category & date filters                   |
 | `/create`          | Create an event (with live preview, access rules, token-gating)     |
-| `/events/[id]`     | Event page — RSVP, attendees, and **per-event group chat**          |
+| `/events/[id]`     | Event page - RSVP, attendees, and **per-event group chat**          |
 | `/my-events`       | Hosting / Attending / Past tabs                                     |
 | `/friends`         | Discover people, **Add Friend**, accept requests, friends list      |
-| `/messages`, `/messages/[id]` | **DM chat** — unlocked once both users are friends       |
-| `/profile`, `/u/[id]` | Editable profile (name, bio, location, contact…) & public profiles |
+| `/messages`, `/messages/[id]` | **DM chat** - unlocked once both users are friends       |
+| `/profile`, `/u/[id]` | Editable profile (name, bio, location, contact...) & public profiles |
 
 Chats (event group chats and DMs) show a sender, day separators and per-message
 timestamps, and persist across reloads.
@@ -126,7 +126,7 @@ State + domain model live in [`lib/store`](lib/store); the app UI in
 | Token           | Value                                             |
 | --------------- | ------------------------------------------------- |
 | Background      | `#050816`                                         |
-| Brand gradient  | `#9945FF` → `#2F80FF` → `#22D3EE`                  |
+| Brand gradient  | `#9945FF` -> `#2F80FF` -> `#22D3EE`                  |
 | Accent (Solana) | `#14F195`                                          |
 | Display font    | Space Grotesk                                     |
 | Body font       | Inter                                             |
@@ -159,12 +159,12 @@ Swap the stub bodies for real SDK calls when wiring the product.
 - Particle canvas is dynamically imported (`ssr: false`) and respects
   `prefers-reduced-motion`.
 - Fonts are self-hosted via `next/font` (no layout shift, no external requests).
-- Images/illustrations are inline SVG — no network round-trips.
+- Images/illustrations are inline SVG - no network round-trips.
 
 ---
 
 ## 📄 License
 
-Placeholder marketing site — content and branding for demonstration purposes.
+Placeholder marketing site - content and branding for demonstration purposes.
 
 Built on **Solana**. 💜

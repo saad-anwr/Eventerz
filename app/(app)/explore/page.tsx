@@ -30,7 +30,7 @@ export default function ExplorePage() {
   const [upcomingOnly, setUpcomingOnly] = React.useState(true);
 
   /*
-   * Filtering happens server-side so every client sees the same result set —
+   * Filtering happens server-side so every client sees the same result set -
    * this list is now shared state, not one browser's local store.
    */
   const { data: rows = [], isLoading } = useEvents({
@@ -64,7 +64,7 @@ export default function ExplorePage() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search events, locations, tags…"
+            placeholder="Search events, locations, tags..."
             className="h-12 w-full rounded-2xl border border-white/10 bg-white/[0.03] pl-11 pr-4 text-sm text-white placeholder:text-muted-foreground focus:border-brand-purple/40 focus:outline-none"
           />
         </div>
@@ -103,13 +103,13 @@ export default function ExplorePage() {
       {isLoading ? (
         <div className="flex items-center gap-2 py-16 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" />
-          Loading events…
+          Loading events...
         </div>
       ) : events.length === 0 ? (
         <EmptyState
           icon={CalendarSearch}
           title="No events found"
-          description="Try a different search or category — or create your own event."
+          description="Try a different search or category - or create your own event."
           action={
             <Button asChild>
               <Link href="/create">

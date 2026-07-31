@@ -48,7 +48,7 @@ export function Navbar() {
           <Link
             href="#top"
             className="rounded-lg focus-glow"
-            aria-label="Eventerz — home"
+            aria-label="Eventerz - home"
           >
             <Logo />
           </Link>

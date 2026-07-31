@@ -61,7 +61,7 @@ function StatCard({ stat, index }: { stat: DashboardStat; index: number }) {
   );
 }
 
-/** Build a smooth cubic path (Catmull-Rom → Bézier) through the series. */
+/** Build a smooth cubic path (Catmull-Rom -> Bézier) through the series. */
 function buildPaths(values: number[], w: number, h: number, pad = 6) {
   const n = values.length;
   const max = 100;
@@ -306,7 +306,7 @@ export function OrganizerDashboard() {
               <span className="text-gradient">every organizer</span>
             </>
           }
-          description="Real-time analytics on RSVPs, mints, attendance and revenue — with wallet-level insights you can act on and export."
+          description="Real-time analytics on RSVPs, mints, attendance and revenue - with wallet-level insights you can act on and export."
         />
 
         <motion.div

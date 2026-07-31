@@ -1,8 +1,8 @@
 /**
  * Translate a Supabase `profiles` row into the app's `User` shape.
  *
- * Every screen already reads `User` via `useSession()`. Mapping here — rather
- * than changing forty call sites — means a real backend account flows straight
+ * Every screen already reads `User` via `useSession()`. Mapping here - rather
+ * than changing forty call sites - means a real backend account flows straight
  * into the existing UI with no other edits.
  */
 
