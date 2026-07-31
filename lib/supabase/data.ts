@@ -430,8 +430,129 @@ export async function requestToJoin(eventId: string): Promise<RsvpRow> {
   const { data, error } = await client().rpc('request_to_join', {
     p_event_id: eventId,
   });
+
+  /*
+   * `request_to_join` refuses token-gated events with P0001 (migration 0013):
+   * Postgres cannot read a token balance, so it fails closed rather than
+   * admitting anyone. The gated door is an Edge Function that reads the holding
+   * from the cluster first.
+   *
+   * Routing on the error rather than on a `token_gated` flag read earlier is
+   * deliberate - the flag the client holds may be stale by exactly the race
+   * that matters, a host enabling gating while someone is on the page.
+   */
+  if (error?.code === 'P0001') {
+    const result = await joinGatedEvent(eventId);
+    if (!result.joined) throw new GateError(result);
+    return result.rsvp as RsvpRow;
+  }
+
   if (error) fail('Sending your request', error);
   return data;
+}
+
+/** Why a gated join was refused, in a form the UI can render as an action. */
+export interface GateRefusal {
+  joined: false;
+  reason: 'no-wallet' | 'insufficient' | string;
+  required?: string;
+  held?: string;
+  detail: string;
+}
+
+type GateResult = GateRefusal | { joined: true; gated: boolean; rsvp: unknown };
+
+export class GateError extends Error {
+  readonly refusal: GateRefusal;
+  constructor(refusal: GateRefusal) {
+    super(refusal.detail);
+    this.name = 'GateError';
+    this.refusal = refusal;
+  }
+}
+
+/**
+ * Join a token-gated event.
+ *
+ * The balance is read server-side, from the wallet on the caller's profile -
+ * which got there through the signed link flow (0011), so it is a wallet they
+ * proved they hold rather than one they named. A client-side balance check
+ * would be a suggestion, not a gate.
+ */
+export async function joinGatedEvent(eventId: string): Promise<GateResult> {
+  const { data, error } = await client().functions.invoke('check-gate', {
+    body: { eventId },
+  });
+
+  /*
+   * A 403 from the function is a *refusal*, not a transport failure, and its
+   * body is the reason. supabase-js raises on non-2xx, so the useful payload
+   * has to be recovered from the error's response or the refusal is flattened
+   * into "Edge Function returned a non-2xx status code".
+   */
+  if (error) {
+    const body = await readFunctionBody(error);
+    if (body && typeof body.reason === 'string') {
+      return body as unknown as GateRefusal;
+    }
+    fail('Checking your holdings', error);
+  }
+
+  return data as GateResult;
+}
+
+/**
+ * The entry requirement, for rendering before anyone tries to join.
+ *
+ * `gate_min_amount` arrives as a string because it is `numeric(40,0)` - PostgREST
+ * would hand a JS client a lossy Number for anything past 2^53, and this is the
+ * same money-is-integers rule the rest of the codebase follows.
+ */
+export async function getEventGate(eventId: string) {
+  const { data, error } = await client().rpc('event_gate', {
+    p_event_id: eventId,
+  });
+  if (error) fail('Reading the entry requirement', error);
+  return Array.isArray(data) ? data[0] : data;
+}
+
+/**
+ * Mint the compressed NFT for a ticket or badge.
+ *
+ * Returns the `not-configured` refusal untouched rather than throwing: until a
+ * Merkle tree is provisioned this is a deployment that cannot mint, which is a
+ * state the UI should describe, not an error it should report.
+ */
+export async function mintCompressedAsset(
+  kind: 'ticket' | 'badge',
+  id: string,
+): Promise<
+  | { minted: true; assetId: string; alreadyMinted?: boolean }
+  | { minted: false; reason: string; detail: string }
+> {
+  const { data, error } = await client().functions.invoke('mint-cnft', {
+    body: { kind, id },
+  });
+
+  if (error) {
+    const body = await readFunctionBody(error);
+    if (body && typeof body.reason === 'string') {
+      return body as unknown as { minted: false; reason: string; detail: string };
+    }
+    fail('Minting your asset', error);
+  }
+
+  return data;
+}
+
+/** Proof-of-attendance badges held by the signed-in user. */
+export async function listMyBadges() {
+  const { data, error } = await client()
+    .from('badges')
+    .select('id, event_id, asset_id, awarded_at, minted_at, events(title, starts_at, cover_image)')
+    .order('awarded_at', { ascending: false });
+  if (error) fail('Loading your badges', error);
+  return data ?? [];
 }
 
 export async function cancelRsvp(eventId: string): Promise<void> {
@@ -883,13 +1004,29 @@ export async function unlinkWallet(): Promise<ProfileRow> {
   return data;
 }
 
-async function readFunctionError(error: unknown): Promise<string | null> {
+/**
+ * The response body behind a `FunctionsHttpError`.
+ *
+ * supabase-js throws before the caller sees the body, and `error.message` is
+ * always "Edge Function returned a non-2xx status code". Every Edge Function
+ * here answers a refusal with a structured reason - `check-gate` says which
+ * holding was short, `mint-cnft` says minting is not configured - and all of
+ * that is in the body or nowhere.
+ */
+async function readFunctionBody(
+  error: unknown,
+): Promise<Record<string, unknown> | null> {
   const response = (error as { context?: Response })?.context;
   if (!response || typeof response.json !== 'function') return null;
   try {
-    const body = await response.json();
-    return typeof body?.error === 'string' ? body.error : null;
+    return (await response.json()) as Record<string, unknown>;
   } catch {
     return null;
   }
+}
+
+/** The `error` field of that body, for the callers that only need the message. */
+async function readFunctionError(error: unknown): Promise<string | null> {
+  const body = await readFunctionBody(error);
+  return typeof body?.error === 'string' ? body.error : null;
 }

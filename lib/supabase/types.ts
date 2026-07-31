@@ -76,6 +76,12 @@ export type EventRow = {
   requires_approval: boolean;
   token_gated: boolean;
   gate_requirement: string | null;
+  // Structured gate (migration 0013). `token_gated` is true only when these
+  // are set - a padlock that implies no checkable rule is the bug 0013 removes.
+  gate_mint: string | null;
+  gate_min_amount: string | null;
+  gate_decimals: number | null;
+  gate_symbol: string | null;
   tags: string[];
   schedule: unknown;
   featured: boolean;
@@ -173,6 +179,32 @@ export type TicketRow = {
   qr_secret: string;
   minted_at: string;
   checked_in_at: string | null;
+};
+
+/**
+ * A proof-of-attendance badge (migration 0013).
+ *
+ * Written by the check-in trigger, never by a client - there are no insert or
+ * update policies on the table at all. `asset_id` stays null until a compressed
+ * NFT is minted for it; the badge is the record of attendance either way.
+ */
+export type BadgeRow = {
+  id: string;
+  profile_id: string;
+  event_id: string;
+  asset_id: string | null;
+  awarded_at: string;
+  minted_at: string | null;
+};
+
+/** The shape `event_gate()` returns. Amounts are text - see the RPC comment. */
+export type EventGateRow = {
+  token_gated: boolean;
+  gate_mint: string | null;
+  gate_min_amount: string | null;
+  gate_decimals: number | null;
+  gate_symbol: string | null;
+  gate_requirement: string | null;
 };
 
 export type FriendRequestRow = {
@@ -297,6 +329,10 @@ export type Database = {
         Pick<MessageRow, 'channel_id' | 'sender_id' | 'body' | 'scope'>
       >;
       payments: Table<PaymentRow>;
+      // Select-only from a client. Badges are written by the check-in trigger
+      // and `record_badge_mint`, both SECURITY DEFINER; the table carries no
+      // insert or update policy, so `never` is the accurate write type.
+      badges: Table<BadgeRow, never, never>;
     };
     Views: {
       discoverable_people: {
@@ -312,6 +348,16 @@ export type Database = {
       request_to_join: {
         Args: { p_event_id: string };
         Returns: RsvpRow;
+      };
+      /**
+       * The entry requirement for a gated event.
+       *
+       * `gate_min_amount` is text, not number: the column is `numeric(40,0)` and
+       * anything past 2^53 does not survive a JS number. Compare it as BigInt.
+       */
+      event_gate: {
+        Args: { p_event_id: string };
+        Returns: EventGateRow[];
       };
       approve_guest: {
         Args: { p_event_id: string; p_profile_id: string };
