@@ -137,15 +137,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(
-      (_event: string, session: Session | null) => {
+      (event: string, session: Session | null) => {
         if (!active) return;
         setSupabaseUser(session?.user ?? null);
+
         if (session?.user) {
           void loadProfile(session.user.id);
           setAuthOpen(false);
-        } else {
-          setProfile(null);
-          // Signed out of the real backend - drop the mirrored session too.
+          return;
+        }
+
+        setProfile(null);
+
+        /*
+         * Only a real sign-out clears the local session.
+         *
+         * This used to clear it whenever `session` was null, which is not the
+         * same thing. Supabase fires `INITIAL_SESSION` on every page load, and
+         * for a wallet-only account that session is *always* null - connecting a
+         * wallet resolves a profile row, it does not mint a Supabase JWT. So
+         * every reload ran `signOut()` against the persisted store and wiped the
+         * account the user had just been using.
+         *
+         * That is the "why am I signed out after closing the browser?" bug: the
+         * cookie and the store were both fine, and the app deleted the session
+         * itself, one millisecond after restoring it.
+         *
+         * `SIGNED_OUT` is the only event that means the user is no longer
+         * signed in. `TOKEN_REFRESHED` and `USER_UPDATED` never carry a null
+         * session, and `INITIAL_SESSION` with null means "there was never one
+         * here" - which is not something to act on.
+         */
+        if (event === 'SIGNED_OUT') {
           useAppStore.getState().signOut();
         }
       }
@@ -220,11 +243,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setAuthOpen(false);
         })();
       } else if (!connected && prevConnected.current) {
-        setProfile((current) =>
-          current ? { ...current, wallet_address: null } : current
-        );
-        // A wallet-only session ends when the wallet disconnects.
-        if (!supabaseUser) useAppStore.getState().signOut();
+        /*
+         * Disconnecting a wallet is not signing out, and it does not unlink.
+         *
+         * Two things used to happen here and both were wrong. The profile's
+         * `wallet_address` was blanked locally, which is a lie - the link lives
+         * in Postgres and survives; the only effect was to defeat the
+         * "already linked" guard above, so the next connect asked the user to
+         * sign again for a binding that already existed. And a wallet-only
+         * session was ended outright, which meant a browser restart with a
+         * locked extension logged the person out of an account they never left.
+         *
+         * A wallet extension locking itself is routine. Identity persists;
+         * anything that actually needs the wallet asks for it at the point of
+         * use, which is where a connection prompt belongs.
+         */
       }
       prevConnected.current = connected;
       return;
@@ -236,10 +269,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!store.currentUserId) store.ensureWalletUser(address);
       else store.linkWallet(address);
       setAuthOpen(false);
-    } else if (!connected && prevConnected.current) {
-      const me = store.currentUserId ? store.users[store.currentUserId] : null;
-      if (me?.authMethod === "wallet") store.signOut();
     }
+    // Demo mode follows the same rule: a disconnect is not a sign-out.
     prevConnected.current = connected;
     // `profile` and `signMessage` are read inside: without them the effect
     // re-checks a stale linked address and re-prompts for a signature that has
