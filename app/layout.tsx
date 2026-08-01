@@ -1,5 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Space_Grotesk, JetBrains_Mono } from "next/font/google";
+// Side-effect import: throws during a production build when a critical
+// environment variable is missing, so a broken deploy fails here rather than
+// silently serving a site nobody can sign in to. See lib/env.ts.
+import "@/lib/env";
 import { siteConfig } from "@/lib/site";
 import { WalletProviders } from "@/components/wallet/providers";
 import { AuthProvider } from "@/components/auth/auth-provider";
