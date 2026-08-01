@@ -11,7 +11,11 @@ import 'server-only';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
-import { isSupabaseConfigured, supabaseConfig } from './config';
+import {
+  authCookieOptions,
+  isSupabaseConfigured,
+  supabaseConfig,
+} from './config';
 import { PROFILE_COLUMNS } from './types';
 import type { Database } from './types';
 
@@ -24,6 +28,7 @@ export async function getSupabaseServerClient() {
     supabaseConfig.url,
     supabaseConfig.anonKey,
     {
+      cookieOptions: authCookieOptions,
       cookies: {
         getAll() {
           return cookieStore.getAll();

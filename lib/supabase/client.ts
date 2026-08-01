@@ -10,7 +10,11 @@
 
 import { createBrowserClient } from '@supabase/ssr';
 
-import { isSupabaseConfigured, supabaseConfig } from './config';
+import {
+  authCookieOptions,
+  isSupabaseConfigured,
+  supabaseConfig,
+} from './config';
 import type { Database } from './types';
 
 type Client = ReturnType<typeof createBrowserClient<Database>>;
@@ -24,6 +28,7 @@ export function getSupabaseBrowserClient(): Client | null {
   client ??= createBrowserClient<Database>(
     supabaseConfig.url,
     supabaseConfig.anonKey,
+    { cookieOptions: authCookieOptions },
   );
   return client;
 }

@@ -12,7 +12,11 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
-import { isSupabaseConfigured, supabaseConfig } from '@/lib/supabase/config';
+import {
+  authCookieOptions,
+  isSupabaseConfigured,
+  supabaseConfig,
+} from '@/lib/supabase/config';
 
 export async function middleware(request: NextRequest) {
   if (!isSupabaseConfigured) return NextResponse.next();
@@ -23,6 +27,7 @@ export async function middleware(request: NextRequest) {
     supabaseConfig.url,
     supabaseConfig.anonKey,
     {
+      cookieOptions: authCookieOptions,
       cookies: {
         getAll() {
           return request.cookies.getAll();

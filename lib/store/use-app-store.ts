@@ -299,12 +299,45 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: "eventerz-store",
-      version: 1,
+      version: 2,
+      /**
+       * What survives a reload - and, just as importantly, what does not.
+       *
+       * This writes to `localStorage`, which is readable by any JavaScript on
+       * the page. That is the whole threat model: one XSS, one malicious
+       * dependency, one bad browser extension, and everything here is
+       * exfiltrated in a single `JSON.parse`. Persisting something is therefore
+       * a decision about what is acceptable to lose, not a caching detail.
+       *
+       * Two things were removed in v2:
+       *
+       *   - **`email`**, stripped from every persisted user below. It is the
+       *     one directly identifying field on the record, and losing the
+       *     email -> wallet_address pair is the exact deanonymisation that
+       *     migration 0015 exists to prevent. It is still held in memory for
+       *     the current session, where the session cookie already implies it;
+       *     it just stops being written to disk. It comes back from the
+       *     session on the next load anyway, so nothing is lost by not storing
+       *     it.
+       *
+       *   - **`messages`**, dropped entirely. Private conversations are the
+       *     most sensitive thing the app holds and the least valuable to cache:
+       *     they are refetched on open, so persisting them bought a few
+       *     milliseconds in exchange for leaving every DM on the disk of every
+       *     device the user has ever signed in on - including shared ones.
+       *
+       * `version: 2` discards any v1 blob rather than migrating it, which is
+       * what clears the emails and messages already sitting in browsers today.
+       */
       partialize: (s) => ({
-        users: s.users,
+        users: Object.fromEntries(
+          Object.entries(s.users).map(([id, u]) => [
+            id,
+            { ...u, email: undefined },
+          ]),
+        ),
         events: s.events,
         friendRequests: s.friendRequests,
-        messages: s.messages,
         currentUserId: s.currentUserId,
       }),
       onRehydrateStorage: () => (state) => {

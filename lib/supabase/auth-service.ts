@@ -79,6 +79,54 @@ export async function signOut(): Promise<AuthResult> {
   return { ok: true, data: undefined };
 }
 
+/**
+ * Delete the signed-in account.
+ *
+ * Calls the `delete-account` Edge Function, which erases the private rows and
+ * anonymises the profile (`delete_my_account()`, migration 0015) and then
+ * removes the `auth.users` row with the service-role key. Both halves need
+ * privileges a browser does not have, which is why this is one call to a
+ * function rather than a sequence of queries from here.
+ *
+ * What survives is deliberate and worth being able to explain to the person
+ * clicking the button: events they hosted, other people's tickets to those
+ * events, and payment receipts. Those are other people's records, and deleting
+ * them would erase a guest's ticket to punish nobody. Everything that
+ * identifies the user - name, avatar, bio, email, wallet link - is cleared.
+ */
+export async function deleteAccount(): Promise<AuthResult> {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) return { ok: false, error: NOT_CONFIGURED };
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) return { ok: false, error: 'You are not signed in.' };
+
+  const { data, error } = await supabase.functions.invoke('delete-account', {
+    method: 'POST',
+  });
+
+  /*
+   * `functions.invoke` reports a non-2xx as a generic FunctionsHttpError, so the
+   * body carries the useful part. The `partial` case matters: the data is gone
+   * but the sign-in is not, and telling someone "deleted" when they can still
+   * log in is the one wrong answer here.
+   */
+  if (error) {
+    const detail =
+      data && typeof data === 'object' && 'error' in data
+        ? String((data as { error: unknown }).error)
+        : 'Could not delete your account. Please try again.';
+    return { ok: false, error: detail };
+  }
+
+  // The account is gone; clear the local session so the UI cannot keep using a
+  // token whose user no longer exists.
+  await supabase.auth.signOut();
+  return { ok: true, data: undefined };
+}
+
 export async function fetchProfile(
   userId: string,
 ): Promise<AuthResult<ProfileRow>> {
