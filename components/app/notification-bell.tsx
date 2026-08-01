@@ -26,7 +26,21 @@ import { useSession } from "@/components/auth/use-session";
 import { timeAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-export function NotificationBell() {
+/**
+ * Which edge of the button the panel hangs from.
+ *
+ * The panel is 320px wide and the sidebar is 256px, so a right-anchored panel
+ * there starts at roughly -100px and is cut off by the edge of the window -
+ * which is what "the notification bar gets abrupted" looks like. Anchoring is
+ * therefore a property of *where the bell is*, and the caller is the only thing
+ * that knows that.
+ *
+ * A left edge for the sidebar, a right edge for the mobile top bar where the
+ * bell sits near the right of the screen and the panel has to open inward.
+ */
+type Align = "left" | "right";
+
+export function NotificationBell({ align = "right" }: { align?: Align }) {
   const { userId } = useSession();
   const { data: items = [], isLoading } = useNotifications(userId ?? undefined);
   const markRead = useMarkNotificationsRead(userId ?? undefined);
@@ -70,7 +84,19 @@ export function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 z-50 mt-2 w-80 overflow-hidden rounded-2xl border border-white/10 bg-brand-bg-soft/95 shadow-2xl backdrop-blur-xl">
+        <div
+          className={cn(
+            "absolute z-50 mt-2 w-80 overflow-hidden rounded-2xl border border-white/10 bg-brand-bg-soft/95 shadow-2xl backdrop-blur-xl",
+            align === "left" ? "left-0" : "right-0",
+            /*
+             * Never wider than the window. 320px fits a sidebar or a tablet,
+             * and does not fit a 360px phone once the page's own padding is
+             * accounted for - without this the panel simply runs off whichever
+             * edge it was not anchored to.
+             */
+            "max-w-[calc(100vw-2rem)]",
+          )}
+        >
           <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
             <h2 className="text-sm font-semibold text-white">Notifications</h2>
             {unread > 0 && (

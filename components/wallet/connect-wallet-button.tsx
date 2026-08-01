@@ -124,6 +124,9 @@ export function ConnectWalletButton({
             transition={{ duration: 0.18 }}
             className={cn(
               "absolute right-0 z-50 mt-2 w-60 overflow-hidden rounded-2xl border border-white/10 bg-brand-bg-soft/95 p-1.5 shadow-card backdrop-blur-2xl",
+              // Same guard as the notification panel: a fixed-width menu must
+              // never be wider than the window it opens in.
+              "max-w-[calc(100vw-2rem)]",
               fullWidth && "left-0 right-auto w-full"
             )}
           >

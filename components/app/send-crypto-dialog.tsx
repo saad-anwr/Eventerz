@@ -295,9 +295,23 @@ export function SendCryptoDialog({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 24, scale: 0.97 }}
             transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-            className="gradient-border relative z-10 w-full max-w-md overflow-hidden rounded-3xl bg-brand-bg-soft/95 shadow-card backdrop-blur-2xl"
+            /*
+             * Capped to the window, with the body scrolling inside.
+             *
+             * The card was `overflow-hidden` with no height limit, so on a
+             * short viewport - a landscape phone, a small laptop, a browser
+             * with devtools open - the bottom of the form was clipped with no
+             * way to reach it. That put the Send button out of reach on a form
+             * that moves real money. The header and the "never holds your
+             * funds" footer stay pinned; only the middle scrolls.
+             *
+             * `dvh` rather than `vh`: on mobile browsers `vh` counts the space
+             * behind the retracting address bar, which is exactly the height
+             * this must not assume it has.
+             */
+            className="gradient-border relative z-10 flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col overflow-hidden rounded-3xl bg-brand-bg-soft/95 shadow-card backdrop-blur-2xl"
           >
-            <div className="flex items-start justify-between gap-4 border-b border-white/10 p-5">
+            <div className="flex shrink-0 items-start justify-between gap-4 border-b border-white/10 p-5">
               <div className="flex items-center gap-3">
                 <Avatar name={recipient.name} seed={recipient.id} size="md" src={recipient.avatarUrl} />
                 <div>
@@ -322,7 +336,9 @@ export function SendCryptoDialog({
               </button>
             </div>
 
-            <div className="p-5">
+            {/* The only part that scrolls. `min-h-0` is required for a flex
+                child to be allowed to shrink below its content height. */}
+            <div className="min-h-0 flex-1 overflow-y-auto p-5">
               {/* Blocking states first - an amount field is pointless if the
                   transfer cannot happen. */}
               {!recipient.walletAddress ? (
@@ -488,7 +504,7 @@ export function SendCryptoDialog({
               )}
             </div>
 
-            <div className="flex items-start gap-2 border-t border-white/10 px-5 py-3.5 text-xs text-muted-foreground">
+            <div className="flex shrink-0 items-start gap-2 border-t border-white/10 px-5 py-3.5 text-xs text-muted-foreground">
               <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-brand-green" />
               Eventerz never holds your funds. The transfer goes straight from
               your wallet to theirs, and you approve it there.

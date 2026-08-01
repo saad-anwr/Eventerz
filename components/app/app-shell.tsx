@@ -164,7 +164,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Link href="/dashboard">
             <Logo />
           </Link>
-          <NotificationBell />
+          {/* Opens rightward, into the page. The sidebar is narrower than the
+              panel, so a right-anchored one would hang off the window. */}
+          <NotificationBell align="left" />
         </div>
 
         <div className="px-4">

@@ -176,7 +176,7 @@ export function AuthModal() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 24, scale: 0.97 }}
             transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-            className="gradient-border relative z-10 w-full max-w-md overflow-hidden rounded-3xl bg-brand-bg-soft/95 shadow-card backdrop-blur-2xl"
+            className="gradient-border relative z-10 flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col overflow-hidden rounded-3xl bg-brand-bg-soft/95 shadow-card backdrop-blur-2xl"
           >
             <button
               onClick={closeAuth}
@@ -186,7 +186,7 @@ export function AuthModal() {
               <X className="size-4" />
             </button>
 
-            <div className="p-6 pt-8 text-center">
+            <div className="min-h-0 flex-1 overflow-y-auto p-6 pt-8 text-center">
               <EventerzMark className="mx-auto size-12" />
               <h2 className="mt-4 font-display text-xl font-bold text-white">
                 {sentTo ? "Check your inbox" : "Sign in to Eventerz"}
@@ -304,7 +304,7 @@ export function AuthModal() {
             </div>
             )}
 
-            <div className="mt-5 flex items-start gap-2 border-t border-white/10 px-6 py-3.5 text-xs text-muted-foreground">
+            <div className="flex shrink-0 items-start gap-2 border-t border-white/10 px-6 py-3.5 text-xs text-muted-foreground">
               <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-brand-green" />
               <span>
                 {isLive ? (

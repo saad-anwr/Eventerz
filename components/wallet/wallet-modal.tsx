@@ -150,10 +150,10 @@ export function WalletModal() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 24, scale: 0.97 }}
             transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-            className="gradient-border relative z-10 w-full max-w-md overflow-hidden rounded-3xl bg-brand-bg-soft/95 shadow-card backdrop-blur-2xl"
+            className="gradient-border relative z-10 flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col overflow-hidden rounded-3xl bg-brand-bg-soft/95 shadow-card backdrop-blur-2xl"
           >
             {/* Header */}
-            <div className="flex items-start justify-between gap-4 border-b border-white/10 p-5">
+            <div className="flex shrink-0 items-start justify-between gap-4 border-b border-white/10 p-5">
               <div className="flex items-center gap-3">
                 <span className="flex size-10 items-center justify-center rounded-2xl bg-brand-purple/15 text-brand-purple">
                   <WalletIcon className="size-5" />
@@ -176,7 +176,7 @@ export function WalletModal() {
               </button>
             </div>
 
-            <div className="max-h-[60vh] overflow-y-auto p-5">
+            <div className="min-h-0 flex-1 overflow-y-auto p-5">
               {/* Detected wallets */}
               {detected.length > 0 ? (
                 <div className="space-y-2">
