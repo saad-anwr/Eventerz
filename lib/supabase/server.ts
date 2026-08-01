@@ -12,6 +12,7 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
 import { isSupabaseConfigured, supabaseConfig } from './config';
+import { PROFILE_COLUMNS } from './types';
 import type { Database } from './types';
 
 export async function getSupabaseServerClient() {
@@ -68,7 +69,7 @@ export async function getServerProfile() {
 
   const { data } = await supabase
     .from('profiles')
-    .select('*')
+    .select(PROFILE_COLUMNS)
     .eq('id', user.id)
     .single();
 

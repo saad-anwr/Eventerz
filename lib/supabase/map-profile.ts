@@ -9,14 +9,27 @@
 import type { AuthMethod, User } from '@/lib/store/types';
 import type { ProfileRow } from './types';
 
-/** Derive a stable handle when the server has not set one yet. */
+/**
+ * Derive a stable handle when the server has not set one yet.
+ *
+ * This used to fall back to the email local-part. It no longer can - the client
+ * cannot read `email` (see `types.ts`) - and it should not have: a handle is
+ * displayed publicly, so deriving it from an address published the local-part
+ * of that address to everyone who saw the profile. `handle_new_user()` does the
+ * same derivation server-side at signup, where it is the user's own address and
+ * they can change the result; this is only the "server has not set one" case.
+ */
 function fallbackHandle(profile: ProfileRow): string {
-  const source = profile.email?.split('@')[0] ?? profile.name;
-  const slug = source.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 16);
+  const slug = profile.name.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 16);
   return slug || `member${profile.id.slice(0, 6)}`;
 }
 
-export function profileToUser(profile: ProfileRow): User {
+/**
+ * @param email - the signed-in user's own address, from the session. Passed
+ *   only when mapping *yourself*: it is never available for anyone else, which
+ *   is the point. Omitted for every other profile.
+ */
+export function profileToUser(profile: ProfileRow, email?: string): User {
   /*
    * The wallet is the primary credential, so a profile that has one is a
    * wallet account regardless of how the person happened to sign in this time.
@@ -27,7 +40,7 @@ export function profileToUser(profile: ProfileRow): User {
     id: profile.id,
     name: profile.name,
     handle: profile.handle ?? fallbackHandle(profile),
-    email: profile.email ?? undefined,
+    email,
     bio: profile.bio ?? undefined,
     location: profile.location ?? undefined,
     website: profile.website ?? undefined,

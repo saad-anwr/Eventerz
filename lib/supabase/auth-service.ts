@@ -10,6 +10,7 @@
 
 import { getSupabaseBrowserClient } from './client';
 import { authCallbackUrl, isSupabaseConfigured } from './config';
+import { PROFILE_COLUMNS } from './types';
 import type { ProfileRow, ProfileUpdate } from './types';
 
 export type AuthResult<T = void> =
@@ -86,7 +87,7 @@ export async function fetchProfile(
 
   const { data, error } = await supabase
     .from('profiles')
-    .select('*')
+    .select(PROFILE_COLUMNS)
     .eq('id', userId)
     .single();
 
@@ -105,7 +106,7 @@ export async function updateProfile(
     .from('profiles')
     .update(patch)
     .eq('id', userId)
-    .select()
+    .select(PROFILE_COLUMNS)
     .single();
 
   if (error) return { ok: false, error: error.message };
@@ -208,7 +209,7 @@ export async function profileForWallet(
 
   const { data } = await supabase
     .from('profiles')
-    .select('*')
+    .select(PROFILE_COLUMNS)
     .eq('wallet_address', walletAddress)
     .maybeSingle();
 

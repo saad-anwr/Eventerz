@@ -25,6 +25,7 @@ import type {
   RsvpRow,
   RsvpStatus,
 } from './types';
+import { PROFILE_COLUMNS } from './types';
 
 function client() {
   const supabase = getSupabaseBrowserClient();
@@ -87,7 +88,7 @@ async function hydrateEvents(rows: EventRow[]): Promise<EventWithMeta[]> {
       .from('rsvps')
       .select('event_id, profile_id, status')
       .in('event_id', eventIds),
-    client().from('profiles').select('*').in('id', hostIds),
+    client().from('profiles').select(PROFILE_COLUMNS).in('id', hostIds),
   ]);
 
   const me = await currentUserId();
@@ -678,7 +679,7 @@ export async function fetchFriends(profileId: string): Promise<ProfileRow[]> {
 
   if (ids.length === 0) return [];
 
-  const { data } = await client().from('profiles').select('*').in('id', ids);
+  const { data } = await client().from('profiles').select(PROFILE_COLUMNS).in('id', ids);
   return data ?? [];
 }
 
@@ -709,7 +710,7 @@ export async function removeFriend(requestId: string) {
 export async function fetchProfile(id: string): Promise<ProfileRow | null> {
   const { data } = await client()
     .from('profiles')
-    .select('*')
+    .select(PROFILE_COLUMNS)
     .eq('id', id)
     .maybeSingle();
   return data;
@@ -723,7 +724,7 @@ export async function updateProfile(
     .from('profiles')
     .update(patch)
     .eq('id', id)
-    .select()
+    .select(PROFILE_COLUMNS)
     .single();
   if (error) fail('Saving your profile', error);
   return data;
@@ -731,7 +732,7 @@ export async function updateProfile(
 
 export async function fetchProfiles(ids: string[]): Promise<ProfileRow[]> {
   if (ids.length === 0) return [];
-  const { data } = await client().from('profiles').select('*').in('id', ids);
+  const { data } = await client().from('profiles').select(PROFILE_COLUMNS).in('id', ids);
   return data ?? [];
 }
 

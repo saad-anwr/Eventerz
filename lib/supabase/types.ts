@@ -12,6 +12,27 @@
  * implicit index signature. An interface here silently degrades every query's
  * inferred type to `never`.
  */
+/**
+ * The columns of `profiles` a client may read, as a PostgREST select list.
+ *
+ * Use this instead of `select('*')` on every profile query. `*` is not a fixed
+ * set - it is "whatever columns exist when the query runs", so a column added
+ * later is published to every caller by default, and the mistake surfaces as a
+ * privacy incident rather than a build failure. Naming them makes exposure the
+ * thing you opt into.
+ *
+ * This is belt to 0015's braces: the database refuses `email` regardless, and a
+ * `select('*')` would now error rather than leak. The list is what keeps the
+ * queries honest and the errors from happening in the first place.
+ *
+ * Kept as a single literal with `as const`, not a concatenation: supabase-js
+ * infers the row type by parsing this string at the type level, and `'a' + 'b'`
+ * widens to `string`, which collapses every profile query to
+ * `GenericStringError`.
+ */
+export const PROFILE_COLUMNS =
+  'id, name, handle, avatar_url, bio, location, website, twitter, wallet_address, reputation, interests, created_at, updated_at' as const;
+
 export type ProfileRow = {
   id: string;
   name: string;
@@ -23,7 +44,19 @@ export type ProfileRow = {
   twitter: string | null;
   /** Primary identity. Null means wallet-pending. */
   wallet_address: string | null;
-  email: string | null;
+  /*
+   * `email` is deliberately absent.
+   *
+   * The column exists, but 0015 revokes SELECT on it from `anon` and
+   * `authenticated`, because `profiles` is world-readable and RLS cannot
+   * exclude a single column - so publishing the row published every address we
+   * hold, and the email -> wallet_address join along with it.
+   *
+   * Leaving it off the type is what stops it creeping back: a query that asks
+   * for it now fails to compile rather than failing at runtime in production.
+   * The signed-in user's own address comes from the session
+   * (`supabase.auth.getUser()`), which is where it authoritatively lives.
+   */
   reputation: number;
   interests: string[];
   created_at: string;

@@ -146,6 +146,39 @@ export function serviceClient(): SupabaseClient {
 }
 
 /**
+ * A client that acts **as the caller**, not as the service role.
+ *
+ * The anon key plus the caller's own `Authorization` header, which is the
+ * combination PostgREST reads to resolve `auth.uid()` and apply RLS exactly as
+ * it would for a request straight from the app.
+ *
+ * This exists for functions that need to run something scoped to the signed-in
+ * user - `delete_my_account()` being the obvious one, since a service-role
+ * client has no `auth.uid()` at all and the function would refuse it.
+ *
+ * Reaching for `serviceClient()` instead, and passing the user id along, is the
+ * tempting shortcut and the wrong one: it turns an operation the caller is
+ * entitled to perform on themselves into one the function performs on whoever
+ * it is told to, with the authorisation check now living in our code rather
+ * than in the database.
+ */
+export function userClient(request: Request): SupabaseClient {
+  const url = Deno.env.get('SUPABASE_URL');
+  const key = Deno.env.get('SUPABASE_ANON_KEY');
+  if (!url || !key) {
+    throw new Error(
+      'SUPABASE_URL and SUPABASE_ANON_KEY must be set on the function.',
+    );
+  }
+  return createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: {
+      headers: { Authorization: request.headers.get('Authorization') ?? '' },
+    },
+  });
+}
+
+/**
  * Resolve the caller from their own JWT.
  *
  * The user id comes from the token, never from the request body. A body field

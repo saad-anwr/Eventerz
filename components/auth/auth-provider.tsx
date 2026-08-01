@@ -30,6 +30,7 @@ import {
   signOut as signOutRemote,
 } from "@/lib/supabase/auth-service";
 import { profileToUser } from "@/lib/supabase/map-profile";
+import { PROFILE_COLUMNS } from "@/lib/supabase/types";
 import type { ProfileRow } from "@/lib/supabase/types";
 import { AuthModal } from "./auth-modal";
 
@@ -100,22 +101,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   /*  Live session                                                          */
   /* --------------------------------------------------------------------- */
 
-  const loadProfile = React.useCallback(async (userId: string) => {
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase) return;
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .single();
+  /**
+   * @param email - the session's own address. `profiles.email` is not readable
+   *   by clients (see `lib/supabase/types.ts`), so the only place the signed-in
+   *   user's address can come from is their own session - which is also the
+   *   only place it should, since nobody else's is available there.
+   */
+  const loadProfile = React.useCallback(
+    async (userId: string, email?: string) => {
+      const supabase = getSupabaseBrowserClient();
+      if (!supabase) return;
+      const { data } = await supabase
+        .from("profiles")
+        .select(PROFILE_COLUMNS)
+        .eq("id", userId)
+        .single();
 
-    setProfile(data ?? null);
+      setProfile(data ?? null);
 
-    // Mirror the real account into the app store so `useSession()` - and
-    // therefore the navbar, dashboard and every screen - reflects the actual
-    // signed-in person rather than a demo record.
-    if (data) useAppStore.getState().syncRemoteUser(profileToUser(data));
-  }, []);
+      // Mirror the real account into the app store so `useSession()` - and
+      // therefore the navbar, dashboard and every screen - reflects the actual
+      // signed-in person rather than a demo record.
+      if (data) {
+        useAppStore.getState().syncRemoteUser(profileToUser(data, email));
+      }
+    },
+    [],
+  );
 
   React.useEffect(() => {
     const supabase = getSupabaseBrowserClient();
@@ -130,7 +142,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!active) return;
       setSupabaseUser(session?.user ?? null);
-      if (session?.user) void loadProfile(session.user.id);
+      if (session?.user) void loadProfile(session.user.id, session.user.email);
       setLoading(false);
     });
 
@@ -142,7 +154,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSupabaseUser(session?.user ?? null);
 
         if (session?.user) {
-          void loadProfile(session.user.id);
+          void loadProfile(session.user.id, session.user.email);
           setAuthOpen(false);
           return;
         }
