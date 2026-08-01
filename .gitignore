@@ -37,4 +37,10 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
+
+# Every env file stays local — except the placeholder template, which is the
+# only record of *which* variables a fresh clone has to set. The bare `.env*`
+# above it would swallow that too, and the file survives today only because it
+# was committed before the rule existed; re-adding it would silently fail.
 .env*
+!.env.example

@@ -29,7 +29,7 @@
  * Provisioning is in `supabase/functions/mint-cnft/README.md`.
  */
 
-import { json, preflight, requireUser, serviceClient } from '../_shared/http.ts';
+import { json, logError, preflight, requireUser, serviceClient } from '../_shared/http.ts';
 
 import { createUmi } from 'npm:@metaplex-foundation/umi-bundle-defaults@0.9.2';
 import {
@@ -169,7 +169,7 @@ Deno.serve(async (request: Request) => {
       .eq('id', id)
       .maybeSingle<TicketRow>();
     if (error) {
-      console.error('[mint-cnft] ticket lookup failed', error);
+      logError('[mint-cnft] ticket lookup failed', error);
       return json(request, { error: 'Could not read that ticket.' }, 500);
     }
     if (!data) return json(request, { error: 'Ticket not found.' }, 404);
@@ -187,7 +187,7 @@ Deno.serve(async (request: Request) => {
       .eq('id', id)
       .maybeSingle<BadgeRow>();
     if (error) {
-      console.error('[mint-cnft] badge lookup failed', error);
+      logError('[mint-cnft] badge lookup failed', error);
       return json(request, { error: 'Could not read that badge.' }, 500);
     }
     if (!data) return json(request, { error: 'Badge not found.' }, 404);
@@ -251,7 +251,7 @@ Deno.serve(async (request: Request) => {
     const leaf = await parseLeafFromMintV1Transaction(umi, signature);
     assetId = leaf.id.toString();
   } catch (error) {
-    console.error('[mint-cnft] mint failed', error);
+    logError('[mint-cnft] mint failed', error);
     return json(
       request,
       { minted: false, reason: 'mint-failed', detail: 'The mint did not land. Nothing was recorded.' },
@@ -276,7 +276,7 @@ Deno.serve(async (request: Request) => {
     // The asset exists; only our record of it failed. Return it so the caller
     // can retry the record rather than the mint - `record_*_mint` is idempotent
     // on the asset id precisely for this path.
-    console.error('[mint-cnft] record failed', recordError);
+    logError('[mint-cnft] record failed', recordError);
     return json(
       request,
       { minted: true, assetId, recorded: false, detail: 'Minted, but the record failed. Retry to file it.' },

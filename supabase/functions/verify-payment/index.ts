@@ -22,7 +22,7 @@
  * a receipt still gets verified when the sender's app is closed.
  */
 
-import { json, preflight, requireUser, serviceClient } from '../_shared/http.ts';
+import { json, logError, preflight, requireUser, serviceClient } from '../_shared/http.ts';
 
 interface PaymentRow {
   signature: string;
@@ -140,7 +140,7 @@ Deno.serve(async (request: Request) => {
     .maybeSingle<PaymentRow>();
 
   if (lookupError) {
-    console.error('[verify-payment] lookup failed', lookupError);
+    logError('[verify-payment] lookup failed', lookupError);
     return json(request, { error: 'Could not read that receipt.' }, 500);
   }
   if (!payment) {
@@ -165,7 +165,7 @@ Deno.serve(async (request: Request) => {
   try {
     tx = await getTransaction(payment.cluster, signature);
   } catch (error) {
-    console.error('[verify-payment] rpc failed', error);
+    logError('[verify-payment] rpc failed', error);
     return json(
       request,
       { error: 'Could not reach the network to check that transaction.' },
@@ -222,7 +222,7 @@ Deno.serve(async (request: Request) => {
     p_signature: signature,
   });
   if (markError) {
-    console.error('[verify-payment] mark failed', markError);
+    logError('[verify-payment] mark failed', markError);
     return json(request, { error: 'Could not save the result.' }, 500);
   }
 

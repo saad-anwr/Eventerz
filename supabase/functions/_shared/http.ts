@@ -9,6 +9,67 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
 
 /**
+ * Patterns that must never reach a log line.
+ *
+ * The RPC URL is the one that actually bites. `HELIUS_RPC_URL` carries its API
+ * key in the query string, and when `fetch` fails at the network layer Deno
+ * builds the message out of the URL it was given - so
+ * `console.error('rpc failed', error)` writes the key verbatim into the
+ * function logs, where it outlives the request and is readable by anyone with
+ * dashboard access. Nothing in the code passes the key to a logger; the runtime
+ * does it on our behalf, which is why redaction has to happen at the log call
+ * rather than at the call sites we control.
+ */
+const REDACTIONS: readonly RegExp[] = [
+  // ?api-key=..., &access-token=..., ?apikey=...
+  //
+  // The value stops at the first delimiter rather than the first space: Deno
+  // wraps the URL in `(...)` in its fetch errors, so `[^&\s]+` would swallow
+  // the closing paren and the `: connection refused` that follows it, hiding
+  // the part of the message that says what actually went wrong.
+  /([?&](?:api[-_]?key|access[-_]?token|token|secret)=)[^&\s'")\],;]+/gi,
+  // Bare JWTs (Supabase keys, user access tokens). The empty group keeps the
+  // replacer's argument shape identical to the pattern above - see below.
+  /\b()eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]+/g,
+];
+
+/**
+ * An error rendered safe to log.
+ *
+ * Keeps the message and the stack - the parts that say what broke - and blanks
+ * only the credential-shaped substrings inside them.
+ */
+export function redact(value: unknown): string {
+  const text =
+    value instanceof Error
+      ? `${value.name}: ${value.message}${value.stack ? `\n${value.stack}` : ''}`
+      : typeof value === 'string'
+        ? value
+        : (() => {
+            try {
+              return JSON.stringify(value) ?? String(value);
+            } catch {
+              return String(value);
+            }
+          })();
+
+  // Every pattern captures exactly one group - the bit to keep, which may be
+  // empty. Without a group `replace` passes the match *offset* as the second
+  // argument, and a truthy number would be spliced into the output as though
+  // it were the kept prefix.
+  return REDACTIONS.reduce(
+    (acc, pattern) =>
+      acc.replace(pattern, (_match, keep: string) => `${keep}[REDACTED]`),
+    text,
+  );
+}
+
+/** `console.error`, with credentials stripped out of the payload. */
+export function logError(tag: string, error: unknown): void {
+  console.error(tag, redact(error));
+}
+
+/**
  * Allowed origins.
  *
  * `ALLOWED_ORIGINS` is a comma-separated list set with

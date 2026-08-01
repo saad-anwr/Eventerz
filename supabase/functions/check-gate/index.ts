@@ -22,7 +22,7 @@
  * checkable by anyone who can read a whale's address off the explorer.
  */
 
-import { json, preflight, requireUser, serviceClient } from '../_shared/http.ts';
+import { json, logError, preflight, requireUser, serviceClient } from '../_shared/http.ts';
 
 interface GateRow {
   id: string;
@@ -125,7 +125,7 @@ Deno.serve(async (request: Request) => {
     .maybeSingle<GateRow>();
 
   if (lookupError) {
-    console.error('[check-gate] lookup failed', lookupError);
+    logError('[check-gate] lookup failed', lookupError);
     return json(request, { error: 'Could not read that event.' }, 500);
   }
   if (!event) return json(request, { error: 'Event not found.' }, 404);
@@ -152,7 +152,7 @@ Deno.serve(async (request: Request) => {
     .maybeSingle<{ wallet_address: string | null }>();
 
   if (profileError) {
-    console.error('[check-gate] profile lookup failed', profileError);
+    logError('[check-gate] profile lookup failed', profileError);
     return json(request, { error: 'Could not read your profile.' }, 500);
   }
 
@@ -177,7 +177,7 @@ Deno.serve(async (request: Request) => {
       ? await nativeBalance(wallet)
       : await tokenBalance(wallet, event.gate_mint);
   } catch (error) {
-    console.error('[check-gate] rpc failed', error);
+    logError('[check-gate] rpc failed', error);
     // 502, not 403. Failing to reach the cluster is our problem, and telling a
     // qualifying holder they do not qualify is the one wrong answer here.
     return json(

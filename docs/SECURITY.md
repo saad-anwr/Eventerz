@@ -134,6 +134,55 @@ a party to, even though it read the row with a key that ignores the policy.
 
 ---
 
+## Secrets in git history - **rotation outstanding**
+
+Recorded here because a leak that has been tidied up looks identical to one that
+never happened, and only one of them still needs action.
+
+A billable **Helius RPC key** was committed to the `Eventerz dApp` repository, in
+the `base` profile of `eas.json` and inside the tracked build artifact
+`eventerz-arm64-release.apk`. Both are cleaned up in the working tree: `eas.json`
+resolves its credentials from EAS environment variables, and `*.apk` / `*.aab`
+are gitignored.
+
+The working tree is not the exposure. Git retains every version of every tracked
+file, so the old value is recoverable from history by anyone who can clone:
+
+```bash
+git log -p -- eas.json | grep api-key
+```
+
+**The key must be rotated in the Helius dashboard.** Removing it from HEAD stops
+it spreading; it does not make the leaked value stop working. Steps are in the
+root `README.md`.
+
+Two things did *not* leak, and the distinction matters:
+
+| Value | Committed? | Action |
+| --- | --- | --- |
+| `HELIUS_RPC_URL` (API key) | Yes - `eas.json`, and inside the APK | **Rotate** |
+| `SUPABASE_ANON_KEY` | Yes - same block | None; public by design, RLS enforced |
+| `SUPABASE_SERVICE_ROLE_KEY` | **Never** | None |
+
+The anon key's safety is conditional, not inherent: it is safe *because* RLS is
+enabled on all 14 tables. Ship a table without a policy and that row of the table
+above becomes wrong.
+
+### Why a client-side RPC key cannot be fixed by hiding it
+
+`NEXT_PUBLIC_` and `EXPO_PUBLIC_` values are inlined into the bundle at build
+time. The Helius URL is therefore extractable from any published web bundle or
+APK - `unzip -p app.apk | grep api-key` is the whole attack. EAS's
+`--visibility sensitive` keeps it out of build logs and the dashboard, which is
+worth having, but it does not keep it out of the artifact.
+
+So the control is economic rather than cryptographic: a spend cap plus a
+domain/bundle restriction on the key. Rotation closes this incident; the cap is
+what bounds the next one. Proxying RPC through an Edge Function is the only way
+to actually hide it, and is worth doing if usage ever justifies the added hop.
+
+---
+
 ## Known gaps
 
 Listed because an unlisted gap is a gap nobody fixes.

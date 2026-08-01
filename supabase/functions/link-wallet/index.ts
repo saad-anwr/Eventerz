@@ -33,7 +33,7 @@ import {
   base58Decode,
   verifyEd25519,
 } from '../_shared/solana.ts';
-import { json, preflight, requireUser, serviceClient } from '../_shared/http.ts';
+import { json, logError, preflight, requireUser, serviceClient } from '../_shared/http.ts';
 
 /** UUID, as embedded in the challenge text by `issue_wallet_link_nonce`. */
 const NONCE_PATTERN =
@@ -101,7 +101,7 @@ Deno.serve(async (request: Request) => {
       base58Decode(walletAddress),
     );
   } catch (error) {
-    console.error('[link-wallet] malformed input', error);
+    logError('[link-wallet] malformed input', error);
     return json(request, { error: 'That signature could not be read.' }, 400);
   }
 
@@ -130,7 +130,7 @@ Deno.serve(async (request: Request) => {
   });
 
   if (error) {
-    console.error('[link-wallet] link failed', error);
+    logError('[link-wallet] link failed', error);
     // These messages are written for the user by the SQL function and are safe
     // to pass through: "already linked to another account", "expired".
     return json(request, { error: error.message }, 400);
