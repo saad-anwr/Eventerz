@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import {
   Award,
+  BadgeCheck,
   Check,
   Globe2,
   ImagePlus,
@@ -22,7 +23,16 @@ import {
   useEventsByHost,
   useUpdateProfile,
 } from "@/lib/hooks/use-eventerz-data";
-import { uploadAvatar } from "@/lib/supabase/data";
+import {
+  fetchMyPhone,
+  hasXIdentity,
+  saveMyPhone,
+  startXLink,
+  syncXIdentity,
+  uploadAvatar,
+} from "@/lib/supabase/data";
+import { profileToUser } from "@/lib/supabase/map-profile";
+import { useAppStore } from "@/lib/store/use-app-store";
 import { eventRowToItem } from "@/lib/supabase/map-event";
 import { useSession } from "@/components/auth/use-session";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -33,6 +43,28 @@ import { EventCard } from "@/components/app/event-card";
 import { Button } from "@/components/ui/button";
 import { shortenAddress } from "@/lib/format";
 import { cn } from "@/lib/utils";
+
+/**
+ * Whatever someone pasted into the X field, reduced to a bare handle.
+ *
+ * The field shows an `x.com/` prefix, which makes a full URL the *more* natural
+ * thing to paste, not less - people copy the address bar. Stripping only a
+ * leading `@` (the old behaviour) would have stored
+ * `https://x.com/saadanwar` as the username and rendered it as
+ * `x.com/https://x.com/saadanwar`.
+ *
+ * Also drops anything after the handle: `?s=21` tracking params come along with
+ * every share link from the app.
+ */
+function normaliseXHandle(input: string): string {
+  return input
+    .trim()
+    .replace(/^https?:\/\//i, "")
+    .replace(/^(www\.)?(x|twitter)\.com\//i, "")
+    .replace(/^@/, "")
+    .split(/[/?#]/)[0]
+    .trim();
+}
 
 const inputCls =
   "h-11 w-full rounded-xl border border-white/10 bg-white/[0.03] px-3.5 text-sm text-white placeholder:text-muted-foreground focus:border-brand-purple/40 focus:outline-none";
@@ -72,6 +104,82 @@ export default function ProfilePage() {
     interests: "",
   });
 
+  /*
+   * The phone is not on `user`, because it is not on `profiles` - it lives in
+   * the owner-only `profile_private` table (0019). Loaded once on sign-in and
+   * held here, so the editor can seed the field with what is actually stored
+   * rather than an empty box over a saved value.
+   */
+  const [phone, setPhone] = React.useState<string | null>(null);
+  const [phoneError, setPhoneError] = React.useState("");
+
+  const [linkingX, setLinkingX] = React.useState(false);
+  const [xError, setXError] = React.useState("");
+
+  /**
+   * Send them to X. `linkIdentity` navigates away, so nothing after the call
+   * runs - the return trip is handled by the effect below.
+   */
+  const linkX = React.useCallback(async () => {
+    setLinkingX(true);
+    setXError("");
+    try {
+      await startXLink(`${window.location.origin}/profile`);
+    } catch (err) {
+      setLinkingX(false);
+      setXError(
+        err instanceof Error ? err.message : "Could not start the X sign-in.",
+      );
+    }
+  }, []);
+
+  /*
+   * Adopt the handle after coming back from X.
+   *
+   * Keyed off "an identity exists but the profile is not marked verified"
+   * rather than off a redirect parameter, because that condition is also true
+   * if the link succeeded and the follow-up write failed - a refresh then
+   * finishes the job instead of stranding someone with a linked account and no
+   * tick.
+   */
+  React.useEffect(() => {
+    if (!userId || user?.twitterVerified) return;
+    let cancelled = false;
+
+    void (async () => {
+      if (!(await hasXIdentity()) || cancelled) return;
+      try {
+        const row = await syncXIdentity();
+        if (!cancelled) useAppStore.getState().syncRemoteUser(profileToUser(row));
+      } catch (err) {
+        if (!cancelled) {
+          setXError(
+            err instanceof Error ? err.message : "Could not confirm your X account.",
+          );
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, user?.twitterVerified]);
+
+  React.useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    void fetchMyPhone()
+      .then((value) => {
+        if (!cancelled) setPhone(value);
+      })
+      // Not surfaced: an unreadable phone is an empty field, and the save path
+      // reports its own failures where the user can act on them.
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
   React.useEffect(() => {
     if (user && editing) {
       setForm({
@@ -79,13 +187,13 @@ export default function ProfilePage() {
         handle: user.handle,
         bio: user.bio ?? "",
         location: user.location ?? "",
-        phone: user.phone ?? "",
+        phone: phone ?? "",
         website: user.website ?? "",
         twitter: user.twitter ?? "",
         interests: user.interests.join(", "),
       });
     }
-  }, [editing, user]);
+  }, [editing, user, phone]);
 
   if (!user) return null;
 
@@ -95,7 +203,6 @@ export default function ProfilePage() {
     .filter((e) => e.hostId !== user.id);
 
   const save = () => {
-    // `phone` is not a column on `profiles`; the form keeps it for future use.
     updateProfile.mutate({
       name: form.name.trim() || user.name,
       handle:
@@ -104,12 +211,35 @@ export default function ProfilePage() {
       bio: form.bio.trim(),
       location: form.location.trim(),
       website: form.website.trim(),
-      twitter: form.twitter.trim().replace(/^@/, ""),
+      twitter: normaliseXHandle(form.twitter),
       interests: form.interests
         .split(",")
         .map((t) => t.trim())
         .filter(Boolean),
     });
+
+    /*
+     * The phone lives in `profile_private` (0019), so it is a second write
+     * rather than part of the patch above.
+     *
+     * Fired alongside rather than awaited: the two are independent, and a phone
+     * that fails to save should not roll back a name that saved fine. The error
+     * surfaces in its own line under the form instead of pretending the whole
+     * save failed.
+     */
+    if (form.phone !== (phone ?? "")) {
+      setPhoneError("");
+      void saveMyPhone(userId!, form.phone)
+        .then(() => setPhone(form.phone.trim() || null))
+        .catch((err: unknown) =>
+          setPhoneError(
+            err instanceof Error
+              ? err.message
+              : "Could not save your phone number.",
+          ),
+        );
+    }
+
     setEditing(false);
   };
 
@@ -220,6 +350,15 @@ export default function ProfilePage() {
             {avatarError}
           </p>
         )}
+
+        {/* The phone saves separately from the rest of the form, so it reports
+            separately too - the alternative is a silent failure, which is the
+            bug this whole field is being fixed for. */}
+        {phoneError && (
+          <p className="relative mt-4 rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+            {phoneError}
+          </p>
+        )}
       </div>
 
       {editing ? (
@@ -295,12 +434,68 @@ export default function ProfilePage() {
               <span className="mb-1.5 block text-sm font-medium text-white">
                 Twitter
               </span>
-              <input
-                className={inputCls}
-                value={form.twitter}
-                onChange={(e) => set("twitter", e.target.value)}
-                placeholder="username"
-              />
+              {/*
+                The `x.com/` prefix is part of the field, not placeholder text.
+                A bare "username" box invites a full URL or an @handle, both of
+                which then have to be stripped on save; showing the prefix makes
+                the expected shape obvious before anything is typed.
+
+                It is decorative - `aria-hidden`, not focusable - so a screen
+                reader announces the label rather than reading a fragment of URL
+                before the input.
+              */}
+              <div
+                className={cn(
+                  inputCls,
+                  "flex items-center gap-0 p-0 focus-within:border-brand-purple/40",
+                )}
+              >
+                <span
+                  aria-hidden
+                  className="shrink-0 select-none border-r border-white/10 py-2.5 pl-3.5 pr-3 text-sm text-muted-foreground"
+                >
+                  x.com/
+                </span>
+                <input
+                  className="h-full min-w-0 flex-1 bg-transparent px-3 text-sm text-white placeholder:text-muted-foreground focus:outline-none"
+                  value={form.twitter}
+                  onChange={(e) => set("twitter", e.target.value)}
+                  placeholder="username"
+                  autoComplete="off"
+                  spellCheck={false}
+                  aria-label="X username"
+                />
+              </div>
+
+              {/*
+                A typed handle is a claim; a linked account is a fact. Both are
+                allowed - not everyone will connect one, and a blank profile is
+                worse than an unverified handle - but only one of them gets a
+                tick, and editing the box by hand drops it (trigger, 0020).
+              */}
+              <div className="mt-2 flex items-center gap-3">
+                {user.twitterVerified ? (
+                  <span className="inline-flex items-center gap-1.5 text-xs text-brand-green">
+                    <BadgeCheck className="size-3.5" />
+                    Verified with X
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void linkX()}
+                    disabled={linkingX}
+                    className="inline-flex items-center gap-1.5 text-xs text-brand-cyan hover:underline disabled:opacity-50"
+                  >
+                    {linkingX ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <BadgeCheck className="size-3.5" />
+                    )}
+                    Verify with X
+                  </button>
+                )}
+                {xError && <span className="text-xs text-red-300">{xError}</span>}
+              </div>
             </label>
           </div>
           <label className="block">
@@ -393,10 +588,11 @@ export default function ProfilePage() {
                     <span className="truncate">{user.email}</span>
                   </li>
                 )}
-                {user.phone && (
+                {/* From `profile_private`, and only ever your own - see 0019. */}
+                {phone && (
                   <li className="flex items-center gap-2.5 text-muted-foreground">
                     <Phone className="size-4 shrink-0" />
-                    {user.phone}
+                    {phone}
                   </li>
                 )}
                 {user.location && (
@@ -413,7 +609,15 @@ export default function ProfilePage() {
                 )}
                 {user.twitter && (
                   <li className="flex items-center gap-2.5 text-muted-foreground">
-                    <Twitter className="size-4 shrink-0" />@{user.twitter}
+                    <Twitter className="size-4 shrink-0" />
+                    <a
+                      href={`https://x.com/${user.twitter}`}
+                      target="_blank"
+                      rel="noopener noreferrer me"
+                      className="truncate hover:text-white hover:underline"
+                    >
+                      x.com/{user.twitter}
+                    </a>
                   </li>
                 )}
               </ul>

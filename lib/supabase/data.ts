@@ -27,6 +27,41 @@ import type {
 } from './types';
 import { PROFILE_COLUMNS } from './types';
 
+/**
+ * Make a user-typed string safe to embed in a PostgREST `.or()` filter.
+ *
+ * `.or()` does not take parameters - it takes a string in PostgREST's own
+ * filter grammar, which the server then parses. Interpolating raw input into it
+ * is the same class of mistake as string-building SQL: the value stops being a
+ * value the moment it contains a character the grammar treats as syntax.
+ *
+ * Three characters matter:
+ *   `,`  separates conditions, so it appends a new OR branch
+ *   `.`  separates column / operator / value
+ *   `()` groups, and `(` opens a nested boolean expression
+ *
+ * So a search for `x,id.eq.<uuid>` stops being a search and becomes an extra
+ * disjunct. RLS still applies - `events` is restricted to `public`/`unlisted`
+ * (0002), so this cannot reach a private event - which is why this is a
+ * hardening fix rather than an exposed record. But "the row filter downstream
+ * happens to save us" is not the reason the query should be correct, and the
+ * next `.or()` someone writes may sit in front of a table without that policy.
+ *
+ * PostgREST's own escape hatch is double quotes around the value, with `"` and
+ * `\` backslash-escaped inside. That keeps the whole thing one literal no
+ * matter what it contains.
+ *
+ * The quotes must wrap the **whole pattern, wildcards included** -
+ * `ilike."%foo%"`, not `ilike.%"foo"%`. In the second form the quotes are just
+ * characters in the middle of the pattern, so it matches nothing and the search
+ * box silently returns no results. Building the pattern here rather than at the
+ * call site is what stops the two being assembled in the wrong order.
+ */
+export function postgrestLikePattern(value: string): string {
+  const escaped = value.trim().replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  return `"%${escaped}%"`;
+}
+
 function client() {
   const supabase = getSupabaseBrowserClient();
   if (!supabase) {
@@ -166,7 +201,7 @@ export async function fetchEvents(options?: {
     request = request.eq('category', options.category);
   }
   if (options?.query?.trim()) {
-    const q = `%${options.query.trim()}%`;
+    const q = postgrestLikePattern(options.query);
     request = request.or(
       `title.ilike.${q},description.ilike.${q},location.ilike.${q}`,
     );
@@ -761,6 +796,95 @@ export async function fetchProfile(id: string): Promise<ProfileRow | null> {
     .eq('id', id)
     .maybeSingle();
   return data;
+}
+
+/**
+ * The signed-in user's own phone number, or null.
+ *
+ * Lives in `profile_private` rather than on `profiles`, because `profiles` is
+ * world-readable and a phone number is at least as identifying as the email
+ * that 0015 went out of its way to stop publishing. RLS on that table is keyed
+ * to `auth.uid()`, so this can only ever return the caller's own row - there is
+ * no id parameter because there is nothing else it could fetch.
+ */
+export async function fetchMyPhone(): Promise<string | null> {
+  const { data, error } = await client()
+    .from('profile_private')
+    .select('phone')
+    .maybeSingle();
+
+  /*
+   * A missing row is the normal state for anyone who has never saved a number,
+   * and `maybeSingle` returns null data without an error for it. A real error
+   * is reported rather than swallowed, so a broken read does not look like an
+   * empty field the user is invited to fill in again.
+   */
+  if (error) fail('Loading your contact details', error);
+  return data?.phone ?? null;
+}
+
+/**
+ * Save the phone number.
+ *
+ * Upsert, because the row does not exist until the first save and the editor
+ * has no way to know which case it is in - and should not have to.
+ *
+ * An empty string is stored as null rather than "": they mean the same thing to
+ * a reader, and only one of them is what "I have no phone number" looks like in
+ * a database.
+ */
+export async function saveMyPhone(
+  profileId: string,
+  phone: string,
+): Promise<void> {
+  const trimmed = phone.trim();
+  const { error } = await client()
+    .from('profile_private')
+    .upsert(
+      { id: profileId, phone: trimmed || null },
+      { onConflict: 'id' },
+    );
+  if (error) fail('Saving your contact details', error);
+}
+
+/**
+ * Start the X account link.
+ *
+ * `linkIdentity` attaches an OAuth identity to the *existing* signed-in user
+ * rather than creating a second account, which is what makes this a proof of
+ * ownership instead of another way to log in. It navigates away to X, so
+ * nothing after it runs - the result is picked up on the way back by
+ * `syncXIdentity`.
+ *
+ * Requires the Twitter provider **and** "Manual linking" to be enabled on the
+ * Supabase project; both are dashboard settings, not code.
+ */
+export async function startXLink(returnTo: string): Promise<void> {
+  const { error } = await client().auth.linkIdentity({
+    provider: 'twitter',
+    options: { redirectTo: returnTo },
+  });
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * Adopt the handle from the linked X identity.
+ *
+ * The handle is read server-side from `auth.identities` (migration 0020), so
+ * this passes no arguments - there is nothing the client could send that would
+ * be worth trusting. Returns the updated profile.
+ */
+export async function syncXIdentity(): Promise<ProfileRow> {
+  const { data, error } = await client().rpc('sync_x_identity');
+  if (error) fail('Confirming your X account', error);
+  return data as ProfileRow;
+}
+
+/** True when this login already has an X identity attached. */
+export async function hasXIdentity(): Promise<boolean> {
+  const { data, error } = await client().auth.getUserIdentities();
+  if (error) return false;
+  return (data?.identities ?? []).some((i) => i.provider === 'twitter');
 }
 
 export async function updateProfile(

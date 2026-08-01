@@ -31,10 +31,12 @@
  * `GenericStringError`.
  */
 export const PROFILE_COLUMNS =
-  'id, name, handle, avatar_url, bio, location, website, twitter, wallet_address, reputation, interests, created_at, updated_at' as const;
+  'id, name, handle, avatar_url, bio, location, website, twitter, twitter_verified, wallet_address, reputation, interests, created_at, updated_at' as const;
 
 export type ProfileRow = {
   id: string;
+  /** Set only by `sync_x_identity()`; no client grant exists (0020). */
+  twitter_verified?: boolean;
   name: string;
   handle: string | null;
   avatar_url: string | null;
@@ -329,6 +331,19 @@ export type DiscoverablePersonRow = ProfileRow & {
   request_sent_by_me: boolean | null;
 };
 
+/**
+ * `profile_private` - fields that belong to one person only (migration 0019).
+ *
+ * Deliberately not folded into `ProfileRow`. That type describes a row anyone
+ * can read, and putting a phone number in it would make every consumer of a
+ * profile a potential leak of one.
+ */
+export type ProfilePrivateRow = {
+  id: string;
+  phone: string | null;
+  updated_at: string;
+};
+
 type Table<Row, Insert = Partial<Row>, Update = Partial<Row>> = {
   Row: Row;
   Insert: Insert;
@@ -343,6 +358,15 @@ export type Database = {
         ProfileRow,
         Partial<ProfileRow> & { id: string },
         ProfileUpdate
+      >;
+      /*
+       * Private fields, readable only by their owner (migration 0019).
+       * `updated_at` is a trigger's job, so it is absent from both write types.
+       */
+      profile_private: Table<
+        ProfilePrivateRow,
+        { id: string; phone?: string | null },
+        { phone?: string | null }
       >;
       events: Table<EventRow>;
       communities: Table<CommunityRow>;
@@ -378,6 +402,11 @@ export type Database = {
       };
     };
     Functions: {
+      /** Reads the linked X identity server-side and adopts its handle (0020). */
+      sync_x_identity: {
+        Args: Record<string, never>;
+        Returns: ProfileRow;
+      };
       request_to_join: {
         Args: { p_event_id: string };
         Returns: RsvpRow;

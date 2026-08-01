@@ -45,6 +45,7 @@ export function profileToUser(profile: ProfileRow, email?: string): User {
     location: profile.location ?? undefined,
     website: profile.website ?? undefined,
     twitter: profile.twitter ?? undefined,
+    twitterVerified: profile.twitter_verified ?? false,
     walletAddress: profile.wallet_address ?? undefined,
     avatarUrl: profile.avatar_url ?? undefined,
     authMethod,

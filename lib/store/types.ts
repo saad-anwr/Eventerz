@@ -5,11 +5,21 @@ export interface User {
   name: string;
   handle: string; // without @
   email?: string;
-  phone?: string;
+  /*
+   * Deliberately absent: `phone`.
+   *
+   * It was declared here and existed nowhere else - no column, no write, no
+   * read - so the profile editor collected a number and dropped it on every
+   * save while this type made it look supported. It now lives in
+   * `profile_private` (0019), readable only by its owner, and is fetched
+   * explicitly rather than riding along on a world-readable profile.
+   */
   bio?: string;
   location?: string;
   website?: string;
   twitter?: string;
+  /** The handle came from a linked X account, not the text box (0020). */
+  twitterVerified?: boolean;
   walletAddress?: string;
   /**
    * Uploaded profile picture.
