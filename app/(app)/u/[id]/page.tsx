@@ -27,6 +27,7 @@ import { Avatar } from "@/components/app/avatar";
 import { EventCard } from "@/components/app/event-card";
 import { EmptyState } from "@/components/app/empty-state";
 import { FriendButton, FriendStatusPill } from "@/components/app/friend-button";
+import { HoldingsCard } from "@/components/app/holdings-card";
 import { Button } from "@/components/ui/button";
 import { shortenAddress } from "@/lib/format";
 
@@ -96,7 +97,13 @@ export default function PublicProfilePage() {
       <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-xl">
         <div className="pointer-events-none absolute -right-16 -top-16 size-56 rounded-full bg-brand-blue/20 blur-3xl" />
         <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center">
-          <Avatar name={user.name} seed={user.id} size="xl" ring />
+          <Avatar
+            name={user.name}
+            seed={user.id}
+            size="xl"
+            ring
+            src={user.avatarUrl}
+          />
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <h1 className="font-display text-2xl font-bold text-white">
@@ -209,6 +216,21 @@ export default function PublicProfilePage() {
               )}
             </ul>
           </div>
+
+          {/*
+            Their holdings, visible to anyone who can see the profile.
+
+            Nothing is disclosed that is not already public: the wallet address
+            is on-chain and its balances are readable by any block explorer. The
+            privacy boundary is the address - which is shown directly above -
+            and that is unchanged.
+          */}
+          {user.walletAddress && (
+            <HoldingsCard
+              address={user.walletAddress}
+              title={`${user.name.split(" ")[0]}'s holdings`}
+            />
+          )}
         </aside>
       </div>
     </div>

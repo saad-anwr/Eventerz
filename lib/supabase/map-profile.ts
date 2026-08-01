@@ -46,6 +46,7 @@ export function profileToUser(profile: ProfileRow, email?: string): User {
     website: profile.website ?? undefined,
     twitter: profile.twitter ?? undefined,
     walletAddress: profile.wallet_address ?? undefined,
+    avatarUrl: profile.avatar_url ?? undefined,
     authMethod,
     reputation: profile.reputation,
     interests: profile.interests ?? [],

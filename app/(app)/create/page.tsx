@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { useCreateEvent } from "@/lib/hooks/use-eventerz-data";
+import { FeeCancelled, useFee } from "@/lib/solana/use-fee";
 import { useSession } from "@/components/auth/use-session";
 import { uploadEventBanner, type CreateEventInput } from "@/lib/supabase/data";
 import type { EventCategory } from "@/lib/store/types";
@@ -118,6 +119,13 @@ export default function CreateEventPage() {
   const { userId } = useSession();
   const createEvent = useCreateEvent(userId ?? undefined);
 
+  /** $5 in SOL, taken before the event is written. Free off mainnet. */
+  const {
+    pay: payCreateFee,
+    paying: payingFee,
+    label: feeLabel,
+  } = useFee("createEvent");
+
   const [bannerUrl, setBannerUrl] = React.useState("");
   const [uploading, setUploading] = React.useState(false);
 
@@ -175,8 +183,17 @@ export default function CreateEventPage() {
   const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
 
+  /*
+   * Covers the fee step as well as the write. The wallet is open while the
+   * charge waits to be approved, and a button that still looks idle invites a
+   * second submit - which on a non-refundable charge is the expensive kind of
+   * double-click.
+   */
+  const busy = payingFee || createEvent.isPending;
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (busy) return;
     if (!form.title.trim()) return setError("Give your event a title.");
     if (!form.startsAt) return setError("Pick a start date & time.");
     if (!form.isOnline && !form.location.trim())
@@ -216,15 +233,41 @@ export default function CreateEventPage() {
       return setError("Sign in before publishing an event.");
     }
 
-    // Publishing writes to Supabase, so the event is visible to everyone -
-    // previously it only ever reached this browser's local store.
-    createEvent.mutate(input, {
-      onSuccess: (event) => router.push(`/events/${event.id}`),
-      onError: (err) =>
-        setError(
-          err instanceof Error ? err.message : "Could not publish the event.",
-        ),
-    });
+    /*
+     * The $5 fee is taken before the event is written, and it is
+     * non-refundable. Publishing first would give away a free event whenever
+     * the payment failed, and an event cannot be un-published once guests can
+     * see it. The mobile app charges the same fee in the same order.
+     */
+    void (async () => {
+      let paid = false;
+      try {
+        paid = (await payCreateFee()) !== null;
+      } catch (err) {
+        if (err instanceof FeeCancelled) return;
+        return setError(
+          err instanceof Error
+            ? err.message
+            : "Could not take the creation fee.",
+        );
+      }
+
+      // Publishing writes to Supabase, so the event is visible to everyone -
+      // previously it only ever reached this browser's local store.
+      createEvent.mutate(input, {
+        onSuccess: (event) => router.push(`/events/${event.id}`),
+        onError: (err) =>
+          setError(
+            paid
+              ? // Money moved and no event exists. "Try again" would invite a
+                // second $5 charge for the same event.
+                "Your fee was taken but the event was not created. Contact support with your wallet address - do not pay again."
+              : err instanceof Error
+                ? err.message
+                : "Could not publish the event.",
+          ),
+      });
+    })();
   };
 
   return (
@@ -444,15 +487,37 @@ export default function CreateEventPage() {
             </p>
           )}
 
+          {/*
+            State the price before the button, not inside the wallet popup. A
+            non-refundable charge should never be the first thing someone learns
+            about their event from a signature request.
+          */}
+          {feeLabel && (
+            <p className="text-xs text-muted-foreground">
+              Publishing costs a one-off{" "}
+              <span className="text-foreground">{feeLabel}</span>, charged from
+              your connected wallet. This fee is not refundable.
+            </p>
+          )}
+
           <div className="flex gap-3">
-            <Button type="submit" size="lg">
-              <CalendarPlus className="size-4" />
-              Publish Event
+            <Button type="submit" size="lg" disabled={busy}>
+              {busy ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <CalendarPlus className="size-4" />
+              )}
+              {payingFee
+                ? "Confirm in your wallet..."
+                : createEvent.isPending
+                  ? "Publishing..."
+                  : "Publish Event"}
             </Button>
             <Button
               type="button"
               size="lg"
               variant="ghost"
+              disabled={busy}
               onClick={() => router.push("/explore")}
             >
               Cancel

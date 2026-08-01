@@ -192,6 +192,45 @@ to actually hide it, and is worth doing if usage ever justifies the added hop.
 
 ---
 
+## Column privileges - **the rules only bind because of these**
+
+Every business rule in this schema lives in a SECURITY DEFINER function:
+`rsvp()` checks capacity, `request_to_join_verified()` checks the token gate,
+`link_wallet_verified()` checks an Ed25519 signature, `recompute_reputation()`
+derives reputation from attendance.
+
+None of that binds a client unless the function is the *only* way in, and until
+0017 it was not. Supabase grants `ALL` on every table in `public` to `anon` and
+`authenticated` at project setup, and no migration had ever narrowed that - every
+`grant`/`revoke` in 0001-0016 was `on function`. RLS was the only control on
+direct writes, and RLS is row-level: a policy says which **rows** you may write,
+never which **columns**.
+
+So `for update using (auth.uid() = id)` meant "you may rewrite any column of your
+own row", and PostgREST publishes that as an HTTP request. The TypeScript
+`ProfileUpdate` type lists the editable fields, but a type is a client-side
+courtesy - `curl` does not import it.
+
+Five one-request escalations followed, all now closed by 0017:
+
+| Column | What a single PATCH bought | Which guarantee it voided |
+| --- | --- | --- |
+| `profiles.wallet_address` | Claim any unclaimed wallet, and its reputation and ticket history | 0011's nonce + signature + Edge Function, entirely |
+| `profiles.reputation` | Any number you like | 0013's "cannot be inflated by anyone - including the profile's owner" |
+| `rsvps.status` | Self-confirm into a full or gated event | `approve_guest`, capacity, waitlist, and the token gate |
+| `events.featured` | Your own event on the home page | Editorial placement |
+| `communities.verified` | Your own verified badge | The badge meaning anything |
+
+0017 grants writes **per column**, and only where a client legitimately writes.
+0009 already did this for `messages` - its insert policy pins `kind = 'text'` and
+`payment_id is null`, so a forged payment receipt cannot be inserted into a
+thread - which is the same idea expressed in a policy rather than a grant.
+
+The rule to keep: **a new column is not writable until someone grants it.** If a
+client needs to write one, add it to the grant in 0017 and say why. If a rule is
+enforced in a function, the table it guards must not be directly writable, or
+the function is advice rather than a gate.
+
 ## Known gaps
 
 Listed because an unlisted gap is a gap nobody fixes.
@@ -209,17 +248,18 @@ Listed because an unlisted gap is a gap nobody fixes.
    `overrides` in `package.json`, all patch-or-minor inside the same major, with
    `next build` as the proof.
 
-2. **No rate limiting.** Nothing throttles repeated `request_to_join` calls, or a
-   stranger messaging every host on the platform. DMs are open by design; open and
-   unmetered is a different thing.
+2. **Rate limiting is now partial** (0016, 0018). Every Edge Function consumes
+   quota from `check_rate_limit` keyed on the caller's profile id, `messages`
+   has a 30/minute flood ceiling enforced by trigger, and
+   `subscribe_newsletter` allows an address 3 attempts an hour.
 
-   `subscribe_newsletter` is the one endpoint callable by **`anon`**, so it is the
-   most exposed of these. It is written to be safe as an unauthenticated write -
-   fixed column list, shape and length validation, `on conflict do nothing`, and
-   an identical return whether or not the address was already present, so it
-   cannot be used to test who is subscribed - but nothing stops someone calling
-   it in a loop. Postgres is the wrong layer for that; the fix is a rate limit at
-   the edge.
+   What is still open is the anonymous case. The subject that matters for the
+   newsletter form is the caller's **IP**, and Postgres cannot see it -
+   PostgREST terminates the connection, so the database only ever sees its own
+   client. The per-address limit closes a form retried in a loop with one
+   address and does nothing against a flood that varies the address each time.
+   The fix is to move that form behind an Edge Function and call `rateLimit()`
+   with `x-forwarded-for`, exactly as the other functions do.
 
 3. **No host-side audit trail** for approve / decline / remove / edit decisions.
    The notifications are the only record, and they live in the recipient's row.

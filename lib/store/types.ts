@@ -11,6 +11,14 @@ export interface User {
   website?: string;
   twitter?: string;
   walletAddress?: string;
+  /**
+   * Uploaded profile picture.
+   *
+   * The column has existed since 0014 and `profileToUser` never read it, so
+   * every consumer silently fell back to the gradient - a picture could be
+   * stored and would never appear anywhere.
+   */
+  avatarUrl?: string;
   authMethod: AuthMethod;
   reputation: number;
   interests: string[];

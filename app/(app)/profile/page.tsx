@@ -6,6 +6,8 @@ import {
   Award,
   Check,
   Globe2,
+  ImagePlus,
+  Loader2,
   Mail,
   MapPin,
   Pencil,
@@ -20,6 +22,7 @@ import {
   useEventsByHost,
   useUpdateProfile,
 } from "@/lib/hooks/use-eventerz-data";
+import { uploadAvatar } from "@/lib/supabase/data";
 import { eventRowToItem } from "@/lib/supabase/map-event";
 import { useSession } from "@/components/auth/use-session";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -45,6 +48,14 @@ export default function ProfilePage() {
   const { open: openWallet } = useConnectModal();
 
   const [editing, setEditing] = React.useState(false);
+  const [avatarUrl, setAvatarUrl] = React.useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = React.useState(false);
+  const [avatarError, setAvatarError] = React.useState("");
+
+  // Seed from the loaded profile, and follow it if it changes underneath.
+  React.useEffect(() => {
+    if (user?.avatarUrl !== undefined) setAvatarUrl(user.avatarUrl ?? null);
+  }, [user?.avatarUrl]);
   const [form, setForm] = React.useState({
     name: "",
     handle: "",
@@ -100,13 +111,80 @@ export default function ProfilePage() {
   const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
 
+  /**
+   * Pick and upload a profile picture.
+   *
+   * Saved immediately rather than with the rest of the form. The file has to
+   * reach storage before `avatar_url` can point at it, and deferring means
+   * holding a local blob URL in form state that means nothing to any other
+   * client - which would then be written to the row verbatim if the upload
+   * later failed.
+   */
+  const handleAvatarChange = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = e.target.files?.[0];
+    // Reset the input so re-picking the same file still fires a change event.
+    e.target.value = "";
+    if (!file || !userId) return;
+
+    setUploadingAvatar(true);
+    setAvatarError("");
+    try {
+      const url = await uploadAvatar(file, userId);
+      setAvatarUrl(url);
+      // Persist straight away: the picture is already in storage, and leaving
+      // the row pointing at the old one would be a picture that exists and is
+      // not used.
+      updateProfile.mutate({ avatar_url: url });
+    } catch (err) {
+      setAvatarError(
+        err instanceof Error ? err.message : "Could not upload that picture.",
+      );
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
   return (
     <div>
       {/* Header */}
       <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-xl">
         <div className="pointer-events-none absolute -right-16 -top-16 size-56 rounded-full bg-brand-purple/20 blur-3xl" />
         <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center">
-          <Avatar name={user.name} seed={user.id} size="xl" ring />
+          {/*
+            The picture doubles as the control for changing it. A separate
+            "upload" button beside an avatar is a second thing to find; the
+            avatar is where everyone looks first and already reads as the
+            subject of the action.
+          */}
+          <div className="relative shrink-0 self-start">
+            <Avatar
+              name={user.name}
+              seed={user.id}
+              size="xl"
+              ring
+              src={avatarUrl}
+            />
+            <label
+              className="absolute -bottom-1 -right-1 flex size-8 cursor-pointer items-center justify-center rounded-full border border-white/15 bg-[#11162b] text-white transition-colors hover:bg-[#1a2140]"
+              title="Change profile picture"
+            >
+              {uploadingAvatar ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <ImagePlus className="size-4" />
+              )}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/avif"
+                className="sr-only"
+                disabled={uploadingAvatar}
+                onChange={handleAvatarChange}
+              />
+              <span className="sr-only">Change profile picture</span>
+            </label>
+          </div>
           <div className="min-w-0 flex-1">
             <h1 className="font-display text-2xl font-bold text-white">
               {user.name}
@@ -129,6 +207,14 @@ export default function ProfilePage() {
             </Button>
           )}
         </div>
+
+        {/* A failed upload has to say so - the avatar simply not changing is
+            indistinguishable from having picked the wrong file. */}
+        {avatarError && (
+          <p className="relative mt-4 rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+            {avatarError}
+          </p>
+        )}
       </div>
 
       {editing ? (

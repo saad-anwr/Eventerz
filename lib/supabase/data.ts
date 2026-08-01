@@ -269,6 +269,53 @@ export async function uploadEventBanner(
   return data.publicUrl;
 }
 
+const AVATAR_BUCKET = 'avatars';
+/** 2 MB, matching the bucket's own `file_size_limit` in migration 0014. */
+const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
+
+/**
+ * Upload a profile picture and return its public URL.
+ *
+ * The web counterpart of the app's `uploadAvatar`. It existed on mobile only,
+ * which meant a picture set on a phone showed up everywhere and there was no
+ * way to set one from a browser at all - the edit form simply had no control
+ * for it.
+ *
+ * Limits are checked here *and* enforced by the bucket. The client check exists
+ * to give a useful message instead of an opaque storage error; the bucket's is
+ * the one that actually holds, because a client check is a convenience and
+ * never a control.
+ *
+ * The path is `<uid>/<random>.<ext>`: the uid prefix is what the storage policy
+ * matches on (`storage.foldername(name)[1] = auth.uid()`), and the random name
+ * means a new picture never has to overwrite the old one - which also sidesteps
+ * CDN caching serving the previous image from a reused URL.
+ */
+export async function uploadAvatar(
+  file: File,
+  profileId: string,
+): Promise<string> {
+  if (!BANNER_TYPES.includes(file.type)) {
+    throw new Error('Use a JPEG, PNG, WebP or AVIF image.');
+  }
+  if (file.size > MAX_AVATAR_BYTES) {
+    const mb = (file.size / 1024 / 1024).toFixed(1);
+    throw new Error(`That image is ${mb} MB. The limit is 2 MB.`);
+  }
+
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg';
+  const path = `${profileId}/${crypto.randomUUID()}.${ext}`;
+
+  const { error } = await client()
+    .storage.from(AVATAR_BUCKET)
+    .upload(path, file, { cacheControl: '31536000', upsert: false });
+
+  if (error) fail('Uploading your picture', error);
+
+  const { data } = client().storage.from(AVATAR_BUCKET).getPublicUrl(path);
+  return data.publicUrl;
+}
+
 export interface CreateEventInput {
   title: string;
   description: string;

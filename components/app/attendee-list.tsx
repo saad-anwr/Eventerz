@@ -66,7 +66,13 @@ export function AttendeeList({
               href={`/u/${g.profile_id}`}
               className="flex flex-col items-center gap-1.5"
             >
-              <Avatar name={g.name} seed={g.profile_id} size="md" ring />
+              <Avatar
+                name={g.name}
+                seed={g.profile_id}
+                size="md"
+                ring
+                src={g.avatar_url}
+              />
               <span className="max-w-16 truncate text-[11px] text-muted-foreground">
                 {g.name.split(" ")[0]}
               </span>
@@ -109,7 +115,9 @@ function GuestPreviewRow({
                 key={p.id}
                 className="rounded-full ring-2 ring-brand-bg-soft"
               >
-                <Avatar name={p.name} seed={p.id} size="sm" />
+                {/* `avatar_url` was already being fetched for this row and
+                    thrown away, so every face fell back to initials. */}
+                <Avatar name={p.name} seed={p.id} size="sm" src={p.avatar_url} />
               </span>
             ))}
             {others > 0 && (

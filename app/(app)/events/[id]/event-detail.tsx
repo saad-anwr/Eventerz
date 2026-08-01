@@ -37,6 +37,7 @@ import { GuestManager } from "@/components/app/guest-manager";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useOnChainActions } from "@/lib/solana/use-onchain-actions";
+import { FeeCancelled, useFee } from "@/lib/solana/use-fee";
 import { formatEventDate } from "@/lib/format";
 import {
   RSVP_PRESENTATION,
@@ -66,6 +67,16 @@ export function EventDetail() {
   const { data: host } = useProfile(row?.host_id);
   const onChain = useOnChainActions();
 
+  /** $1 in SOL, taken before the seat is claimed. Free off mainnet. */
+  const {
+    pay: payRsvpFee,
+    paying: payingFee,
+    label: feeLabel,
+    enabled: feesOn,
+  } = useFee('rsvp');
+  const [joinError, setJoinError] = React.useState('');
+  const joining = payingFee || requestToJoin.isPending;
+
   /**
    * Claim the seat on-chain, then in the database.
    *
@@ -78,7 +89,31 @@ export function EventDetail() {
    * recorded after the cluster confirms it.
    */
   const handleJoin = React.useCallback(async () => {
-    if (!event) return;
+    if (!event || joining) return;
+    setJoinError('');
+
+    /*
+     * The $1 fee comes first, and it is non-refundable.
+     *
+     * Same ordering as the mobile app and for the same reason: RSVPing first
+     * would seat people for free whenever the payment failed, and a seat that
+     * has been taken cannot be quietly untaken - the host has already seen the
+     * guest count move.
+     *
+     * Note this sits *above* the on-chain seat claim rather than beside it.
+     * Those two are not alike: the seat claim is additive and failure-tolerant
+     * by design, whereas this decides whether the RSVP happens at all.
+     */
+    try {
+      if ((await payRsvpFee()) === null && feesOn) return;
+    } catch (err) {
+      if (err instanceof FeeCancelled) return;
+      setJoinError(
+        err instanceof Error ? err.message : 'Could not take the RSVP fee.',
+      );
+      return;
+    }
+
     if (onChain.available) {
       try {
         await onChain.claimSeat(event.id, host?.wallet_address);
@@ -86,8 +121,27 @@ export function EventDetail() {
         console.warn('[eventerz] on-chain seat claim failed', err);
       }
     }
-    requestToJoin.mutate(event.id);
-  }, [event, host?.wallet_address, onChain, requestToJoin]);
+    requestToJoin.mutate(event.id, {
+      onError: (err) =>
+        setJoinError(
+          feesOn
+            ? // The fee landed and the seat did not. Telling them to try again
+              // invites a second charge for the same event.
+              'Your fee was taken but the RSVP did not save. Contact support with your wallet address - do not pay again.'
+            : err instanceof Error
+              ? err.message
+              : 'Could not RSVP. Please try again.',
+        ),
+    });
+  }, [
+    event,
+    feesOn,
+    host?.wallet_address,
+    joining,
+    onChain,
+    payRsvpFee,
+    requestToJoin,
+  ]);
 
   if (isLoading) {
     return (
@@ -137,10 +191,15 @@ export function EventDetail() {
   // version dropped mutation errors on the floor, which is what made the RSVP
   // button look inert when the server rejected the call.
   const actionError =
-    (requestToJoin.error as Error | null)?.message ??
-    (cancelRsvp.error as Error | null)?.message ??
+    // The fee path sets its own message, and it takes precedence: it is the
+    // only one that can involve money having moved.
+    joinError ||
+    (requestToJoin.error as Error | null)?.message ||
+    (cancelRsvp.error as Error | null)?.message ||
     null;
-  const busy = requestToJoin.isPending || cancelRsvp.isPending;
+  // Includes the fee step: the wallet is open and the button must not look idle
+  // while a charge is waiting to be approved.
+  const busy = joining || cancelRsvp.isPending;
 
 
   return (
@@ -436,8 +495,25 @@ export function EventDetail() {
                   ) : (
                     <BadgeCheck className="size-4" />
                   )}
-                  {busy ? "Sending..." : rsvpActionLabel(event)}
+                  {payingFee
+                    ? "Confirm in your wallet..."
+                    : busy
+                      ? "Sending..."
+                      : rsvpActionLabel(event)}
                 </Button>
+              )}
+
+              {/*
+                Say the price before the button is pressed. The charge is not
+                refundable, so learning about it from a wallet popup is not good
+                enough.
+              */}
+              {feeLabel && !status && !isHost && (
+                <p className="mt-2 text-center text-xs text-muted-foreground">
+                  RSVPing costs a one-off{" "}
+                  <span className="text-foreground">{feeLabel}</span>, and is
+                  not refundable.
+                </p>
               )}
             </div>
 
