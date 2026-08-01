@@ -25,6 +25,7 @@ import {
 
 import { IS_MAINNET } from './cluster';
 import { explorerTxUrl } from './eventerz-program';
+import { computeBudgetInstructions } from './priority-fee';
 import {
   FEE_LABEL,
   TREASURY_ADDRESS,
@@ -97,6 +98,18 @@ export function useFee(kind: FeeKind) {
       const fresh = await quoteFee(kind);
       setQuote(fresh);
 
+      const treasury = new PublicKey(TREASURY_ADDRESS);
+
+      /*
+       * Priority fee. This is the transaction that decides whether someone gets
+       * their event, so it is the last one that should be left sitting
+       * unconfirmed because it bid nothing for block space.
+       */
+      const budget = await computeBudgetInstructions('transfer', [
+        publicKey,
+        treasury,
+      ]);
+
       const { blockhash, lastValidBlockHeight } =
         await connection.getLatestBlockhash();
 
@@ -104,15 +117,17 @@ export function useFee(kind: FeeKind) {
         feePayer: publicKey,
         blockhash,
         lastValidBlockHeight,
-      }).add(
-        SystemProgram.transfer({
-          fromPubkey: publicKey,
-          toPubkey: new PublicKey(TREASURY_ADDRESS),
-          // bigint all the way to the instruction. A number loses precision
-          // above 2^53 lamports, and money is the wrong place to find out.
-          lamports: fresh.lamports,
-        }),
-      );
+      })
+        .add(...budget)
+        .add(
+          SystemProgram.transfer({
+            fromPubkey: publicKey,
+            toPubkey: treasury,
+            // bigint all the way to the instruction. A number loses precision
+            // above 2^53 lamports, and money is the wrong place to find out.
+            lamports: fresh.lamports,
+          }),
+        );
 
       const signature = await sendTransaction(transaction, connection);
 

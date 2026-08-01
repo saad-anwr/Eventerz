@@ -22,6 +22,7 @@ import * as React from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { Transaction, type TransactionInstruction } from '@solana/web3.js';
 
+import { computeBudgetInstructions, type ComputeKind } from './priority-fee';
 import {
   cancelEventInstruction,
   checkInInstruction,
@@ -57,8 +58,21 @@ export function useOnChainActions() {
 
   /** Build, sign, send, confirm. The only place that talks to the cluster. */
   const submit = React.useCallback(
-    async (instruction: TransactionInstruction): Promise<OnChainOutcome> => {
+    async (
+      instruction: TransactionInstruction,
+      kind: ComputeKind = 'simple',
+    ): Promise<OnChainOutcome> => {
       if (!publicKey) throw new Error('Connect a wallet first.');
+
+      /*
+       * Priority fee, or this may never land. Mainnet orders by fee per compute
+       * unit, and a transaction bidding nothing is not included while the
+       * network is busy - it just expires. See `priority-fee`.
+       */
+      const budget = await computeBudgetInstructions(
+        kind,
+        instruction.keys.filter((k) => k.isWritable).map((k) => k.pubkey),
+      );
 
       const { blockhash, lastValidBlockHeight } =
         await connection.getLatestBlockhash();
@@ -67,7 +81,9 @@ export function useOnChainActions() {
         feePayer: publicKey,
         blockhash,
         lastValidBlockHeight,
-      }).add(instruction);
+      })
+        .add(...budget)
+        .add(instruction);
 
       const signature = await sendTransaction(transaction, connection);
 
@@ -101,6 +117,7 @@ export function useOnChainActions() {
       if (!programId || !publicKey) return null;
       return submit(
         createEventInstruction({ ...args, host: publicKey }, programId),
+        'createEvent',
       );
     },
     [programId, publicKey, submit],
@@ -126,6 +143,7 @@ export function useOnChainActions() {
           new PublicKey(hostWallet),
           programId,
         ),
+        'claimSeat',
       );
     },
     [programId, publicKey, submit],
