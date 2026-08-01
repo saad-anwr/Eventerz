@@ -29,7 +29,7 @@
  * Provisioning is in `supabase/functions/mint-cnft/README.md`.
  */
 
-import { json, logError, preflight, requireUser, serviceClient } from '../_shared/http.ts';
+import { json, logError, preflight, requireUser, serviceClient, rateLimit } from '../_shared/http.ts';
 
 import { createUmi } from 'npm:@metaplex-foundation/umi-bundle-defaults@0.9.2';
 import {
@@ -118,6 +118,16 @@ Deno.serve(async (request: Request) => {
 
   const user = await requireUser(request);
   if (!user) return json(request, { error: 'Sign in first.' }, 401);
+
+  /*
+   * Minting is the most expensive thing here - it signs and submits an on-chain
+   * transaction with the tree authority. Ten a minute is generous for a human.
+   *
+   * Keyed on the profile id, not the address: a caller can open a new
+   * connection but cannot become a different account.
+   */
+  const limited = await rateLimit(request, 'mint-cnft', user.id, 10, 60);
+  if (limited) return limited;
 
   let body: { kind?: string; id?: string };
   try {

@@ -22,8 +22,10 @@ import {
 } from "@/lib/hooks/use-eventerz-data";
 import { eventRowToItem } from "@/lib/supabase/map-event";
 import { useSession } from "@/components/auth/use-session";
+import { useAuth } from "@/components/auth/auth-provider";
 import { useConnectModal } from "@/components/wallet/connect-modal-context";
 import { Avatar } from "@/components/app/avatar";
+import { DeleteAccountCard } from "@/components/app/delete-account-card";
 import { EventCard } from "@/components/app/event-card";
 import { Button } from "@/components/ui/button";
 import { shortenAddress } from "@/lib/format";
@@ -34,6 +36,9 @@ const inputCls =
 
 export default function ProfilePage() {
   const { user, userId } = useSession();
+  // Deletion only means anything against a real backend; the demo store has
+  // no account to delete.
+  const { isLive } = useAuth();
   const updateProfile = useUpdateProfile(userId ?? undefined);
   const { data: hostedRows = [] } = useEventsByHost(userId ?? undefined);
   const { data: attendingRows = [] } = useEventsAttending(userId ?? undefined);
@@ -356,6 +361,8 @@ export default function ProfilePage() {
                 <div className="text-xs text-muted-foreground">Attending</div>
               </div>
             </div>
+
+            {isLive && <DeleteAccountCard />}
           </aside>
         </div>
       )}

@@ -84,8 +84,23 @@ export function logError(tag: string, error: unknown): void {
 const DEFAULT_ORIGINS = [
   'https://www.eventerz.xyz',
   'https://eventerz.xyz',
-  'http://localhost:3000',
 ];
+
+/*
+ * `http://localhost:3000` used to be in that list.
+ *
+ * It meant a page served from any developer's machine - or anyone else's, since
+ * localhost is not a place, it is whatever is running on the visitor's own
+ * computer - could call the deployed functions from a browser with credentials
+ * attached. The JWT check is still the real gate, so this was never the whole
+ * story, but a permanently-allowed origin in production is a hole with no
+ * upside.
+ *
+ * Local development adds it back explicitly, which is the point: it is now a
+ * thing someone opts into for a deployment, rather than a default that ships.
+ *
+ *   supabase secrets set ALLOWED_ORIGINS=https://www.eventerz.xyz,http://localhost:3000
+ */
 
 function allowedOrigins(): string[] {
   const configured = Deno.env.get('ALLOWED_ORIGINS');
@@ -176,6 +191,60 @@ export function userClient(request: Request): SupabaseClient {
       headers: { Authorization: request.headers.get('Authorization') ?? '' },
     },
   });
+}
+
+/**
+ * Consume one unit of rate-limit quota. Returns a 429 `Response` when the
+ * caller is over it, or `null` when they may proceed.
+ *
+ * Backed by `check_rate_limit` (migration 0016) rather than an in-memory
+ * counter, because Edge Functions are horizontally scaled and cold-start
+ * constantly - a module-level `Map` would reset unpredictably and limit almost
+ * nothing.
+ *
+ * `subject` should be the profile id wherever the caller is authenticated: it
+ * is stable, and it cannot be rotated by opening a new connection the way an
+ * address can. The IP fallback is for endpoints reachable before sign-in.
+ *
+ * Fails **closed**. If the counter cannot be reached, the request is refused
+ * rather than waved through - an unavailable limiter is the moment abuse is
+ * most likely, not least.
+ */
+export async function rateLimit(
+  request: Request,
+  bucket: string,
+  subject: string | null,
+  limit: number,
+  windowSeconds = 60,
+): Promise<Response | null> {
+  const key =
+    subject ??
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+    '';
+
+  try {
+    const { data, error } = await serviceClient().rpc('check_rate_limit', {
+      p_bucket: bucket,
+      p_subject: key,
+      p_limit: limit,
+      p_window: `${windowSeconds} seconds`,
+    });
+
+    if (error) {
+      logError(`[${bucket}] rate limit check failed`, error);
+      return json(request, { error: 'Service unavailable. Try again.' }, 503);
+    }
+    if (data === true) return null;
+  } catch (error) {
+    logError(`[${bucket}] rate limit check threw`, error);
+    return json(request, { error: 'Service unavailable. Try again.' }, 503);
+  }
+
+  return json(
+    request,
+    { error: 'Too many requests. Wait a moment and try again.' },
+    429,
+  );
 }
 
 /**

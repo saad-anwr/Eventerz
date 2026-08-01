@@ -33,7 +33,7 @@ import {
   base58Decode,
   verifyEd25519,
 } from '../_shared/solana.ts';
-import { json, logError, preflight, requireUser, serviceClient } from '../_shared/http.ts';
+import { json, logError, preflight, requireUser, serviceClient, rateLimit } from '../_shared/http.ts';
 
 /** UUID, as embedded in the challenge text by `issue_wallet_link_nonce`. */
 const NONCE_PATTERN =
@@ -51,6 +51,17 @@ Deno.serve(async (request: Request) => {
   if (!user) {
     return json(request, { error: 'Sign in first.' }, 401);
   }
+
+  /*
+   * Signature verification is CPU work, and a wallet-claim attempt that fails is
+   * either a bug or somebody trying addresses. Five a minute is far above any
+   * genuine use - linking a wallet is a once-per-account action.
+   *
+   * Keyed on the profile id, not the address: a caller can open a new
+   * connection but cannot become a different account.
+   */
+  const limited = await rateLimit(request, 'link-wallet', user.id, 5, 60);
+  if (limited) return limited;
 
   let body: { walletAddress?: string; message?: string; signature?: string };
   try {

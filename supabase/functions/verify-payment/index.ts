@@ -22,7 +22,7 @@
  * a receipt still gets verified when the sender's app is closed.
  */
 
-import { json, logError, preflight, requireUser, serviceClient } from '../_shared/http.ts';
+import { json, logError, preflight, requireUser, serviceClient, rateLimit } from '../_shared/http.ts';
 
 interface PaymentRow {
   signature: string;
@@ -120,6 +120,17 @@ Deno.serve(async (request: Request) => {
 
   const user = await requireUser(request);
   if (!user) return json(request, { error: 'Sign in first.' }, 401);
+
+  /*
+   * Each call is an outbound RPC to a provider billed per request, so this bounds
+   * spend as much as abuse. Twenty a minute leaves ample room for a client
+   * retrying a confirmation.
+   *
+   * Keyed on the profile id, not the address: a caller can open a new
+   * connection but cannot become a different account.
+   */
+  const limited = await rateLimit(request, 'verify-payment', user.id, 20, 60);
+  if (limited) return limited;
 
   let body: { signature?: string };
   try {

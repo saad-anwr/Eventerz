@@ -37,9 +37,21 @@ export async function GET(request: NextRequest) {
 
   const { error } = await supabase.auth.exchangeCodeForSession(code);
   if (error) {
-    return NextResponse.redirect(
-      `${origin}/?auth_error=${encodeURIComponent(error.message)}`,
-    );
+    /*
+     * A fixed code, not `error.message`.
+     *
+     * The message comes from the auth server and can name the grant type, the
+     * provider's own failure text, or the reason a token was rejected. Putting
+     * it in the query string publishes it well beyond this response: it lands
+     * in browser history, in the `Referer` sent to any third party the landing
+     * page loads, and in Vercel's access logs. None of that helps the user,
+     * whose only available action is to try again.
+     *
+     * The detail goes to the server log, which is where an operator can
+     * correlate it by timestamp.
+     */
+    console.error('[auth/callback] code exchange failed', error.message);
+    return NextResponse.redirect(`${origin}/?auth_error=exchange_failed`);
   }
 
   /*

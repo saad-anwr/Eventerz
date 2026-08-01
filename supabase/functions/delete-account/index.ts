@@ -55,6 +55,14 @@ Deno.serve(async (request: Request) => {
     return json(request, { error: 'Sign in first.' }, 401);
   }
 
+  /*
+   * Three a minute. Deletion is a once-ever action, so anything above this is
+   * either a stuck retry loop or someone probing the endpoint - and each call
+   * does a lot of write work before it can decide it is a no-op.
+   */
+  const limited = await rateLimit(request, 'delete-account', user.id, 3, 60);
+  if (limited) return limited;
+
   const admin = serviceClient();
 
   /*

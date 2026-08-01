@@ -22,7 +22,7 @@
  * checkable by anyone who can read a whale's address off the explorer.
  */
 
-import { json, logError, preflight, requireUser, serviceClient } from '../_shared/http.ts';
+import { json, logError, preflight, requireUser, serviceClient, rateLimit } from '../_shared/http.ts';
 
 interface GateRow {
   id: string;
@@ -105,6 +105,16 @@ Deno.serve(async (request: Request) => {
 
   const user = await requireUser(request);
   if (!user) return json(request, { error: 'Sign in first.' }, 401);
+
+  /*
+   * Also an outbound RPC per call, but it runs on page view for a token-gated
+   * event, so the ceiling is higher than the others.
+   *
+   * Keyed on the profile id, not the address: a caller can open a new
+   * connection but cannot become a different account.
+   */
+  const limited = await rateLimit(request, 'check-gate', user.id, 30, 60);
+  if (limited) return limited;
 
   let body: { eventId?: string };
   try {
