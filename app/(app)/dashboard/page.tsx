@@ -95,8 +95,13 @@ export default function DashboardPage() {
   const { data: requesters = [] } = useProfiles(
     data.incoming.map((r) => r.requester_id),
   );
-  const requesterNames = React.useMemo(
-    () => Object.fromEntries(requesters.map((u) => [u.id, u.name])),
+  /*
+   * Keep the whole row, not just the name. Mapping straight to a string threw
+   * away the avatar that had already been fetched alongside it, so these faces
+   * could only ever be initials.
+   */
+  const requesterById = React.useMemo(
+    () => Object.fromEntries(requesters.map((u) => [u.id, u])),
     [requesters],
   );
 
@@ -175,10 +180,11 @@ export default function DashboardPage() {
             {data.incoming.slice(0, 4).map((r) => (
               <Avatar
                 key={r.id}
-                name={requesterNames[r.requester_id] ?? "Member"}
+                name={requesterById[r.requester_id]?.name ?? "Member"}
                 seed={r.requester_id}
                 size="sm"
                 ring
+                src={requesterById[r.requester_id]?.avatar_url}
               />
             ))}
           </div>

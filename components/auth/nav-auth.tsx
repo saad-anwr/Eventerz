@@ -39,7 +39,7 @@ export function NavAuth({
         className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] py-1 pl-1 pr-3 transition-colors hover:border-brand-purple/40"
         aria-label="Open app"
       >
-        <Avatar name={user.name} seed={user.id} size="sm" />
+        <Avatar name={user.name} seed={user.id} size="sm" src={user.avatarUrl} />
         <span className="max-w-24 truncate text-sm font-medium text-white">
           {user.name.split(" ")[0]}
         </span>

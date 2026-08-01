@@ -211,7 +211,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <WalletChip />
           <div className="flex items-center gap-2.5 rounded-xl px-1 py-1">
             <Link href="/profile" className="flex min-w-0 flex-1 items-center gap-2.5">
-              <Avatar name={user.name} seed={user.id} size="sm" />
+              <Avatar name={user.name} seed={user.id} size="sm" src={user.avatarUrl} />
               <span className="min-w-0">
                 <span className="block truncate text-sm font-medium text-white">
                   {user.name}
@@ -246,7 +246,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </Link>
           </Button>
           <Link href="/profile">
-            <Avatar name={user.name} seed={user.id} size="sm" ring />
+            <Avatar name={user.name} seed={user.id} size="sm" ring src={user.avatarUrl} />
           </Link>
         </div>
       </header>

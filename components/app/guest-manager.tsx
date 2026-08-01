@@ -217,7 +217,7 @@ function GuestRow({
       )}
     >
       <Link href={`/u/${guest.profile_id}`} className="shrink-0">
-        <Avatar name={guest.name} seed={guest.profile_id} size="sm" />
+        <Avatar name={guest.name} seed={guest.profile_id} size="sm" src={guest.avatar_url} />
       </Link>
       <div className="min-w-0 flex-1">
         <Link

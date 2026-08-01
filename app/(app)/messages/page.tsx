@@ -49,7 +49,7 @@ export default function MessagesPage() {
                 i > 0 ? "border-t border-white/[0.06]" : ""
               }`}
             >
-              <Avatar name={user.name} seed={user.id} size="md" ring />
+              <Avatar name={user.name} seed={user.id} size="md" ring src={user.avatar_url} />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
                   <span className="flex min-w-0 items-center gap-2">

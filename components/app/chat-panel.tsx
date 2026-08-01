@@ -164,6 +164,7 @@ export function ChatPanel({
                       name={sender?.name ?? "?"}
                       seed={m.senderId}
                       size="sm"
+                      src={sender?.avatar_url}
                     />
                   )}
                 </div>

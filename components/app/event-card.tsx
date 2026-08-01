@@ -129,7 +129,7 @@ export function EventCard({ event }: { event: EventItem }) {
           </h3>
 
           <div className="mt-3 flex items-center gap-2">
-            <Avatar name={host?.name ?? "Host"} seed={event.hostId} size="xs" />
+            <Avatar name={host?.name ?? "Host"} seed={event.hostId} size="xs" src={host?.avatar_url} />
             <span className="truncate text-xs text-muted-foreground">
               {host?.name ?? "Unknown host"}
             </span>

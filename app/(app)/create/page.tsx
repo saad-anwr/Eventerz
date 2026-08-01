@@ -564,7 +564,7 @@ export default function CreateEventPage() {
               </h3>
               {user && (
                 <div className="mt-3 flex items-center gap-2">
-                  <Avatar name={user.name} seed={user.id} size="xs" />
+                  <Avatar name={user.name} seed={user.id} size="xs" src={user.avatarUrl} />
                   <span className="text-xs text-muted-foreground">
                     Hosted by {user.name}
                   </span>

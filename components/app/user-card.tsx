@@ -11,7 +11,7 @@ export function UserCard({ user }: { user: User }) {
     <div className="flex flex-col rounded-2xl border border-white/10 bg-white/[0.03] p-4 backdrop-blur-xl transition-colors hover:border-white/20">
       <div className="flex items-start gap-3">
         <Link href={`/u/${user.id}`}>
-          <Avatar name={user.name} seed={user.id} size="md" ring />
+          <Avatar name={user.name} seed={user.id} size="md" ring src={user.avatarUrl} />
         </Link>
         <div className="min-w-0 flex-1">
           <Link

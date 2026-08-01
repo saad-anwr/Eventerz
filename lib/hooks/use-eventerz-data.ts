@@ -50,6 +50,8 @@ import {
 } from '@/lib/supabase/data';
 import type { ProfileUpdate } from '@/lib/supabase/types';
 import { isSupabaseConfigured } from '@/lib/supabase/config';
+import { profileToUser } from '@/lib/supabase/map-profile';
+import { useAppStore } from '@/lib/store/use-app-store';
 
 import { queryKeys } from './use-realtime';
 
@@ -332,7 +334,25 @@ export function useUpdateProfile(profileId: string | undefined) {
       if (!profileId) throw new Error('Sign in to edit your profile.');
       return updateProfile(profileId, patch);
     },
-    onSuccess: () => {
+    /**
+     * Write the saved row back into the app store as well as invalidating the
+     * queries.
+     *
+     * There are two sources of truth for "the current user" and they are not
+     * the same one. React Query owns profiles fetched *by id*; the zustand
+     * store owns the signed-in user, and `useSession` - which the sidebar, the
+     * nav and every "you" avatar read from - only ever looks at the store.
+     *
+     * So invalidating query keys refreshed the half of the UI nobody was
+     * looking at. Saving a new picture updated the profile header, because that
+     * screen holds it in local state, and left the sidebar showing the old one
+     * until a full page reload. The same was true of a changed name or handle.
+     *
+     * `updateProfile` already returns the saved row, so the fix is to stop
+     * throwing it away.
+     */
+    onSuccess: (row) => {
+      useAppStore.getState().syncRemoteUser(profileToUser(row));
       queryClient.invalidateQueries({ queryKey: ['profile'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.people });
     },

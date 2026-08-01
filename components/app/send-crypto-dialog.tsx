@@ -38,6 +38,8 @@ interface Recipient {
   name: string;
   /** Null when they have never linked one - the blocking case. */
   walletAddress: string | null;
+  /** Optional: callers that only know an id and a name still work. */
+  avatarUrl?: string | null;
 }
 
 interface SendCryptoDialogProps {
@@ -297,7 +299,7 @@ export function SendCryptoDialog({
           >
             <div className="flex items-start justify-between gap-4 border-b border-white/10 p-5">
               <div className="flex items-center gap-3">
-                <Avatar name={recipient.name} seed={recipient.id} size="md" />
+                <Avatar name={recipient.name} seed={recipient.id} size="md" src={recipient.avatarUrl} />
                 <div>
                   <h2 className="font-display text-lg font-semibold text-white">
                     Send SOL

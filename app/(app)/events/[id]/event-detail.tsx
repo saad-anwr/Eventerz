@@ -309,7 +309,7 @@ export function EventDetail() {
               href={`/u/${event.hostId}`}
               className="flex min-w-0 flex-1 items-center gap-3 transition-opacity hover:opacity-80"
             >
-              <Avatar name={host?.name ?? "Host"} seed={event.hostId} size="md" />
+              <Avatar name={host?.name ?? "Host"} seed={event.hostId} size="md" src={host?.avatar_url} />
               <div className="min-w-0">
                 <p className="text-xs text-muted-foreground">Hosted by</p>
                 <p className="truncate text-sm font-semibold text-white">

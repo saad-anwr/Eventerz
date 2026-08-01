@@ -48,14 +48,19 @@ export default function ProfilePage() {
   const { open: openWallet } = useConnectModal();
 
   const [editing, setEditing] = React.useState(false);
-  const [avatarUrl, setAvatarUrl] = React.useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = React.useState(false);
   const [avatarError, setAvatarError] = React.useState("");
 
-  // Seed from the loaded profile, and follow it if it changes underneath.
-  React.useEffect(() => {
-    if (user?.avatarUrl !== undefined) setAvatarUrl(user.avatarUrl ?? null);
-  }, [user?.avatarUrl]);
+  /*
+   * Read straight from the session rather than mirroring it into local state.
+   *
+   * A local copy is what made this screen lie: it updated the moment the upload
+   * finished, so the header showed the new picture while the sidebar - reading
+   * the store - still showed the old one. Two views of the same fact,
+   * disagreeing. `useUpdateProfile` now writes the saved row back to the store,
+   * so there is one value and every part of the page moves together.
+   */
+  const avatarUrl = user?.avatarUrl ?? null;
   const [form, setForm] = React.useState({
     name: "",
     handle: "",
@@ -132,10 +137,10 @@ export default function ProfilePage() {
     setAvatarError("");
     try {
       const url = await uploadAvatar(file, userId);
-      setAvatarUrl(url);
       // Persist straight away: the picture is already in storage, and leaving
       // the row pointing at the old one would be a picture that exists and is
-      // not used.
+      // not used. The store updates from the saved row, so the whole site -
+      // sidebar included - follows without a reload.
       updateProfile.mutate({ avatar_url: url });
     } catch (err) {
       setAvatarError(

@@ -105,7 +105,7 @@ export default function FriendsPage() {
                 className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3"
               >
                 <Link href={`/u/${p.id}`}>
-                  <Avatar name={p.name} seed={p.id} size="md" ring />
+                  <Avatar name={p.name} seed={p.id} size="md" ring src={p.avatar_url} />
                 </Link>
                 <div className="min-w-0 flex-1">
                   <Link

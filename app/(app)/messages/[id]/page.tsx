@@ -74,7 +74,7 @@ export default function DirectMessagePage() {
           <ArrowLeft className="size-4" />
         </Link>
         <Link href={`/u/${other.id}`} className="flex min-w-0 items-center gap-3">
-          <Avatar name={other.name} seed={other.id} size="md" ring />
+          <Avatar name={other.name} seed={other.id} size="md" ring src={other.avatar_url} />
           <div className="min-w-0">
             <p className="truncate font-semibold text-white">{other.name}</p>
             <p className="truncate text-xs text-muted-foreground">
