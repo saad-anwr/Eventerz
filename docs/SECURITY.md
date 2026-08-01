@@ -145,16 +145,25 @@ the `base` profile of `eas.json` and inside the tracked build artifact
 resolves its credentials from EAS environment variables, and `*.apk` / `*.aab`
 are gitignored.
 
-The working tree is not the exposure. Git retains every version of every tracked
-file, so the old value is recoverable from history by anyone who can clone:
+The working tree is not the exposure. `github.com/saad-anwr/Eventerz-dApp` is
+**public**, and the key was pushed to it: committed 31 Jul 2026 20:03, removed
+from HEAD 1 Aug 2026 13:35 - roughly 17½ hours readable by anyone, and still
+reachable from 6 historical commits on the remote:
 
 ```bash
 git log -p -- eas.json | grep api-key
 ```
 
-**The key must be rotated in the Helius dashboard.** Removing it from HEAD stops
-it spreading; it does not make the leaked value stop working. Steps are in the
-root `README.md`.
+**The key must be rotated in the Helius dashboard**, and treated as already
+scraped: public repos are harvested for keys continuously. Removing it from HEAD
+stops it spreading; it does not make the leaked value stop working. Steps are in
+the root `README.md`.
+
+The delivery mechanism is worth naming, because it will still be running after
+this is fixed: an automated process commits and pushes all three repositories on
+a timer (`update_DD/MM_HH:MM`). Nothing reviews a diff first, so anything written
+into a working tree is public within minutes. `.gitignore` is not hygiene here -
+it is the only control before publication.
 
 Two things did *not* leak, and the distinction matters:
 
