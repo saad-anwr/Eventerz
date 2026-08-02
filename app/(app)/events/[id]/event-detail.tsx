@@ -275,8 +275,12 @@ export function EventDetail() {
         {/* Left: details */}
         <div className="space-y-6">
           <div>
-            <h1 className="font-display text-3xl font-bold tracking-tight text-white">
+            {/* Host-written. Never sent to the translation provider - see
+                components/layout/translation-provider.tsx. */}
+            <h1
               data-no-translate
+              className="font-display text-3xl font-bold tracking-tight text-white"
+            >
               {event.title}
             </h1>
             <div className="mt-4 space-y-3">
@@ -349,8 +353,10 @@ export function EventDetail() {
               <h2 className="mb-2 font-display text-lg font-semibold text-white">
                 About
               </h2>
-              <p className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
+              <p
                 data-no-translate
+                className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground"
+              >
                 {event.description}
               </p>
             </div>

@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/terms" },
 };
 
-const UPDATED = "2026-07-30";
+const UPDATED = "2026-08-03";
 
 export default function TermsPage() {
   return (

@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 };
 
 /** Kept next to the page so the date and the text change together. */
-const UPDATED = "2026-07-30";
+const UPDATED = "2026-08-03";
 
 export default function PrivacyPage() {
   return (
@@ -50,8 +50,26 @@ export default function PrivacyPage() {
       <p>
         Authentication runs on Supabase. Depending on how you sign in, that means
         an email address, or the name, email address and profile picture your
-        Google account chooses to share. We store a profile row containing your
-        display name, handle, avatar, and optional bio.
+        Google account chooses to share. There is no password: you sign in with a
+        one-time link, a Google account, or your wallet, so we never hold one.
+      </p>
+      <p>
+        Your email address is held only in the authentication record, where it is
+        readable by you and by us. It is deliberately <em>not</em> stored on your
+        public profile, because profiles are readable by anyone - so publishing it
+        there would have published every address we hold, and the link between
+        your email and your wallet with it.
+      </p>
+      <p>
+        Your <strong>public profile</strong> holds your display name, handle,
+        avatar, and anything optional you choose to add: bio, location, website,
+        and X handle. Treat all of it as public, because it is - anyone can see a
+        profile without signing in.
+      </p>
+      <p>
+        A <strong>phone number</strong> is optional. If you add one it is stored
+        separately from your profile, in a table only you can read, and it is
+        never shown to other users.
       </p>
 
       <h3>When you link a wallet</h3>
@@ -215,8 +233,42 @@ export default function PrivacyPage() {
               never your identity
             </td>
           </tr>
+          <tr>
+            <td>Translation provider</td>
+            <td>
+              Only if you change the language. Interface labels and buttons are
+              sent to be translated - never your messages, event text, profile or
+              wallet address. See below
+            </td>
+          </tr>
         </tbody>
       </table>
+
+      <h3>About the language picker</h3>
+      <p>
+        Changing the language sends the interface text on screen to a translation
+        service, by default{" "}
+        <a href="https://mymemory.translated.net/" rel="noreferrer noopener">
+          MyMemory
+        </a>
+        . That service is a <strong>public translation memory</strong>: text sent
+        to it may be retained and reused. So what is sent matters, and we limit
+        it deliberately.
+      </p>
+      <p>
+        Content you or another person wrote is <strong>excluded</strong>:
+        messages, event titles and descriptions, names, handles, bios, wallet
+        addresses and transaction signatures are all marked so the translator
+        never reads them. Only our own interface strings - &ldquo;Create
+        event&rdquo;, &ldquo;Going&rdquo;, &ldquo;Save&rdquo; - are sent. Text you
+        write stays in its original language when the rest of the interface
+        changes, which is deliberate: translating what a host wrote would
+        silently rewrite it.
+      </p>
+      <p>
+        If you never change the language, nothing is sent to a translation
+        service at all.
+      </p>
       <p>
         We do not sell personal data. We disclose it otherwise only where the law
         requires it.
@@ -265,20 +317,53 @@ export default function PrivacyPage() {
 
       <h2>Keeping and deleting data</h2>
       <p>
-        We keep your data while your account is open. Ask us to delete it and we
-        will remove your profile, messages, RSVPs and payment receipts from our
-        database.
+        We keep your data while your account is open. You can delete it yourself
+        at any time - <strong>Profile → Delete account</strong>. No email, no
+        waiting on us. It takes effect immediately and cannot be undone.
       </p>
-      <p>Two limits are worth stating rather than burying:</p>
+      <p>What is erased:</p>
       <ul>
         <li>
-          Events you hosted may be retained in a reduced form so that the
-          attendance record of everyone who came does not disappear with them.
+          Your name, avatar, bio, location, website, X handle and phone number.
+        </li>
+        <li>Your email address and the ability to sign in.</li>
+        <li>
+          The link between your account and your wallet. The wallet itself is
+          yours and is untouched.
+        </li>
+        <li>Your notifications, reminders, friend connections and community memberships.</li>
+        <li>RSVPs to events that have not happened yet.</li>
+      </ul>
+      <p>
+        What remains, and why. These are records that belong to{" "}
+        <em>other people</em>, and deleting them would take something from
+        someone who did not ask to lose it:
+      </p>
+      <ul>
+        <li>
+          <strong>Events you hosted</strong> stay, so guests keep the tickets they
+          already hold. Your name is removed from them.
         </li>
         <li>
-          On-chain records cannot be deleted by us or by anyone else.
+          <strong>Payment receipts</strong> stay. A receipt is the other
+          person&rsquo;s record of money that actually moved, and the transaction
+          exists on the blockchain regardless.
+        </li>
+        <li>
+          <strong>Messages you sent</strong> stay in place with the text replaced
+          by &ldquo;[deleted]&rdquo;, so the other person&rsquo;s conversation
+          still makes sense rather than appearing to be one they had with
+          themselves.
+        </li>
+        <li>
+          <strong>On-chain records</strong> cannot be deleted by us or by anyone
+          else. This is a property of the blockchain, not a choice we make.
         </li>
       </ul>
+      <p>
+        Attendance at events that already happened is kept in anonymised form, so
+        a host&rsquo;s record of who came is not rewritten after the fact.
+      </p>
 
       <h2>Your rights</h2>
       <p>
