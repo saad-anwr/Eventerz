@@ -27,57 +27,7 @@
     --input: 224 30% 18%;
     --ring: 265 100% 64%;
 
-    /*
-     * The page and panel colours. These were hard-coded in `tailwind.config.ts`
-     * as `brand.bg` / `brand.bg-soft`, which is why `body { @apply bg-brand-bg }`
-     * stayed dark no matter what the other tokens said - the one class that
-     * paints the whole page was the one class the theme could not reach.
-     */
-    --brand-bg: 230 62% 5%;
-    --brand-bg-soft: 230 55% 9%;
-
-    /* Overlay tint for glass and hairlines, as raw RGB for rgb(... / a). */
-    --overlay: 255 255 255;
-
     --radius: 0.9rem;
-  }
-
-  /*
-   * Light theme.
-   *
-   * `:root` keeps the dark values so the default is unchanged and nothing has
-   * to opt in to staying as it was. `.light` on <html> overrides; the provider
-   * adds and removes that one class.
-   *
-   * Brand hues are deliberately absent - purple is purple on both. Only
-   * surfaces and the text on them move.
-   */
-  .light {
-    --background: 228 44% 98%;
-    --foreground: 228 54% 9%;
-
-    --card: 0 0% 100%;
-    --card-foreground: 228 54% 9%;
-
-    --secondary: 228 33% 95%;
-    --secondary-foreground: 228 54% 9%;
-
-    --muted: 228 30% 93%;
-    /*
-     * Darker than the dark theme's muted foreground, not the same value. That
-     * one is 2.9:1 on white and fails AA for body text - reusing it would make
-     * every caption on the site unreadable the moment someone picks light.
-     */
-    --muted-foreground: 222 17% 39%;
-
-    --border: 228 25% 90%;
-    --input: 228 25% 90%;
-
-    --brand-bg: 228 44% 98%;
-    --brand-bg-soft: 0 0% 100%;
-
-    /* Inverted: an overlay has to darken to be visible on a light page. */
-    --overlay: 11 16 36;
   }
 
   * {
@@ -106,12 +56,12 @@
     height: 10px;
   }
   ::-webkit-scrollbar-track {
-    background: hsl(var(--brand-bg));
+    background: #050816;
   }
   ::-webkit-scrollbar-thumb {
     background: linear-gradient(180deg, #9945ff, #2f80ff);
     border-radius: 999px;
-    border: 2px solid hsl(var(--brand-bg));
+    border: 2px solid #050816;
   }
   ::-webkit-scrollbar-thumb:hover {
     background: linear-gradient(180deg, #a95cff, #4a92ff);
@@ -133,14 +83,10 @@
 @layer components {
   /* Glassmorphism surface */
   .glass {
-    @apply backdrop-blur-xl;
-    border: 1px solid rgb(var(--overlay) / 0.1);
-    background: rgb(var(--overlay) / 0.03);
+    @apply border border-white/10 bg-white/[0.03] backdrop-blur-xl;
   }
   .glass-strong {
-    @apply backdrop-blur-2xl;
-    border: 1px solid rgb(var(--overlay) / 0.1);
-    background: rgb(var(--overlay) / 0.06);
+    @apply border border-white/10 bg-white/[0.06] backdrop-blur-2xl;
   }
 
   /* Gradient text */
@@ -166,8 +112,8 @@
     position: relative;
     background: linear-gradient(
       180deg,
-      rgb(var(--overlay) / 0.05),
-      rgb(var(--overlay) / 0.01)
+      rgba(255, 255, 255, 0.05),
+      rgba(255, 255, 255, 0.01)
     );
   }
   .gradient-border::before {
@@ -197,9 +143,7 @@
 
   /* Chip / pill */
   .chip {
-    @apply inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-medium text-muted-foreground backdrop-blur-md;
-    border: 1px solid rgb(var(--overlay) / 0.1);
-    background: rgb(var(--overlay) / 0.04);
+    @apply inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3.5 py-1.5 text-xs font-medium text-muted-foreground backdrop-blur-md;
   }
 }
 
@@ -251,7 +195,7 @@
   .focus-glow:focus-visible {
     outline: none;
     box-shadow:
-      0 0 0 2px hsl(var(--brand-bg)),
+      0 0 0 2px #050816,
       0 0 0 4px rgba(153, 69, 255, 0.7);
   }
 }

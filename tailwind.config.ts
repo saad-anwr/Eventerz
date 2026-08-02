@@ -45,10 +45,8 @@ const config: Config = {
         },
         // Eventerz brand palette
         brand: {
-          // Variable-driven so the page follows the theme; the rest of the brand
-          // palette below is fixed, because a brand colour is not a surface.
-          bg: "hsl(var(--brand-bg))",
-          "bg-soft": "hsl(var(--brand-bg-soft))",
+          bg: "#050816",
+          "bg-soft": "#0a0f24",
           purple: "#9945ff",
           violet: "#7c3aed",
           blue: "#2f80ff",

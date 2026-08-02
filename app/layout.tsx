@@ -8,7 +8,6 @@ import { siteConfig } from "@/lib/site";
 import { WalletProviders } from "@/components/wallet/providers";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { QueryProvider } from "@/components/query-provider";
-import { ThemeProvider, themeScript } from "@/components/layout/theme-provider";
 import "./globals.css";
 
 const inter = Inter({
@@ -105,22 +104,12 @@ export default function RootLayout({
       className={`${inter.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} dark scroll-smooth`}
       suppressHydrationWarning
     >
-      <head>
-        {/*
-          Runs before first paint, so a light-mode user never sees the dark page
-          flash first. It has to be a blocking inline script - anything that
-          waits for React has already missed the frame it was meant to fix.
-        */}
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
-      </head>
       <body className="min-h-screen bg-brand-bg text-foreground selection:bg-brand-purple/30">
-        <ThemeProvider>
-          <QueryProvider>
-            <WalletProviders>
-              <AuthProvider>{children}</AuthProvider>
-            </WalletProviders>
-          </QueryProvider>
-        </ThemeProvider>
+        <QueryProvider>
+          <WalletProviders>
+            <AuthProvider>{children}</AuthProvider>
+          </WalletProviders>
+        </QueryProvider>
       </body>
     </html>
   );
