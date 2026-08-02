@@ -88,6 +88,24 @@ export const languageFor = (code: string): Language | undefined =>
   LANGUAGES.find((l) => l.code === code);
 
 /**
+ * Every language name, in both spellings, as a set.
+ *
+ * These must never be machine-translated. A picker exists so someone who cannot
+ * read the current interface can find their own language in it - and the moment
+ * "Deutsch" is rendered as "Alemán" it has stopped doing that. Observed on
+ * device: switching to Spanish turned English/Deutsch/Dansk/Norsk into
+ * Inglés/Alemán/Danés/Noruego, leaving a German speaker with nothing to
+ * recognise.
+ *
+ * Held here rather than as a flag on the picker because the rule belongs to the
+ * names themselves: a language's name is a proper noun and reads the same
+ * wherever it appears.
+ */
+export const LANGUAGE_NAMES: ReadonlySet<string> = new Set(
+  LANGUAGES.flatMap((l) => [l.name, l.nativeName]),
+);
+
+/**
  * Filter for the picker's search box.
  *
  * Matches the native name and the English name, so both "Deutsch" and "German"

@@ -13,13 +13,16 @@
 import * as React from "react";
 import { Check, Globe, Search } from "lucide-react";
 
-import { useLanguage } from "@/components/layout/translation-provider";
+import {
+  useLanguage,
+  useQuotaExhausted,
+} from "@/components/layout/translation-provider";
 import { languageFor, searchLanguages } from "@/lib/i18n/languages";
-import { quotaExhausted } from "@/lib/i18n/translate";
 import { cn } from "@/lib/utils";
 
 export function LanguagePicker() {
   const { language, setLanguage } = useLanguage();
+  const outOfQuota = useQuotaExhausted();
   const [query, setQuery] = React.useState("");
 
   const active = languageFor(language);
@@ -89,7 +92,7 @@ export function LanguagePicker() {
       */}
       {language !== "en" && (
         <p className="mt-3 text-xs text-muted-foreground">
-          {quotaExhausted()
+          {outOfQuota
             ? "The free translation quota for today is used up, so text stays in English."
             : "Translated automatically. Wording may be imperfect."}
         </p>

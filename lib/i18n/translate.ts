@@ -22,7 +22,11 @@
  * quota trade-off between the two is documented there.
  */
 
-import { requestTranslations } from "./providers";
+import { LANGUAGE_NAMES } from "./languages";
+import {
+  quotaExhausted as isQuotaExhausted,
+  requestTranslations,
+} from "./providers";
 
 export const SOURCE_LANGUAGE = "en";
 
@@ -48,6 +52,23 @@ export function subscribe(listener: Listener): () => void {
 }
 
 const notify = () => listeners.forEach((l) => l());
+
+let notifyTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Coalesced repaint.
+ *
+ * Strings land one at a time, and re-walking the DOM sixty times in a row would
+ * cost more than the translation did. Batching them into one pass every quarter
+ * second still reads as copy filling in.
+ */
+function scheduleNotify() {
+  if (notifyTimer) return;
+  notifyTimer = setTimeout(() => {
+    notifyTimer = null;
+    notify();
+  }, 250);
+}
 
 function bucket(language: string): Map<string, string> {
   let found = memory.get(language);
@@ -101,6 +122,7 @@ function schedulePersist(language: string) {
 let pending = new Set<string>();
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 let activeLanguage = SOURCE_LANGUAGE;
+let quotaAnnounced = false;
 
 const MAX_BATCH = 60;
 
@@ -119,13 +141,39 @@ async function flush() {
    * permanent. Nothing is cached for a failed string, so the next navigation
    * asks again naturally.
    */
-  const translated = await requestTranslations(batch, language);
-  if (translated.size > 0) {
-    const target = bucket(language);
-    for (const [source, value] of translated) target.set(source, value);
-    schedulePersist(language);
+  /*
+   * Cached and repainted as each string arrives, not once at the end.
+   *
+   * The provider answers one string per request and a page asks for sixty,
+   * which measured at half a minute. Holding all of them back until the last
+   * one landed meant picking a language did nothing at all for that whole time
+   * - indistinguishable from a broken setting, and the reason this looked
+   * unfixed after it already worked.
+   */
+  const target = bucket(language);
+
+  const translated = await requestTranslations(
+    batch,
+    language,
+    (source, value) => {
+      target.set(source, value);
+      scheduleNotify();
+    },
+  );
+  /*
+   * Running out of quota is the one state change nothing else announces.
+   *
+   * Every other repaint is triggered by a translation arriving, and once the
+   * allowance is gone none ever will - so the picker would sit on "translated
+   * automatically" while translating nothing. Announced once; the flag never
+   * goes back.
+   */
+  if (isQuotaExhausted() && !quotaAnnounced) {
+    quotaAnnounced = true;
     notify();
   }
+
+  if (translated.size > 0) schedulePersist(language);
 
   if (pending.size > 0) flushTimer = setTimeout(flush, 50);
 }
@@ -155,7 +203,9 @@ export function translate(text: string, language: string): string {
     !text ||
     // Numbers, wallet addresses, symbols: nothing a translator would change,
     // and sending them wastes quota while risking a mangled address.
-    !/[a-zA-Z]{2}/.test(text)
+    !/[a-zA-Z]{2}/.test(text) ||
+    // A language's own name, which must survive into every other language.
+    LANGUAGE_NAMES.has(text)
   ) {
     return text;
   }

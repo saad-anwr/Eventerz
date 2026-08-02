@@ -60,11 +60,15 @@ export const quotaExhausted = (): boolean => quotaOut;
 /**
  * How many requests MyMemory gets at once.
  *
- * It takes one string per GET, and a screen can ask for sixty. Firing all of
- * them together is the reliable way to be rate-limited at the exact moment
- * someone is watching, so they go a few at a time.
+ * It takes one string per GET, and a page can ask for sixty. Firing all of them
+ * together is the reliable way to be rate-limited at the exact moment someone
+ * is watching, so they go a few at a time.
+ *
+ * Eight rather than four because a round trip measured ~2s from a device -
+ * four at a time turned one screen into half a minute of waiting. Eight keeps
+ * a page inside a few seconds without looking like a flood.
  */
-const MYMEMORY_CONCURRENCY = 4;
+const MYMEMORY_CONCURRENCY = 8;
 
 /**
  * MyMemory reports some failures as an HTTP 200 whose `translatedText` is a
@@ -85,9 +89,50 @@ function looksLikeProviderError(text: string): boolean {
   return /[A-Z]/.test(text) && !/[a-z]/.test(text);
 }
 
+/**
+ * Has the day's allowance run out?
+ *
+ * `quotaFinished` is the documented flag and the obvious thing to check, but it
+ * is not what MyMemory actually sends when the limit is hit. Observed live, the
+ * body is:
+ *
+ *   { quotaFinished: null, responseStatus: 429,
+ *     responseDetails: "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE
+ *                       TRANSLATIONS FOR TODAY. NEXT AVAILABLE IN 16 HOURS..." }
+ *
+ * Trusting the flag alone meant the app never noticed. Every string still
+ * failed safely - the shouted warning is caught as a provider error rather than
+ * displayed - but the run kept going, spending hundreds of requests against a
+ * spent quota, and `quotaExhausted()` stayed false so the picker could not say
+ * why nothing was translating. All three signals are checked because any one of
+ * them may be the one that changes.
+ */
+function outOfQuota(body: {
+  quotaFinished?: boolean;
+  responseStatus?: number | string;
+  responseDetails?: string;
+}): boolean {
+  return (
+    body.quotaFinished === true ||
+    Number(body.responseStatus) === 429 ||
+    /ALL AVAILABLE FREE TRANSLATIONS/i.test(body.responseDetails ?? "")
+  );
+}
+
+/**
+ * Called the moment a single string comes back, before the batch finishes.
+ *
+ * MyMemory answers one string per request, so a page's worth of copy arrives
+ * over several seconds. Without this the caller has nothing to show until the
+ * last one lands and the whole interface changes language in one jump - which
+ * on device read as "the setting did nothing", right up until it did.
+ */
+export type OnTranslated = (source: string, translated: string) => void;
+
 async function viaMyMemory(
   texts: string[],
   language: string,
+  onTranslated?: OnTranslated,
 ): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   const target = toProviderCode(language);
@@ -105,15 +150,31 @@ async function viaMyMemory(
 
       try {
         const response = await fetch(url);
+
+        /*
+         * Checked before `response.ok`, which is the whole point.
+         *
+         * A spent daily allowance comes back as HTTP 429, so bailing out on
+         * `!response.ok` skipped the one response that says "stop asking" -
+         * and every worker went right on to the next string. Sixty requests
+         * fired at an endpoint that had already refused the first is how a
+         * rate limit turns into a blocked IP.
+         */
+        if (response.status === 429) {
+          quotaOut = true;
+          return;
+        }
+
         if (!response.ok) continue;
 
         const body = (await response.json()) as {
           responseStatus?: number | string;
           quotaFinished?: boolean;
+          responseDetails?: string;
           responseData?: { translatedText?: string };
         };
 
-        if (body.quotaFinished) {
+        if (outOfQuota(body)) {
           // Stop the whole run: every further request would fail the same way,
           // and hammering a spent quota is how an IP gets blocked outright.
           quotaOut = true;
@@ -128,6 +189,7 @@ async function viaMyMemory(
           !looksLikeProviderError(translated)
         ) {
           out.set(text, translated);
+          onTranslated?.(text, translated);
         }
       } catch {
         // Network blip. The string stays English and is retried on a later
@@ -146,6 +208,7 @@ async function viaMyMemory(
 async function viaLibreTranslate(
   texts: string[],
   language: string,
+  onTranslated?: OnTranslated,
 ): Promise<Map<string, string>> {
   const out = new Map<string, string>();
 
@@ -174,6 +237,9 @@ async function viaLibreTranslate(
     const translated = list[i];
     if (typeof translated === 'string' && translated.length > 0) {
       out.set(source, translated);
+      // Every string of a LibreTranslate batch arrives at once, so this fires
+      // in one burst rather than trickling. The caller does not have to care.
+      onTranslated?.(source, translated);
     }
   });
 
@@ -184,12 +250,13 @@ async function viaLibreTranslate(
 export async function requestTranslations(
   texts: string[],
   language: string,
+  onTranslated?: OnTranslated,
 ): Promise<Map<string, string>> {
   if (texts.length === 0 || quotaOut) return new Map();
   try {
     return usingLibreTranslate()
-      ? await viaLibreTranslate(texts, language)
-      : await viaMyMemory(texts, language);
+      ? await viaLibreTranslate(texts, language, onTranslated)
+      : await viaMyMemory(texts, language, onTranslated);
   } catch {
     return new Map();
   }

@@ -38,6 +38,7 @@ import { LANGUAGES } from "@/lib/i18n/languages";
 import {
   SOURCE_LANGUAGE,
   hydrateCache,
+  quotaExhausted,
   setActiveLanguage,
   subscribe,
   translate,
@@ -57,6 +58,21 @@ const LanguageContext = React.createContext<LanguageValue>({
 });
 
 export const useLanguage = () => React.useContext(LanguageContext);
+
+/**
+ * Whether the provider has run out of quota, re-rendering when it happens.
+ *
+ * Reading `quotaExhausted()` straight from render would latch whatever it said
+ * the first time: the flag flips mid-session and nothing else repaints the
+ * component that explains it.
+ */
+export function useQuotaExhausted(): boolean {
+  return React.useSyncExternalStore(
+    subscribe,
+    quotaExhausted,
+    () => false, // Server render: nothing has been requested yet.
+  );
+}
 
 /** Elements whose text must never be touched. */
 const SKIP_TAGS = new Set([
@@ -164,10 +180,51 @@ export function TranslationProvider({
       found.forEach(applyTo);
     };
 
+    /*
+     * Copy that never becomes a text node.
+     *
+     * A placeholder is as visible as any label, and a tooltip or an
+     * accessibility name is the only copy some people get at all - a screen
+     * reader announcing English buttons on a Spanish page is worse than the
+     * untranslated page, because the user cannot see that anything is wrong.
+     * The tree walker cannot reach any of them, so they are done separately.
+     */
+    const ATTRS = ["placeholder", "title", "aria-label"] as const;
+    const originalAttr = new WeakMap<Element, Map<string, string>>();
+
+    const applyAttrs = (root: Element) => {
+      const targets = [
+        ...(root.matches?.("[placeholder],[title],[aria-label]") ? [root] : []),
+        ...root.querySelectorAll("[placeholder],[title],[aria-label]"),
+      ];
+
+      for (const el of targets) {
+        if (el.closest(`[${SKIP_ATTR}]`)) continue;
+
+        let saved = originalAttr.get(el);
+        if (!saved) {
+          saved = new Map();
+          originalAttr.set(el, saved);
+        }
+
+        for (const attr of ATTRS) {
+          const current = el.getAttribute(attr);
+          if (current === null) continue;
+
+          const source = (saved.get(attr) ?? current).trim();
+          if (!saved.has(attr)) saved.set(attr, source);
+
+          const translated = translate(source, language);
+          if (translated !== source) el.setAttribute(attr, translated);
+        }
+      }
+    };
+
     const run = () => {
       if (applying) return;
       applying = true;
       walk(document.body);
+      applyAttrs(document.body);
       // Cleared on a microtask so our own writes do not re-enter through the
       // observer below.
       queueMicrotask(() => {
@@ -185,6 +242,10 @@ export function TranslationProvider({
       childList: true,
       subtree: true,
       characterData: true,
+      // React restores a placeholder to English on re-render exactly as it does
+      // a text node, and without this the box quietly reverts mid-session.
+      attributes: true,
+      attributeFilter: [...ATTRS],
     });
 
     const unsubscribe = subscribe(run);
