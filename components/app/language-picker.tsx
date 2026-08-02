@@ -15,7 +15,7 @@ import { Check, Globe, Search } from "lucide-react";
 
 import { useLanguage } from "@/components/layout/translation-provider";
 import { languageFor, searchLanguages } from "@/lib/i18n/languages";
-import { translationEnabled } from "@/lib/i18n/translate";
+import { quotaExhausted } from "@/lib/i18n/translate";
 import { cn } from "@/lib/utils";
 
 export function LanguagePicker() {
@@ -89,9 +89,9 @@ export function LanguagePicker() {
       */}
       {language !== "en" && (
         <p className="mt-3 text-xs text-muted-foreground">
-          {translationEnabled()
-            ? "Translated automatically. Wording may be imperfect."
-            : "Translation is not configured on this deployment, so text stays in English."}
+          {quotaExhausted()
+            ? "The free translation quota for today is used up, so text stays in English."
+            : "Translated automatically. Wording may be imperfect."}
         </p>
       )}
     </div>

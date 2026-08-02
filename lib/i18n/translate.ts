@@ -16,22 +16,23 @@
  *
  * # Provider
  *
- * LibreTranslate's request shape - open, self-hostable, and no key required for
- * your own instance, so nothing here forces a billing relationship to run the
- * site. `NEXT_PUBLIC_TRANSLATE_URL` points it somewhere;
- * `NEXT_PUBLIC_TRANSLATE_API_KEY` is sent when set.
- *
- * With neither configured, translation is **off** and everything stays English.
- * Quietly shipping every visitor's interface copy to a third-party endpoint
- * nobody configured is not a reasonable default.
+ * Chosen in `providers.ts`. MyMemory by default - free, keyless, and therefore
+ * working with no setup at all - and LibreTranslate whenever
+ * `NEXT_PUBLIC_TRANSLATE_URL` names one, which is what a launch should use. The
+ * quota trade-off between the two is documented there.
  */
 
-const ENDPOINT = (process.env.NEXT_PUBLIC_TRANSLATE_URL ?? "").trim();
-const API_KEY = (process.env.NEXT_PUBLIC_TRANSLATE_API_KEY ?? "").trim();
+import { requestTranslations } from "./providers";
 
 export const SOURCE_LANGUAGE = "en";
 
-export const translationEnabled = (): boolean => /^https?:\/\//i.test(ENDPOINT);
+/**
+ * Always on. There is always a provider, so a picker can never silently do
+ * nothing - which is the bug this feature exists to fix.
+ */
+export const translationEnabled = (): boolean => true;
+
+export { quotaExhausted } from "./providers";
 
 const STORAGE_PREFIX = "eventerz.i18n.";
 
@@ -111,44 +112,19 @@ async function flush() {
 
   if (batch.length === 0 || language === SOURCE_LANGUAGE) return;
 
-  try {
-    const response = await fetch(`${ENDPOINT.replace(/\/$/, "")}/translate`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        q: batch,
-        source: SOURCE_LANGUAGE,
-        target: language,
-        format: "text",
-        ...(API_KEY ? { api_key: API_KEY } : {}),
-      }),
-    });
-    if (!response.ok) throw new Error(`translate ${response.status}`);
-
-    const body = (await response.json()) as {
-      translatedText?: string | string[];
-    };
-    const out = Array.isArray(body.translatedText)
-      ? body.translatedText
-      : [body.translatedText ?? ""];
-
+  /*
+   * Failures are silent and not retried in place, on purpose. The page already
+   * reads correctly in English, so an error banner over working copy is noise -
+   * and retrying a failing provider on every render is how a rate limit becomes
+   * permanent. Nothing is cached for a failed string, so the next navigation
+   * asks again naturally.
+   */
+  const translated = await requestTranslations(batch, language);
+  if (translated.size > 0) {
     const target = bucket(language);
-    batch.forEach((source, i) => {
-      const translated = out[i];
-      if (typeof translated === "string" && translated.length > 0) {
-        target.set(source, translated);
-      }
-    });
-
+    for (const [source, value] of translated) target.set(source, value);
     schedulePersist(language);
     notify();
-  } catch {
-    /*
-     * Silent and not retried, on purpose. The page already reads correctly in
-     * English, so an error banner over working copy is noise - and retrying a
-     * failing endpoint on every render is how a rate limit becomes permanent.
-     * The strings stay uncached, so the next navigation tries again.
-     */
   }
 
   if (pending.size > 0) flushTimer = setTimeout(flush, 50);
