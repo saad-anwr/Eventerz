@@ -272,12 +272,49 @@ end $$;
    `profiles` is already world-readable (0001), which is what lets one user
    find another. This view exposes the friendship state alongside, so the
    Friends screen needs one query instead of N.
+
+   The column list is written out, and the view is dropped rather than replaced.
+   Both of those are the same lesson.
+
+   This was originally `select p.*, fr.status as friend_status, ...`. A view
+   expands `*` once, at creation time, and freezes the result - so the view's
+   column list is whatever `profiles` looked like on the day it was created,
+   and `friend_status` sat at whatever ordinal position that happened to put it
+   in. Every later migration that adds a column to `profiles` then shifts the
+   expansion by one: 0020 adds `twitter_verified`, which lands where
+   `friend_status` used to be, and re-running this file fails with 42P16
+   ("cannot change name of view column friend_status to twitter_verified").
+
+   `create or replace view` cannot recover from that - it may append columns but
+   may not rename or remove one - so the drop is what makes the file re-runnable.
+   `cascade` is deliberately not used: if something ever does depend on this
+   view, this should error rather than quietly take it with it.
+
+   Naming the columns is what stops the problem recurring. The set the view
+   publishes is now a set somebody chose, and it no longer moves when `profiles`
+   gains a column. 0015 reaches this same conclusion from the other direction -
+   there it is `email` that must not be in the expansion - and rebuilds this view
+   with the identical list.
    =========================================================================== */
 
-create or replace view public.discoverable_people
+drop view if exists public.discoverable_people;
+
+create view public.discoverable_people
 with (security_invoker = true) as
   select
-    p.*,
+    p.id,
+    p.name,
+    p.handle,
+    p.avatar_url,
+    p.bio,
+    p.location,
+    p.website,
+    p.twitter,
+    p.wallet_address,
+    p.reputation,
+    p.interests,
+    p.created_at,
+    p.updated_at,
     fr.status  as friend_status,
     fr.requester_id = auth.uid() as request_sent_by_me
   from public.profiles p

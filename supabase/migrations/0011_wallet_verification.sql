@@ -118,25 +118,36 @@ begin
   returning nonce into fresh;
 
   /*
-   * Every literal carries its own `E` prefix.
+   * The literals are joined with an explicit `||`.
    *
-   * Adjacent string constants are concatenated by the parser, but each is
-   * *escaped* independently - so `E'a\n' 'b\n'` yields a real newline followed by
-   * a literal backslash-n. The wallet would have displayed "...funds.\n\nNonce:"
-   * verbatim, which is exactly the kind of malformed prompt that teaches users to
+   * Writing `E` on every line and letting the parser concatenate them does not
+   * parse at all - this function used to raise 42601 on creation. Postgres
+   * continues a string constant across lines only when the next line opens with
+   * a bare quote: the lexer rule is quote, newline, quote, and it keeps the
+   * escape state of the string it is continuing. An `E` in between does not
+   * match that rule, so the first constant ends and a second one begins,
+   * leaving two string literals adjacent with no operator between them.
+   *
+   * The bare-quote continuation form is valid and the continued segments do
+   * stay escape-processed - but the whole reason the broken version got written
+   * was that its author did not believe that. `||` needs no such belief: five
+   * independently escaped strings, joined by an operator that means join.
+   *
+   * Getting this right is not cosmetic. A wallet displaying "...funds.\n\nNonce:"
+   * verbatim is exactly the kind of malformed prompt that teaches users to
    * approve signatures without reading them.
    *
-   * The parenthesised `(now() + interval '5 minutes')` matters for the same
+   * The parenthesised `(now() + interval '5 minutes')` matters for a related
    * reason: `AT TIME ZONE` binds tighter than `+`, so without them Postgres
    * parses `interval AT TIME ZONE 'UTC'` and the expression does not mean what
    * it reads as.
    */
   return format(
     E'Eventerz - verify wallet ownership\n\n'
-    E'Signing this message links %s to your Eventerz account.\n'
-    E'It is free, does not touch the blockchain, and cannot move any funds.\n\n'
-    E'Nonce: %s\n'
-    E'Expires: %s',
+    || E'Signing this message links %s to your Eventerz account.\n'
+    || E'It is free, does not touch the blockchain, and cannot move any funds.\n\n'
+    || E'Nonce: %s\n'
+    || E'Expires: %s',
     trim(p_wallet_address),
     fresh,
     to_char(

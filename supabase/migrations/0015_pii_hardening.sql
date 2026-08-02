@@ -47,9 +47,48 @@
    becomes invisible to `anon` and `authenticated` no matter what a client asks
    for. That matters more than fixing the queries: a client-side allow-list is
    only as good as the next person who writes `select('*')`.
+
+   ---------------------------------------------------------------------------
+   Superseded by 0021, and guarded accordingly.
+
+   0021 went further and dropped the column: it was written once at signup and
+   read by nothing, so the revoke was protecting a copy that had no reader. It
+   also could not be shown to cover Realtime, which broadcasts `profiles` and
+   authorises per row rather than per column. 0001 no longer creates the column
+   at all, so on a fresh database there is nothing here to revoke.
+
+   The revoke is kept, wrapped in an existence check, because a database sitting
+   at 0014 - with the column present and world-readable - still needs it. On
+   such a database this closes the leak and 0021 then removes the column
+   entirely; on any database at 0021 or later, or built fresh, it is a no-op.
+   Guarded rather than deleted so re-running this file cannot fail, which is
+   what the header promises.
 */
 
-revoke select (email) on public.profiles from anon, authenticated;
+do $$
+begin
+  -- pg_attribute rather than information_schema.columns: the latter hides
+  -- columns the calling role holds no privilege on, so a role that had already
+  -- had SELECT revoked would be told the column does not exist.
+  if exists (
+    select 1
+    from pg_catalog.pg_attribute a
+    where a.attrelid = 'public.profiles'::regclass
+      and a.attname  = 'email'
+      and a.attnum   > 0
+      and not a.attisdropped
+  ) then
+    execute 'revoke select (email) on public.profiles from anon, authenticated';
+
+    execute $c$
+      comment on column public.profiles.email is
+        'Mirrored from the OAuth identity. NOT readable by anon or authenticated '
+        '- see 0015. The owner reads their own address from the session '
+        '(auth.users.email); anything server-side uses service_role. Removed '
+        'entirely by 0021.'
+    $c$;
+  end if;
+end $$;
 
 /*
  * Deliberately NOT revoked from `service_role`.
@@ -70,17 +109,13 @@ revoke select (email) on public.profiles from anon, authenticated;
  * was mirrored *from*, and `supabase.auth.getUser()` returns it to the person
  * it belongs to and to nobody else. The client now reads it from there.
  *
- * Which raises the fair question of why the column exists at all. It is the
- * lookup that lets a returning Google user resolve to their existing wallet
- * account (0001), and that lookup runs inside SECURITY DEFINER functions, not
- * from a client. So: keep the column, keep the index, publish neither.
+ * Which raises the fair question of why the column exists at all. The answer
+ * given here was "the lookup that lets a returning Google user resolve to their
+ * existing wallet account (0001)" - and that turned out to be wrong: no such
+ * lookup was ever written. 0021 checked, found no reader, and dropped it. This
+ * paragraph is left standing as the record of the assumption that delayed that
+ * conclusion by six migrations.
  */
-
-comment on column public.profiles.email is
-  'Mirrored from the OAuth identity so a returning Google user resolves to their '
-  'existing wallet account. NOT readable by anon or authenticated - see 0015. '
-  'The owner reads their own address from the session (auth.users.email); '
-  'anything server-side uses service_role.';
 
 /* ===========================================================================
    2. Account deletion
@@ -235,10 +270,17 @@ begin
    * wallet link is severed, and the handle is randomised so it cannot be used
    * to re-identify anyone or squatted by someone else.
    */
+  /*
+   * `email` is not cleared here, because this migration can no longer assume
+   * the column exists - 0001 does not create it and 0021 drops it - and a
+   * statement naming a missing column would fail at call time. On a database
+   * still carrying the column, 0021 removes it outright a few migrations later,
+   * which erases the address for every tombstone at once rather than one
+   * deletion at a time.
+   */
   update public.profiles
      set name           = 'Deleted account',
          handle         = 'deleted' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 12),
-         email          = null,
          wallet_address = null,
          avatar_url     = null,
          bio            = null,

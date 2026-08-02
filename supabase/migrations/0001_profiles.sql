@@ -32,8 +32,22 @@ create table if not exists public.profiles (
   -- Unique so one wallet cannot be claimed by two accounts.
   wallet_address text unique,
 
-  -- Secondary credential, mirrored from the OAuth identity for lookup.
-  email text,
+  /*
+   * There is deliberately no `email` column.
+   *
+   * This table originally mirrored the OAuth address here, justified as "the
+   * lookup that lets a returning Google user resolve to their existing wallet
+   * account". That lookup was never built - `profile_for_wallet()` below goes
+   * the other way - so the column was written once at signup and read by
+   * nothing, while sitting in the one table that is world-readable (see the RLS
+   * section) and broadcast over Realtime.
+   *
+   * 0015 closed the read path with a column privilege and 0021 removed the
+   * column outright; 0021 carries the full argument. It is gone from here as
+   * well so a fresh database never creates it, rather than creating a column of
+   * personal data and dropping it twenty migrations later. The address lives in
+   * `auth.users.email`, which is where it was being copied from.
+   */
 
   -- Portable on-chain reputation.
   reputation int not null default 0 check (reputation >= 0),
@@ -45,11 +59,8 @@ create table if not exists public.profiles (
 
 comment on column public.profiles.wallet_address is
   'Primary identity. Null means the account is wallet-pending: browsing works, on-chain actions do not.';
-comment on column public.profiles.email is
-  'Mirrored from the OAuth identity so a returning Google user resolves to their existing wallet account.';
 
 create index if not exists profiles_wallet_address_idx on public.profiles (wallet_address);
-create index if not exists profiles_email_idx on public.profiles (email);
 
 -- ---------------------------------------------------------------------------
 -- updated_at maintenance
@@ -116,8 +127,13 @@ begin
     final_handle := left(base_handle, 14) || suffix::text;
   end loop;
 
-  insert into public.profiles (id, name, handle, avatar_url, email)
-  values (new.id, display, final_handle, avatar, new.email)
+  /*
+   * `new.email` is read above to derive a display name and nothing more - a
+   * local variable inside a SECURITY DEFINER function, not a stored copy. The
+   * address itself is not written here; see the note on the table.
+   */
+  insert into public.profiles (id, name, handle, avatar_url)
+  values (new.id, display, final_handle, avatar)
   on conflict (id) do nothing;
 
   return new;

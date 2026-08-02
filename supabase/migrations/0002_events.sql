@@ -281,6 +281,19 @@ create policy "notifications own" on public.notifications
 /*  RSVP - capacity, dedupe and ticket allocation in one atomic step           */
 /* -------------------------------------------------------------------------- */
 
+/*
+ * Dropped before it is created, rather than just replaced.
+ *
+ * 0005 redefines `rsvp(uuid)` to return `public.rsvps` instead of
+ * `public.tickets`, and `create or replace function` may not change a return
+ * type. So re-running this file against a database that has already reached
+ * 0005 failed with 42P13 ("cannot change return type of existing function"),
+ * which contradicts the promise at the top of this file. Dropping first makes
+ * that promise true; the chain then reaches 0005, which drops and recreates it
+ * again with the signature the application actually calls.
+ */
+drop function if exists public.rsvp(uuid);
+
 create or replace function public.rsvp(p_event_id uuid)
 returns public.tickets
 language plpgsql
