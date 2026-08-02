@@ -195,6 +195,8 @@ export function ChatPanel({
                       ) : (
                         <div
                           title={fullTimestamp(m.createdAt)}
+                          /* Never sent to the translation provider. See below. */
+                          data-no-translate
                           className="rounded-2xl border border-white/10 bg-white/[0.05] px-3.5 py-2 text-sm text-white/90"
                         >
                           {m.text}
@@ -204,6 +206,23 @@ export function ChatPanel({
                   ) : (
                     <div
                       title={fullTimestamp(m.createdAt)}
+                      /*
+                       * `data-no-translate` is load-bearing, not cosmetic.
+                       *
+                       * The language picker translates by walking the DOM and
+                       * POSTing every text node it finds to a translation
+                       * provider - MyMemory by default, which is a *public*
+                       * translation memory. Without this marker, switching
+                       * language would send the contents of a private
+                       * conversation to a third party that may retain and
+                       * republish it.
+                       *
+                       * The walker skips opted-out subtrees only, so anything
+                       * rendering user-written text has to carry this. The
+                       * translator's own docs say user content is skipped;
+                       * this attribute is the only thing that makes that true.
+                       */
+                      data-no-translate
                       className={cn(
                         "rounded-2xl px-3.5 py-2 text-sm leading-relaxed",
                         mine

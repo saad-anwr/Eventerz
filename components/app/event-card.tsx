@@ -125,6 +125,7 @@ export function EventCard({ event }: { event: EventItem }) {
             {formatEventDate(event.startsAt)}
           </p>
           <h3 className="mt-1 line-clamp-2 font-display text-base font-semibold text-white">
+            data-no-translate
             {event.title}
           </h3>
 

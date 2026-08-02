@@ -276,6 +276,7 @@ export function EventDetail() {
         <div className="space-y-6">
           <div>
             <h1 className="font-display text-3xl font-bold tracking-tight text-white">
+              data-no-translate
               {event.title}
             </h1>
             <div className="mt-4 space-y-3">
@@ -349,6 +350,7 @@ export function EventDetail() {
                 About
               </h2>
               <p className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
+                data-no-translate
                 {event.description}
               </p>
             </div>
