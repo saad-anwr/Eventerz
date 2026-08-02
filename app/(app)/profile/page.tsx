@@ -39,6 +39,7 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { useConnectModal } from "@/components/wallet/connect-modal-context";
 import { Avatar } from "@/components/app/avatar";
 import { DeleteAccountCard } from "@/components/app/delete-account-card";
+import { LanguagePicker } from "@/components/app/language-picker";
 import { EventCard } from "@/components/app/event-card";
 import { Button } from "@/components/ui/button";
 import { shortenAddress } from "@/lib/format";
@@ -626,7 +627,7 @@ export default function ProfilePage() {
                 {user.walletAddress ? (
                   <div className="flex items-center gap-2 text-sm text-brand-green">
                     <Wallet className="size-4" />
-                    {shortenAddress(user.walletAddress)}
+                    <span data-no-translate>{shortenAddress(user.walletAddress)}</span>
                   </div>
                 ) : (
                   <Button
@@ -656,6 +657,8 @@ export default function ProfilePage() {
                 <div className="text-xs text-muted-foreground">Attending</div>
               </div>
             </div>
+
+            <LanguagePicker />
 
             {isLive && <DeleteAccountCard />}
           </aside>

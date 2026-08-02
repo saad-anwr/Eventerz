@@ -114,7 +114,7 @@ function WalletChip() {
     return (
       <div className="flex items-center gap-2 rounded-xl border border-brand-green/25 bg-brand-green/10 px-3 py-2 text-xs font-medium text-brand-green">
         <span className="size-1.5 rounded-full bg-brand-green" />
-        {shortenAddress(user.walletAddress)}
+        <span data-no-translate>{shortenAddress(user.walletAddress)}</span>
       </div>
     );
   }

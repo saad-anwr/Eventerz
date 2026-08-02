@@ -8,6 +8,7 @@ import { siteConfig } from "@/lib/site";
 import { WalletProviders } from "@/components/wallet/providers";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { QueryProvider } from "@/components/query-provider";
+import { TranslationProvider } from "@/components/layout/translation-provider";
 import "./globals.css";
 
 const inter = Inter({
@@ -105,11 +106,15 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-screen bg-brand-bg text-foreground selection:bg-brand-purple/30">
-        <QueryProvider>
-          <WalletProviders>
-            <AuthProvider>{children}</AuthProvider>
-          </WalletProviders>
-        </QueryProvider>
+        {/* Outermost, so the language is known before anything below renders
+            and the DOM walk sees the finished page. */}
+        <TranslationProvider>
+          <QueryProvider>
+            <WalletProviders>
+              <AuthProvider>{children}</AuthProvider>
+            </WalletProviders>
+          </QueryProvider>
+        </TranslationProvider>
       </body>
     </html>
   );

@@ -211,7 +211,7 @@ export default function PublicProfilePage() {
               {user.walletAddress && (
                 <li className="flex items-center gap-2.5 text-brand-green">
                   <Wallet className="size-4 shrink-0" />
-                  {shortenAddress(user.walletAddress)}
+                  <span data-no-translate>{shortenAddress(user.walletAddress)}</span>
                 </li>
               )}
             </ul>
