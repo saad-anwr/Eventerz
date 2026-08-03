@@ -190,8 +190,6 @@ export function setActiveLanguage(language: string) {
   hydrateCache(language);
 }
 
-export const getActiveLanguage = () => activeLanguage;
-
 /**
  * The translation of `text`, or `text` itself while one is fetched.
  * Synchronous - it is called during render and from a DOM walk.

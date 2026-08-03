@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { SpotlightCard } from "@/components/ui/spotlight-card";
-import { staggerContainer, staggerItem } from "@/components/ui/reveal";
+import { staggerContainer, staggerItem } from "@/components/ui/stagger";
 import { features, type Feature } from "@/lib/data";
 import { Layers } from "lucide-react";
 import { cn } from "@/lib/utils";

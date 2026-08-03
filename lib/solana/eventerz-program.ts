@@ -524,7 +524,3 @@ export function decodeSeatAccount(data: Uint8Array): OnChainSeat | null {
   };
 }
 
-/** Explorer link for a signature, on whichever cluster this build targets. */
-export function explorerTxUrl(signature: string): string {
-  return `https://explorer.solana.com/tx/${signature}${explorerClusterSuffix()}`;
-}

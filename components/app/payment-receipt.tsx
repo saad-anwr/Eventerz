@@ -4,17 +4,13 @@ import * as React from "react";
 import { ArrowUpRight, BadgeCheck, Clock3, Coins } from "lucide-react";
 import type { PaymentRow } from "@/lib/supabase/types";
 import { formatTokenAmount } from "@/lib/solana/amount";
+import { explorerTxUrl } from "@/lib/solana/cluster";
 import { cn } from "@/lib/utils";
 
 interface PaymentReceiptProps {
   payment: PaymentRow;
   /** True when the viewer is the sender - flips the wording, not the amount. */
   mine: boolean;
-}
-
-function explorerUrl(signature: string, cluster: string): string {
-  const suffix = cluster === "mainnet-beta" ? "" : `?cluster=${cluster}`;
-  return `https://explorer.solana.com/tx/${signature}${suffix}`;
 }
 
 /**
@@ -37,7 +33,7 @@ export function PaymentReceipt({ payment, mine }: PaymentReceiptProps) {
 
   return (
     <a
-      href={explorerUrl(payment.signature, payment.cluster)}
+      href={explorerTxUrl(payment.signature, payment.cluster)}
       target="_blank"
       rel="noopener noreferrer"
       className={cn(

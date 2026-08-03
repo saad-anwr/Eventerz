@@ -30,9 +30,8 @@ export default function Error({
   reset: () => void;
 }) {
   React.useEffect(() => {
-    // Nothing forwards this anywhere yet - see the analytics seam in
-    // `lib/integrations.ts`. Logging it at least puts it somewhere a developer
-    // looking at a user's console can find it.
+    // Nothing forwards this to an error reporter yet. Logging it at least puts
+    // it somewhere a developer looking at a user's console can find it.
     // eslint-disable-next-line no-console
     console.error("[eventerz] route error", error);
   }, [error]);

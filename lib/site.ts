@@ -45,8 +45,6 @@ export const siteConfig = {
   },
 } as const;
 
-export type SiteConfig = typeof siteConfig;
-
 /** Primary navigation links (in-page anchors for the marketing site). */
 export const navLinks = [
   { label: "Features", href: "#features" },

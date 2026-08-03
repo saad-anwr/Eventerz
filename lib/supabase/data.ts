@@ -586,21 +586,6 @@ export async function joinGatedEvent(eventId: string): Promise<GateResult> {
 }
 
 /**
- * The entry requirement, for rendering before anyone tries to join.
- *
- * `gate_min_amount` arrives as a string because it is `numeric(40,0)` - PostgREST
- * would hand a JS client a lossy Number for anything past 2^53, and this is the
- * same money-is-integers rule the rest of the codebase follows.
- */
-export async function getEventGate(eventId: string) {
-  const { data, error } = await client().rpc('event_gate', {
-    p_event_id: eventId,
-  });
-  if (error) fail('Reading the entry requirement', error);
-  return Array.isArray(data) ? data[0] : data;
-}
-
-/**
  * Mint the compressed NFT for a ticket or badge.
  *
  * Returns the `not-configured` refusal untouched rather than throwing: until a
@@ -627,16 +612,6 @@ export async function mintCompressedAsset(
   }
 
   return data;
-}
-
-/** Proof-of-attendance badges held by the signed-in user. */
-export async function listMyBadges() {
-  const { data, error } = await client()
-    .from('badges')
-    .select('id, event_id, asset_id, awarded_at, minted_at, events(title, starts_at, cover_image)')
-    .order('awarded_at', { ascending: false });
-  if (error) fail('Loading your badges', error);
-  return data ?? [];
 }
 
 export async function cancelRsvp(eventId: string): Promise<void> {
@@ -780,14 +755,6 @@ export async function respondToFriendRequest(id: string, accept: boolean) {
     .update({ status: accept ? 'accepted' : 'declined' })
     .eq('id', id);
   if (error) fail('Responding to the request', error);
-}
-
-export async function removeFriend(requestId: string) {
-  const { error } = await client()
-    .from('friend_requests')
-    .delete()
-    .eq('id', requestId);
-  if (error) fail('Removing the friend', error);
 }
 
 export async function fetchProfile(id: string): Promise<ProfileRow | null> {
@@ -1120,55 +1087,12 @@ export async function subscribeToNewsletter(
 /*  Wallet ownership                                                           */
 /* -------------------------------------------------------------------------- */
 
-/**
- * Step one of linking a wallet: get the text to sign.
- *
- * The server returns a full sentence, not a bare nonce, and the wallet shows
- * it to the user verbatim. A popup asking someone to approve an opaque UUID
- * teaches the habit every signature-phishing attack depends on.
+/*
+ * Linking a wallet - issuing the challenge and submitting the signature - lives
+ * in `auth-service.ts` (`linkWallet`), next to the rest of the identity
+ * surface. This file used to carry a second implementation of the same two
+ * steps; the one that shipped was always the auth-service one.
  */
-export async function issueWalletLinkChallenge(
-  walletAddress: string,
-): Promise<string> {
-  const { data, error } = await client().rpc('issue_wallet_link_nonce', {
-    p_wallet_address: walletAddress,
-  });
-  if (error) fail('Starting wallet verification', error);
-  return data as string;
-}
-
-/**
- * Step two: submit the signature for verification.
- *
- * Postgres has no Ed25519, so the check happens in the `link-wallet` Edge
- * Function, which then calls a function revoked from `authenticated` - the
- * caller cannot link a wallet without going through the signature check.
- */
-export async function linkWalletWithSignature(args: {
-  walletAddress: string;
-  message: string;
-  /** Base58 or base64; the function accepts whichever the wallet produced. */
-  signature: string;
-}): Promise<ProfileRow> {
-  const { data, error } = await client().functions.invoke('link-wallet', {
-    body: args,
-  });
-
-  if (error) {
-    /*
-     * `FunctionsHttpError` carries the useful message in the response body
-     * rather than in `error.message`, which is always "Edge Function returned a
-     * non-2xx status code". Surfacing that instead of "already linked to
-     * another account" would make a self-explanatory failure unreadable.
-     */
-    const detail = await readFunctionError(error);
-    throw new Error(detail ?? 'Could not verify that wallet.');
-  }
-
-  const payload = data as { profile?: ProfileRow } | null;
-  if (!payload?.profile) throw new Error('Could not verify that wallet.');
-  return payload.profile;
-}
 
 /** One wallet on the signed-in account. */
 export type LinkedWallet = {
@@ -1278,10 +1202,4 @@ async function readFunctionBody(
   } catch {
     return null;
   }
-}
-
-/** The `error` field of that body, for the callers that only need the message. */
-async function readFunctionError(error: unknown): Promise<string | null> {
-  const body = await readFunctionBody(error);
-  return typeof body?.error === 'string' ? body.error : null;
 }

@@ -121,16 +121,6 @@ export type RsvpState =
   | "declined"
   | "cancelled";
 
-export type FriendStatus = "pending" | "accepted" | "declined";
-
-export interface FriendRequest {
-  id: string;
-  from: string; // userId
-  to: string; // userId
-  status: FriendStatus;
-  createdAt: number;
-}
-
 export type MessageScope = "event" | "dm";
 
 export interface Message {

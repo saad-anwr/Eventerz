@@ -1,0 +1,13 @@
+#!/bin/sh
+#
+# Refuse a commit that carries a credential.
+#
+# Tracked, rather than living in .git/hooks, so it survives a fresh clone and
+# shows up in review. `npm install` points git at this directory (see the
+# `prepare` script in package.json); to wire it up by hand:
+#
+#   git config core.hooksPath .githooks
+#
+# Genuine false positive: ALLOW_SECRETS=1 git commit ...
+
+exec node scripts/check-secrets.mjs

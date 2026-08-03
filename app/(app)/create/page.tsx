@@ -26,17 +26,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { formatEventDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
-
-const CATEGORIES: EventCategory[] = [
-  "Conference",
-  "Meetup",
-  "Hackathon",
-  "Workshop",
-  "Party",
-  "AMA",
-  "Concert",
-  "Other",
-];
+import {
+  EVENT_CATEGORIES,
+  Field,
+  Toggle,
+  inputCls,
+} from "@/components/app/form-controls";
 
 const GRADIENTS = [
   "from-brand-purple to-brand-blue",
@@ -48,70 +43,6 @@ const GRADIENTS = [
   "from-brand-green to-brand-cyan",
   "from-rose-500 to-brand-violet",
 ];
-
-function Field({
-  label,
-  children,
-  hint,
-}: {
-  label: string;
-  children: React.ReactNode;
-  hint?: string;
-}) {
-  return (
-    <label className="block">
-      <span className="mb-1.5 block text-sm font-medium text-white">
-        {label}
-      </span>
-      {children}
-      {hint && <span className="mt-1 block text-xs text-muted-foreground">{hint}</span>}
-    </label>
-  );
-}
-
-const inputCls =
-  "h-11 w-full rounded-xl border border-white/10 bg-white/[0.03] px-3.5 text-sm text-white placeholder:text-muted-foreground focus:border-brand-purple/40 focus:outline-none";
-
-function Toggle({
-  checked,
-  onChange,
-  label,
-  icon: Icon,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  label: string;
-  icon: React.ElementType;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!checked)}
-      className={cn(
-        "flex items-center gap-3 rounded-xl border px-3.5 py-3 text-left text-sm transition-colors",
-        checked
-          ? "border-brand-purple/40 bg-brand-purple/10 text-white"
-          : "border-white/10 bg-white/[0.03] text-muted-foreground hover:text-white"
-      )}
-    >
-      <Icon className={cn("size-4", checked && "text-brand-purple")} />
-      <span className="flex-1">{label}</span>
-      <span
-        className={cn(
-          "flex h-5 w-9 items-center rounded-full p-0.5 transition-colors",
-          checked ? "bg-brand-purple" : "bg-white/15"
-        )}
-      >
-        <span
-          className={cn(
-            "size-4 rounded-full bg-white transition-transform",
-            checked && "translate-x-4"
-          )}
-        />
-      </span>
-    </button>
-  );
-}
 
 export default function CreateEventPage() {
   const router = useRouter();
@@ -302,7 +233,7 @@ export default function CreateEventPage() {
 
           <Field label="Category">
             <div className="flex flex-wrap gap-2">
-              {CATEGORIES.map((c) => (
+              {EVENT_CATEGORIES.map((c) => (
                 <button
                   key={c}
                   type="button"

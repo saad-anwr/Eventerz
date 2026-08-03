@@ -30,7 +30,6 @@ export const queryKeys = {
   guestPreview: (id: string) => ['guests', 'preview', id] as const,
   people: ['people'] as const,
   friendRequests: (id: string) => ['friends', 'requests', id] as const,
-  friends: (id: string) => ['friends', id] as const,
   profile: (id: string) => ['profile', id] as const,
   messages: (channelId: string) => ['messages', channelId] as const,
   /** Receipts referenced by a thread's messages. */

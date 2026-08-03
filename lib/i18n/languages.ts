@@ -79,8 +79,6 @@ export const LANGUAGES: Language[] = [
   { code: 'eo', name: 'Esperanto', nativeName: 'Esperanto' },
 ];
 
-export type LanguageCode = string;
-
 /** The source language. Copy in the codebase is written in this. */
 export const SOURCE_LANGUAGE = 'en';
 

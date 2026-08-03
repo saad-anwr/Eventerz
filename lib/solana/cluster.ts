@@ -90,3 +90,22 @@ export function rpcEndpoint(): string {
 export function explorerClusterSuffix(): string {
   return IS_MAINNET ? "" : `?cluster=${SOLANA_CLUSTER}`;
 }
+
+/**
+ * Explorer link for a signature.
+ *
+ * `cluster` is a parameter because a payment receipt records the cluster it was
+ * made on, and that is not always the one this build targets: opening a devnet
+ * signature against mainnet is exactly the "transaction not found" above.
+ *
+ * It lives here rather than beside the instruction builders so a chat bubble
+ * can link a receipt without pulling web3.js and the borsh decoders in with it.
+ */
+export function explorerTxUrl(signature: string, cluster?: string): string {
+  const suffix = cluster
+    ? cluster === "mainnet-beta"
+      ? ""
+      : `?cluster=${cluster}`
+    : explorerClusterSuffix();
+  return `https://explorer.solana.com/tx/${signature}${suffix}`;
+}

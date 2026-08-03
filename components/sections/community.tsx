@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { ArrowUpRight, Globe } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { SpotlightCard } from "@/components/ui/spotlight-card";
-import { staggerContainer, staggerItem } from "@/components/ui/reveal";
+import { staggerContainer, staggerItem } from "@/components/ui/stagger";
 import { communities, type Community } from "@/lib/data";
 import { cn } from "@/lib/utils";
 

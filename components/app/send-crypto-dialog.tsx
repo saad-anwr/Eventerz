@@ -28,7 +28,7 @@ import {
   maxSendableLamports,
   solToLamports,
 } from "@/lib/solana/amount";
-import { explorerTxUrl } from "@/lib/solana/eventerz-program";
+import { explorerTxUrl } from "@/lib/solana/cluster";
 import { shortenAddress } from "@/lib/format";
 import { useScrollLock } from "@/hooks/use-scroll-lock";
 import { cn } from "@/lib/utils";

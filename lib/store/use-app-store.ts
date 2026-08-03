@@ -1,45 +1,24 @@
 "use client";
 
+/**
+ * The session store: who is signed in, as far as the UI is concerned.
+ *
+ * Everything else - events, guests, messages, friendships - is read from
+ * Supabase through `lib/hooks/use-eventerz-data.ts` and cached by React Query.
+ * This holds only the identity that `useSession()` reads, so that every screen
+ * can ask "who am I?" without knowing whether the answer came from a real
+ * Supabase account or from the local demo fallback.
+ */
+
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { uid } from "@/lib/format";
-import type {
-  AuthMethod,
-  EventItem,
-  FriendRequest,
-  Message,
-  User,
-} from "./types";
-import {
-  buildSeedEvents,
-  buildSeedFriendships,
-  buildSeedMessages,
-  seedUsers,
-} from "./seed";
-
-export interface CreateEventInput {
-  title: string;
-  description: string;
-  category: EventItem["category"];
-  startsAt: string;
-  endsAt?: string;
-  location: string;
-  isOnline: boolean;
-  capacity: number;
-  price: string;
-  visibility: "public" | "private";
-  requiresApproval: boolean;
-  tokenGated: boolean;
-  tags: string[];
-  coverGradient: string;
-}
+import type { AuthMethod, User } from "./types";
+import { seedUsers } from "./seed";
 
 interface AppState {
   hasHydrated: boolean;
   users: Record<string, User>;
-  events: Record<string, EventItem>;
-  friendRequests: FriendRequest[];
-  messages: Message[];
   currentUserId: string | null;
 
   // lifecycle
@@ -60,23 +39,6 @@ interface AppState {
   ensureWalletUser: (address: string) => User;
   linkWallet: (address: string) => void;
   signOut: () => void;
-  updateProfile: (patch: Partial<User>) => void;
-
-  // events
-  createEvent: (input: CreateEventInput) => EventItem;
-  toggleRsvp: (eventId: string, userId: string) => void;
-
-  // friends
-  sendFriendRequest: (from: string, to: string) => void;
-  respondFriendRequest: (id: string, accept: boolean) => void;
-
-  // chat
-  sendMessage: (
-    scope: Message["scope"],
-    channelId: string,
-    senderId: string,
-    text: string
-  ) => void;
 }
 
 function makeHandle(name: string) {
@@ -84,30 +46,11 @@ function makeHandle(name: string) {
   return `${base}${Math.floor(Math.random() * 90 + 10)}`;
 }
 
-/** Seed a couple of incoming friend requests so new users can try "Accept". */
-function welcomeRequests(
-  users: Record<string, User>,
-  toId: string
-): FriendRequest[] {
-  return ["u_maya", "u_priya"]
-    .filter((fid) => users[fid])
-    .map((fid) => ({
-      id: uid("f"),
-      from: fid,
-      to: toId,
-      status: "pending" as const,
-      createdAt: Date.now(),
-    }));
-}
-
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
       hasHydrated: false,
       users: {},
-      events: {},
-      friendRequests: [],
-      messages: [],
       currentUserId: null,
 
       setHasHydrated: (v) => set({ hasHydrated: v }),
@@ -116,14 +59,7 @@ export const useAppStore = create<AppState>()(
         if (Object.keys(get().users).length > 0) return;
         const users: Record<string, User> = {};
         seedUsers.forEach((u) => (users[u.id] = u));
-        const events: Record<string, EventItem> = {};
-        buildSeedEvents().forEach((e) => (events[e.id] = e));
-        set({
-          users,
-          events,
-          messages: buildSeedMessages(),
-          friendRequests: buildSeedFriendships(),
-        });
+        set({ users });
       },
 
       signInLocal: (method, data) => {
@@ -148,7 +84,6 @@ export const useAppStore = create<AppState>()(
         set((s) => ({
           users: { ...s.users, [id]: user },
           currentUserId: id,
-          friendRequests: [...s.friendRequests, ...welcomeRequests(get().users, id)],
         }));
         return user;
       },
@@ -187,7 +122,6 @@ export const useAppStore = create<AppState>()(
         set((s) => ({
           users: { ...s.users, [id]: user },
           currentUserId: s.currentUserId ?? id,
-          friendRequests: [...s.friendRequests, ...welcomeRequests(get().users, id)],
         }));
         return user;
       },
@@ -206,100 +140,10 @@ export const useAppStore = create<AppState>()(
       },
 
       signOut: () => set({ currentUserId: null }),
-
-      updateProfile: (patch) => {
-        const { currentUserId, users } = get();
-        if (!currentUserId) return;
-        const me = users[currentUserId];
-        if (!me) return;
-        set({ users: { ...users, [currentUserId]: { ...me, ...patch } } });
-      },
-
-      createEvent: (input) => {
-        const hostId = get().currentUserId;
-        if (!hostId) throw new Error("Must be signed in to create an event");
-        const id = uid("e");
-        const event: EventItem = {
-          id,
-          ...input,
-          hostId,
-          attendeeIds: [hostId],
-          createdAt: Date.now(),
-        };
-        set((s) => ({ events: { ...s.events, [id]: event } }));
-        return event;
-      },
-
-      toggleRsvp: (eventId, userId) => {
-        const event = get().events[eventId];
-        if (!event) return;
-        const going = event.attendeeIds.includes(userId);
-        const attendeeIds = going
-          ? event.attendeeIds.filter((x) => x !== userId)
-          : [...event.attendeeIds, userId];
-        set((s) => ({
-          events: { ...s.events, [eventId]: { ...event, attendeeIds } },
-        }));
-      },
-
-      sendFriendRequest: (from, to) => {
-        if (from === to) return;
-        const exists = get().friendRequests.find(
-          (r) =>
-            (r.from === from && r.to === to) ||
-            (r.from === to && r.to === from)
-        );
-        if (exists) return;
-        const req: FriendRequest = {
-          id: uid("f"),
-          from,
-          to,
-          status: "pending",
-          createdAt: Date.now(),
-        };
-        set((s) => ({ friendRequests: [...s.friendRequests, req] }));
-
-        // Demo: seeded users "accept" shortly after, so DM chat becomes usable.
-        if (get().users[to]?.seeded) {
-          setTimeout(() => {
-            set((s) => ({
-              friendRequests: s.friendRequests.map((r) =>
-                r.id === req.id && r.status === "pending"
-                  ? { ...r, status: "accepted" }
-                  : r
-              ),
-            }));
-          }, 1300);
-        }
-      },
-
-      respondFriendRequest: (id, accept) => {
-        set((s) => ({
-          friendRequests: s.friendRequests.map((r) =>
-            r.id === id
-              ? { ...r, status: accept ? "accepted" : "declined" }
-              : r
-          ),
-        }));
-      },
-
-      sendMessage: (scope, channelId, senderId, text) => {
-        const trimmed = text.trim();
-        if (!trimmed) return;
-        const msg: Message = {
-          id: uid("m"),
-          scope,
-          channelId,
-          senderId,
-          text: trimmed,
-          createdAt: Date.now(),
-        };
-        set((s) => ({ messages: [...s.messages, msg] }));
-      },
     }),
     {
       name: "eventerz-store",
-      version: 2,
+      version: 3,
       /**
        * What survives a reload - and, just as importantly, what does not.
        *
@@ -309,25 +153,23 @@ export const useAppStore = create<AppState>()(
        * exfiltrated in a single `JSON.parse`. Persisting something is therefore
        * a decision about what is acceptable to lose, not a caching detail.
        *
-       * Two things were removed in v2:
+       * `email` is stripped from every persisted user below. It is the one
+       * directly identifying field on the record, and losing the
+       * email -> wallet_address pair is the exact deanonymisation that
+       * migration 0015 exists to prevent. It is still held in memory for the
+       * current session, where the session cookie already implies it; it just
+       * stops being written to disk, and comes back from the session on the
+       * next load anyway.
        *
-       *   - **`email`**, stripped from every persisted user below. It is the
-       *     one directly identifying field on the record, and losing the
-       *     email -> wallet_address pair is the exact deanonymisation that
-       *     migration 0015 exists to prevent. It is still held in memory for
-       *     the current session, where the session cookie already implies it;
-       *     it just stops being written to disk. It comes back from the
-       *     session on the next load anyway, so nothing is lost by not storing
-       *     it.
+       * Cached events, messages and friend requests used to be persisted here
+       * too. They are gone - not merely unpersisted - because the store no
+       * longer holds them: private conversations are the most sensitive thing
+       * the app has and the least valuable to cache, and Supabase is the only
+       * source any of it is read from now.
        *
-       *   - **`messages`**, dropped entirely. Private conversations are the
-       *     most sensitive thing the app holds and the least valuable to cache:
-       *     they are refetched on open, so persisting them bought a few
-       *     milliseconds in exchange for leaving every DM on the disk of every
-       *     device the user has ever signed in on - including shared ones.
-       *
-       * `version: 2` discards any v1 blob rather than migrating it, which is
-       * what clears the emails and messages already sitting in browsers today.
+       * `version: 3` discards an older blob rather than migrating it, which is
+       * what clears the emails, messages and stale event copies already sitting
+       * in browsers today.
        */
       partialize: (s) => ({
         users: Object.fromEntries(
@@ -336,8 +178,6 @@ export const useAppStore = create<AppState>()(
             { ...u, email: undefined },
           ]),
         ),
-        events: s.events,
-        friendRequests: s.friendRequests,
         currentUserId: s.currentUserId,
       }),
       onRehydrateStorage: () => (state) => {
@@ -346,52 +186,3 @@ export const useAppStore = create<AppState>()(
     }
   )
 );
-
-/* --------------------------------------------------------------------- */
-/*  Derived selectors (pure - call inside useAppStore(s => ...))          */
-/* --------------------------------------------------------------------- */
-
-export const dmChannelId = (a: string, b: string) =>
-  `dm:${[a, b].sort().join("__")}`;
-
-export function friendIdsOf(
-  requests: FriendRequest[],
-  userId: string
-): string[] {
-  return requests
-    .filter(
-      (r) =>
-        r.status === "accepted" && (r.from === userId || r.to === userId)
-    )
-    .map((r) => (r.from === userId ? r.to : r.from));
-}
-
-export type FriendRelation =
-  | "self"
-  | "none"
-  | "friends"
-  | "outgoing"
-  | "incoming";
-
-export function relationBetween(
-  s: AppState,
-  me: string,
-  other: string
-): FriendRelation {
-  if (me === other) return "self";
-  const req = s.friendRequests.find(
-    (r) =>
-      (r.from === me && r.to === other) || (r.from === other && r.to === me)
-  );
-  if (!req) return "none";
-  if (req.status === "accepted") return "friends";
-  if (req.status === "declined") return "none";
-  return req.from === me ? "outgoing" : "incoming";
-}
-
-export function incomingRequests(
-  requests: FriendRequest[],
-  userId: string
-): FriendRequest[] {
-  return requests.filter((r) => r.to === userId && r.status === "pending");
-}

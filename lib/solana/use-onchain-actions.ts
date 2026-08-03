@@ -22,6 +22,7 @@ import * as React from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { Transaction, type TransactionInstruction } from '@solana/web3.js';
 
+import { explorerTxUrl } from './cluster';
 import { computeBudgetInstructions, type ComputeKind } from './priority-fee';
 import {
   cancelEventInstruction,
@@ -31,7 +32,6 @@ import {
   decodeEventAccount,
   eventPda,
   eventerzProgramId,
-  explorerTxUrl,
   releaseSeatInstruction,
   type OnChainEvent,
 } from './eventerz-program';

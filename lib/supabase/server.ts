@@ -16,7 +16,6 @@ import {
   isSupabaseConfigured,
   supabaseConfig,
 } from './config';
-import { PROFILE_COLUMNS } from './types';
 import type { Database } from './types';
 
 export async function getSupabaseServerClient() {
@@ -48,35 +47,9 @@ export async function getSupabaseServerClient() {
   );
 }
 
-/** The signed-in user on the server, or null. Never throws. */
-export async function getServerUser() {
-  const supabase = await getSupabaseServerClient();
-  if (!supabase) return null;
-
-  // `getUser()` revalidates the JWT with the auth server. `getSession()` reads
-  // the cookie without verifying it, so it must not be trusted server-side.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  return user;
-}
-
-/** The signed-in user's profile row, or null. */
-export async function getServerProfile() {
-  const supabase = await getSupabaseServerClient();
-  if (!supabase) return null;
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const { data } = await supabase
-    .from('profiles')
-    .select(PROFILE_COLUMNS)
-    .eq('id', user.id)
-    .single();
-
-  return data;
-}
+/*
+ * Callers that need the signed-in user server-side should read it from this
+ * client with `supabase.auth.getUser()`, which revalidates the JWT with the
+ * auth server. `getSession()` reads the cookie without verifying it, so it must
+ * not be trusted here.
+ */

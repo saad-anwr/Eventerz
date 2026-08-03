@@ -23,7 +23,6 @@ import {
   fetchEventsAttending,
   fetchEventsByHost,
   fetchFriendRequests,
-  fetchFriends,
   fetchGuestPreview,
   fetchConversations,
   fetchMessages,
@@ -31,16 +30,12 @@ import {
   fetchPayments,
   fetchProfile,
   fetchProfiles,
-  issueWalletLinkChallenge,
-  linkWalletWithSignature,
   markNotificationsRead,
   recordPayment,
-  removeFriend,
   requestToJoin,
   respondToFriendRequest,
   sendFriendRequest,
   sendMessage,
-  unlinkWallet,
   updateEvent,
   updateProfile,
   verifyPayment,
@@ -259,14 +254,6 @@ export function useDiscoverablePeople() {
   });
 }
 
-export function useFriends(profileId: string | undefined) {
-  return useQuery({
-    queryKey: queryKeys.friends(profileId ?? ''),
-    queryFn: () => fetchFriends(profileId!),
-    enabled: Boolean(profileId) && isSupabaseConfigured,
-  });
-}
-
 export function useFriendRequests(profileId: string | undefined) {
   return useQuery({
     queryKey: queryKeys.friendRequests(profileId ?? ''),
@@ -294,17 +281,6 @@ export function useRespondToFriendRequest() {
   return useMutation({
     mutationFn: ({ id, accept }: { id: string; accept: boolean }) =>
       respondToFriendRequest(id, accept),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['friends'] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.people });
-    },
-  });
-}
-
-export function useRemoveFriend() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (requestId: string) => removeFriend(requestId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['friends'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.people });
@@ -466,47 +442,5 @@ export function useRecordPayment(channelId: string | null) {
 /* -------------------------------------------------------------------------- */
 /*  Wallet ownership                                                           */
 /* -------------------------------------------------------------------------- */
-
-/**
- * Link a wallet by proving you hold its key.
- *
- * `signMessage` is supplied by the caller because the two platforms sign
- * differently - the browser wallet adapter's `signMessage` returns bytes, and
- * Mobile Wallet Adapter needs an association intent - and neither belongs in a
- * data hook.
- */
-export function useLinkWallet(profileId: string | undefined) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (args: {
-      walletAddress: string;
-      signMessage: (message: string) => Promise<string>;
-    }) => {
-      if (!profileId) throw new Error('Sign in before linking a wallet.');
-      const message = await issueWalletLinkChallenge(args.walletAddress);
-      const signature = await args.signMessage(message);
-      return linkWalletWithSignature({
-        walletAddress: args.walletAddress,
-        message,
-        signature,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['profile'] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.people });
-    },
-  });
-}
-
-export function useUnlinkWallet() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: () => unlinkWallet(),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['profile'] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.people });
-    },
-  });
-}
 
 export { dmChannelId };

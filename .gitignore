@@ -16,8 +16,26 @@
 
 # misc
 .DS_Store
-*.pem
 Thumbs.db
+
+# Credentials and signing material. Belt and braces with
+# `scripts/check-secrets.mjs`, which checks *content* rather than paths - this
+# list only covers the files somebody thought of in advance.
+*.pem
+*.jks
+*.keystore
+*.p12
+*.p8
+*.mobileprovision
+id_rsa
+id_ed25519
+
+# Compiled apps. Never commit these: `NEXT_PUBLIC_*` values are inlined into
+# the bundle at build time, so a committed binary hands every build-time value
+# to anyone who can `grep` it.
+*.apk
+*.aab
+*.ipa
 
 # debug
 npm-debug.log*

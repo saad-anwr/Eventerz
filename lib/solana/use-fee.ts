@@ -24,7 +24,7 @@ import {
 } from '@solana/web3.js';
 
 import { IS_MAINNET } from './cluster';
-import { explorerTxUrl } from './eventerz-program';
+import { explorerTxUrl } from './cluster';
 import { computeBudgetInstructions } from './priority-fee';
 import {
   FEE_LABEL,

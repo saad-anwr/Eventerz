@@ -59,13 +59,15 @@ Requires **Node 18.18+** (Node 20 LTS recommended).
 │   ├── sitemap.ts            # /sitemap.xml
 │   └── robots.ts             # /robots.txt
 ├── components/
-│   ├── ui/                   # Reusable primitives (button, card, accordion,
-│   │                         #   spotlight-card, reveal, counter, badge,
-│   │                         #   marquee, magnetic, particles, logo, blob)
+│   ├── ui/                   # Reusable primitives (button, accordion,
+│   │                         #   spotlight-card, stagger, counter, badge,
+│   │                         #   marquee, magnetic, particles, logo)
+│   ├── app/                  # Signed-in surfaces (event card, chat, guests)
 │   ├── layout/               # navbar, footer, animated background
 │   └── sections/             # One component per page section
-├── hooks/                    # use-mouse-position, use-media-query, use-scroll-lock
-├── lib/                      # utils (cn), site config, content data, integrations
+├── hooks/                    # use-hydrated, use-scroll-lock
+├── lib/                      # utils (cn), site config, content data, Solana,
+│                             #   Supabase data access, i18n
 ├── public/                   # favicon.svg, icon.svg, og.svg, manifest
 ├── tailwind.config.ts
 └── next.config.mjs
@@ -137,19 +139,24 @@ defined in [`app/globals.css`](app/globals.css).
 
 ---
 
-## 🔌 Future integrations
+## 🔌 Where each integration lives
 
-Front-end seams are stubbed in [`lib/integrations.ts`](lib/integrations.ts) with
-mock returns and `TODO`s, plus env placeholders in [`.env.example`](.env.example):
+Nothing here is simulated. Every entry below is implemented at the path given,
+and anything absent is absent rather than stubbed - a stub that returns a
+plausible-looking success is how a UI ends up reporting a mint that never
+happened. Env placeholders are in [`.env.example`](.env.example).
 
-- **Wallet Adapter** (Phantom / Backpack / Solflare)
-- **Helius** RPC + DAS indexing
-- **Anchor** program (on-chain RSVP / check-in)
-- **Metaplex** compressed-NFT ticket minting
-- **Supabase** off-chain indexing / metadata
-- **Analytics** + **Newsletter** providers
-
-Swap the stub bodies for real SDK calls when wiring the product.
+| Integration | Where |
+| --- | --- |
+| Wallet connect (Phantom / Backpack / Solflare) | [`components/wallet/providers.tsx`](components/wallet/providers.tsx) |
+| Anchor program (RSVP, check-in) | [`lib/solana/use-onchain-actions.ts`](lib/solana/use-onchain-actions.ts) - hand-built instructions; see `Eventerz Program/README.md` for why the Anchor client is not used at runtime |
+| Helius RPC | [`lib/solana/cluster.ts`](lib/solana/cluster.ts) |
+| cNFT tickets & badges | `supabase/functions/mint-cnft/` - server-side, because a Bubblegum mint is signed by the tree authority |
+| Token gating | `supabase/functions/check-gate/` + [`lib/solana/gate.ts`](lib/solana/gate.ts) |
+| Reputation | derived in Postgres, migration `0013` |
+| Supabase client | [`lib/supabase/client.ts`](lib/supabase/client.ts); data access in [`lib/supabase/data.ts`](lib/supabase/data.ts) |
+| Newsletter | `subscribe_newsletter`, migration `0012` |
+| Analytics | not wired. `app/error.tsx` logs to the console and nothing forwards it |
 
 ---
 
