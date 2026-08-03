@@ -255,6 +255,11 @@ export function EventDetail() {
             src={event.coverImage}
             alt=""
             className="absolute inset-0 size-full object-cover"
+            // Fall back to the gradient rather than a broken-image icon. See
+            // the same handler on `EventCard`.
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+            }}
           />
         )}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_15%,rgba(255,255,255,0.35),transparent_55%)]" />

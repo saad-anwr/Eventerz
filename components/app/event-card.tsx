@@ -54,6 +54,17 @@ export function EventCard({ event }: { event: EventItem }) {
               alt=""
               loading="lazy"
               className="absolute inset-0 size-full object-cover"
+              /*
+                Hide the element if the image fails rather than leaving the
+                browser's broken-image icon over the gradient. `displayableBanner`
+                already rejects anything that is not an http(s) URL; this covers
+                the rest - a deleted storage object, a bucket made private, a
+                network that dropped the request - where the URL is well-formed
+                and simply does not resolve.
+              */
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+              }}
             />
           )}
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_15%,rgba(255,255,255,0.35),transparent_55%)]" />

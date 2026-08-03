@@ -269,21 +269,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Logo />
         </Link>
         {/*
-          No Friends, Messages or Create buttons here.
+          Notifications and sign-out. Nothing else.
 
-          Community is a tab one thumb-reach away in the bottom bar, and Create
-          is the raised control in the middle of it. Repeating either up here
-          was the same redundancy this pass removed everywhere else - a second
-          route to a destination already visible on screen.
+          Friends, Messages and Create left because each is a tab in the bar
+          below. The avatar left for the same reason and is the clearest case of
+          it: it linked to Profile, which is a tab, *and* looked like an account
+          menu it never was - so the one row on the screen with no obvious
+          purpose was occupying the corner where every other app puts one.
 
-          Notifications keeps its bell: it is the one thing in this row that is
-          genuinely not a destination in the bar.
+          Sign-out takes its place because it was genuinely unreachable on a
+          phone: it lived in the desktop sidebar footer, which is `lg`-only, so
+          nobody on a small screen could sign out at all.
         */}
         <div className="flex items-center gap-1">
           <NotificationBell />
-          <Link href="/profile">
-            <Avatar name={user.name} seed={user.id} size="sm" ring src={user.avatarUrl} />
-          </Link>
+          <button
+            onClick={signOut}
+            aria-label="Sign out"
+            className="flex size-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-muted-foreground transition-colors hover:border-brand-purple/40 hover:text-white"
+          >
+            <LogOut className="size-[18px]" />
+          </button>
         </div>
       </header>
 
@@ -301,7 +307,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         which is the app's bar exactly - see `useMobileNav` for why these five
         and not the six in the sidebar.
       */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t border-white/10 bg-brand-bg/90 px-2 py-2 backdrop-blur-xl lg:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-40 flex items-stretch border-t border-white/10 bg-brand-bg/90 px-1 py-2 backdrop-blur-xl lg:hidden">
         {nav.map((item, index) => {
           const active = isActive(pathname, item.href);
           const tab = (
@@ -325,18 +331,33 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </Link>
           );
 
-          // The raised Create button, centred. `-mt-6` lifts it clear of the
-          // bar the way the app's does, so the two read as the same control.
+          /*
+            The raised Create button, in a slot of its own.
+
+            It sits inside a `flex-1` wrapper rather than being a `shrink-0`
+            child of the nav, and the nav no longer uses `justify-around`. That
+            combination was the uneven spacing: four `flex-1` tabs shared
+            whatever was left after a fixed 56px button, and `justify-around`
+            then added its own margins around all five, so the gaps either side
+            of Create were visibly wider than the gaps between tabs.
+
+            Five equal slots, one of which happens to contain a circle, is what
+            the app's tab bar does - see `EventerzTabBar`, where both `TabItem`
+            and `CreateButton` are `flex-1`. `-mt-6` lifts the circle clear of
+            the bar without taking it out of the layout.
+          */
           if (index === 2) {
             return (
               <React.Fragment key="create-slot">
-                <Link
-                  href="/create"
-                  aria-label="Create event"
-                  className="-mt-6 flex size-14 shrink-0 items-center justify-center rounded-full border-4 border-brand-bg bg-gradient-to-br from-brand-purple to-brand-cyan text-white shadow-lg shadow-brand-purple/30 transition-transform active:scale-95"
-                >
-                  <Plus className="size-6" />
-                </Link>
+                <div className="flex flex-1 items-start justify-center">
+                  <Link
+                    href="/create"
+                    aria-label="Create event"
+                    className="-mt-6 flex size-14 items-center justify-center rounded-full border-4 border-brand-bg bg-gradient-to-br from-brand-purple to-brand-cyan text-white shadow-lg shadow-brand-purple/30 transition-transform active:scale-95"
+                  >
+                    <Plus className="size-6" />
+                  </Link>
+                </div>
                 {tab}
               </React.Fragment>
             );

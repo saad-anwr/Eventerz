@@ -9,6 +9,30 @@
 import type { EventItem, EventCategory, RsvpState } from '@/lib/store/types';
 import type { EventWithMeta } from './data';
 
+/**
+ * A banner URL a browser can actually load, or nothing.
+ *
+ * Events created by the app before the upload step existed stored the picker's
+ * device-local path - `file:///data/user/0/.../ImagePicker/abc.jpeg` - straight
+ * into `cover_image`. Rendering that in an `<img>` gives a broken-image icon,
+ * which is worse than the gradient it replaced: the gradient is a design, and a
+ * broken icon reads as a broken site.
+ *
+ * `file://` in a page also *means* something different from what was intended -
+ * it addresses the visitor's own disk, not the host's - so there is no version
+ * of this that could ever have worked off-device.
+ *
+ * The upload path is fixed and new events store a public URL; this guard is for
+ * the rows already written, and for anything that ever writes a bad value
+ * again. Only `http(s)` and protocol-relative URLs survive.
+ */
+export function displayableBanner(value: string | null): string | undefined {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  if (!/^(https?:)?\/\//i.test(trimmed)) return undefined;
+  return trimmed;
+}
+
 export function eventRowToItem(row: EventWithMeta): EventItem {
   return {
     id: row.id,
@@ -16,7 +40,7 @@ export function eventRowToItem(row: EventWithMeta): EventItem {
     description: row.description,
     hostId: row.host_id,
     coverGradient: row.cover_gradient,
-    coverImage: row.cover_image ?? undefined,
+    coverImage: displayableBanner(row.cover_image),
     category: row.category as EventCategory,
     startsAt: row.starts_at,
     endsAt: row.ends_at ?? undefined,

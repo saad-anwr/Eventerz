@@ -81,7 +81,7 @@ export function HeroDashboard() {
     <div
       onMouseMove={handleMove}
       onMouseLeave={reset}
-      className="relative mx-auto aspect-[4/3] w-full max-w-2xl sm:aspect-[16/11]"
+      className="relative mx-auto aspect-[5/4] w-full max-w-2xl sm:aspect-[16/11]"
     >
       {/* Glow behind */}
       <div className="absolute left-1/2 top-1/2 -z-10 h-3/4 w-3/4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand-purple/25 blur-[90px]" />
@@ -91,7 +91,7 @@ export function HeroDashboard() {
         depth={-18}
         mx={mx}
         my={my}
-        className="left-1/2 top-1/2 w-[78%] -translate-x-1/2 -translate-y-1/2"
+        className="left-1/2 top-1/2 w-full -translate-x-1/2 -translate-y-1/2 md:w-[78%]"
       >
         <div className="gradient-border overflow-hidden rounded-3xl bg-brand-bg-soft/80 shadow-card backdrop-blur-2xl">
           {/* window chrome */}
@@ -154,6 +154,23 @@ export function HeroDashboard() {
         </div>
       </Layer>
 
+      {/*
+        The four floating cards are desktop-only.
+
+        They are absolutely positioned at percentage offsets around a panel that
+        was 78% of the container, which works at 1024px and collapses below it:
+        on a phone the ticket, the reputation badge, the balance and the QR card
+        all landed on top of each other *and* on top of the dashboard behind
+        them, so the first thing a visitor saw was four illegible overlapping
+        boxes. Scaling them down would keep the collision and add unreadable
+        text to it.
+
+        Below `md` the dashboard panel goes full width and stands alone, which
+        is the one piece of this composition that reads on a small screen - it
+        is a self-contained mock of the product rather than a decoration around
+        one. The floating cards return, unchanged, where there is room.
+      */}
+
       {/* ---- Floating: NFT Ticket (top-left) ---- */}
       <Layer
         depth={40}
@@ -161,7 +178,7 @@ export function HeroDashboard() {
         my={my}
         float
         floatDelay={0.4}
-        className="left-[-2%] top-[6%] w-40 sm:left-0"
+        className="hidden md:block left-[-2%] top-[6%] w-40 sm:left-0"
       >
         <div className="gradient-border rounded-2xl bg-brand-bg-soft/90 p-3 shadow-glow backdrop-blur-xl">
           <div className="mb-2 flex items-center justify-between">
@@ -190,7 +207,7 @@ export function HeroDashboard() {
         my={my}
         float
         floatDelay={1.1}
-        className="right-[-2%] top-[2%] w-36 sm:right-0"
+        className="hidden md:block right-[-2%] top-[2%] w-36 sm:right-0"
       >
         <div className="gradient-border rounded-2xl bg-brand-bg-soft/90 p-3 shadow-glow-cyan backdrop-blur-xl">
           <div className="flex items-center gap-2">
@@ -223,7 +240,7 @@ export function HeroDashboard() {
         my={my}
         float
         floatDelay={0.8}
-        className="bottom-[6%] left-[2%] w-36 sm:left-[-4%]"
+        className="hidden md:block bottom-[6%] left-[2%] w-36 sm:left-[-4%]"
       >
         <div className="gradient-border rounded-2xl bg-brand-bg-soft/90 p-3 shadow-glow-blue backdrop-blur-xl">
           <div className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold text-brand-blue">
@@ -245,7 +262,7 @@ export function HeroDashboard() {
         my={my}
         float
         floatDelay={1.5}
-        className="bottom-[2%] right-[0%] w-32 sm:right-[-2%]"
+        className="hidden md:block bottom-[2%] right-[0%] w-32 sm:right-[-2%]"
       >
         <div className="gradient-border rounded-2xl bg-brand-bg-soft/90 p-3 text-center shadow-glow backdrop-blur-xl">
           <div className="mb-2 flex items-center justify-center gap-1 text-[10px] font-semibold text-brand-purple">

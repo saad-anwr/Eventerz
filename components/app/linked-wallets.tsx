@@ -18,7 +18,12 @@
  */
 
 import * as React from "react";
-import { Check, Loader2, Star, Trash2, Wallet } from "lucide-react";
+import { Check, Loader2, Plus, Star, Trash2, Wallet } from "lucide-react";
+
+import { useConnectModal } from "@/components/wallet/connect-modal-context";
+
+/** Matches `max_wallets_per_profile()` in migration 0022. */
+const MAX_WALLETS = 10;
 
 import {
   myWallets,
@@ -37,6 +42,7 @@ export function LinkedWallets({
 }: {
   connectedAddress?: string | null;
 }) {
+  const { open: openWallet } = useConnectModal();
   const [wallets, setWallets] = React.useState<LinkedWallet[]>([]);
   const [loading, setLoading] = React.useState(isSupabaseConfigured);
   const [busy, setBusy] = React.useState<string | null>(null);
@@ -50,6 +56,21 @@ export function LinkedWallets({
 
   React.useEffect(() => {
     void refresh();
+  }, [refresh, connectedAddress]);
+
+  /*
+   * Re-read when the tab regains focus.
+   *
+   * Linking runs through a wallet extension: the user leaves this tab, approves
+   * a signature in a popup, and `auth-provider` posts it while they are away.
+   * Without this the list they come back to is the one rendered before they
+   * left, so a wallet they just linked appears not to have linked - and the
+   * obvious response to that is to try again.
+   */
+  React.useEffect(() => {
+    const onFocus = () => void refresh();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
   }, [refresh]);
 
   const act = React.useCallback(
@@ -80,8 +101,8 @@ export function LinkedWallets({
         <Loader2 className="size-4 animate-spin text-muted-foreground" />
       ) : wallets.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No wallets linked yet. Connect one and approve the signature to attach
-          it to this account.
+          No wallets linked yet. Link one and approve the signature to attach it
+          to this account.
         </p>
       ) : (
         <ul className="space-y-2">
@@ -153,9 +174,33 @@ export function LinkedWallets({
 
       {error && <p className="mt-2 text-xs text-rose-400">{error}</p>}
 
+      {/*
+        The way *in*.
+
+        This panel shipped with Remove and "Make main" and no way to add a
+        wallet at all, which made a screen about managing several wallets usable
+        only for taking them away. Linking happens through the same connect
+        modal as everywhere else: choosing a wallet there triggers the
+        auto-link in `auth-provider.tsx`, which issues the challenge, has the
+        wallet sign it and posts it to the `link-wallet` Edge Function. There is
+        no separate "link" path to keep in step, and no way to reach a linked
+        row without a signature.
+      */}
+      <Button
+        variant="outline"
+        size="sm"
+        className="mt-4 w-full"
+        onClick={openWallet}
+        disabled={busy !== null || wallets.length >= MAX_WALLETS}
+      >
+        <Plus className="size-3.5" />
+        {wallets.length === 0 ? "Link a wallet" : "Link another wallet"}
+      </Button>
+
       <p className="mt-3 text-xs text-muted-foreground">
-        Up to 10 wallets can share this account. Your tickets, friends and
-        reputation belong to the account, not to any one wallet.
+        {wallets.length >= MAX_WALLETS
+          ? `You have reached the limit of ${MAX_WALLETS} linked wallets. Remove one to link another.`
+          : `Up to ${MAX_WALLETS} wallets can share this account. Your tickets, friends and reputation belong to the account, not to any one wallet.`}
       </p>
     </div>
   );
