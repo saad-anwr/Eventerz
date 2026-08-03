@@ -4,13 +4,12 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Compass,
   Home,
   LogOut,
   MessageCircle,
   Plus,
+  Settings,
   Sparkles,
-  Ticket,
   UserRound,
   Users,
   Wallet,
@@ -45,42 +44,40 @@ function usePendingRequestCount(): number {
 }
 
 /**
- * The desktop sidebar's destinations - everything, because it has the room.
+ * The five destinations, identical here and in the app's tab bar.
+ *
+ * # The rule
+ *
+ * **A nav entry is a place you cannot get to from somewhere else.** The old set
+ * broke that everywhere: Explore was a nav entry *and* a dashboard hero button;
+ * My Events was a nav entry *and* a quick action *and* the "View all" on the
+ * dashboard; Create was a hero button *and* a quick action *and* the button in
+ * the top bar. Three routes to one screen is not three times as discoverable -
+ * it is a dashboard where most of what you see does nothing new, while
+ * Settings, which had no route at all, was a column inside Profile.
+ *
+ * Each of these owns a domain nothing else does:
+ *
+ *   Home       what is happening, and the way into Explore
+ *   Community  friends, requests, messages - three screens that were two nav
+ *              entries and two header icons, all answering "who do I know"
+ *   Create     the one action, raised and centred on mobile
+ *   Profile    you as others see you
+ *   Settings   wallets, language, privacy - previously nowhere
+ *
+ * Explore and My Events stay as routes reached from Home. Losing a nav entry is
+ * not losing a screen; it is losing the third way of reaching one.
+ *
+ * Desktop shows the same five rather than a longer list. The sidebar has room
+ * for more, but "the same product on both" is worth more than using the space.
  */
-function useNav(): NavItem[] {
+function useSharedNav(): NavItem[] {
   const pending = usePendingRequestCount();
   return [
     { href: "/dashboard", label: "Home", icon: Home },
-    { href: "/explore", label: "Explore", icon: Compass },
-    { href: "/my-events", label: "My Events", icon: Ticket },
-    { href: "/friends", label: "Friends", icon: Users, badge: pending },
-    { href: "/messages", label: "Messages", icon: MessageCircle },
+    { href: "/community", label: "Community", icon: Users, badge: pending },
     { href: "/profile", label: "Profile", icon: UserRound },
-  ];
-}
-
-/**
- * The phone's bottom bar, and the app's tab bar, are the same five.
- *
- * They used to be the first five of `useNav()` - Home, Explore, My Events,
- * Friends, Messages - while the app showed Home, Friends, Create, Tickets,
- * Profile. Two of five matched. Someone moving between the site on their phone
- * and the app on their Seeker had to relearn where everything was, which is the
- * opposite of what having both is for.
- *
- * These five are the primary loop of an events product: find something, get a
- * ticket, turn up, and the profile that accumulates from doing so. Create sits
- * in the middle on both, raised, because it is the one thing a host does that
- * is not navigation. Friends and Messages move to the top bar on both - they
- * are correspondence, not destinations, and the pending-request badge follows
- * them so nothing time-sensitive is buried.
- */
-function useMobileNav(): NavItem[] {
-  return [
-    { href: "/dashboard", label: "Home", icon: Home },
-    { href: "/explore", label: "Explore", icon: Compass },
-    { href: "/my-events", label: "Tickets", icon: Ticket },
-    { href: "/profile", label: "Profile", icon: UserRound },
+    { href: "/settings", label: "Settings", icon: Settings },
   ];
 }
 
@@ -168,8 +165,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, userId, isSignedIn, isLoading } = useSession();
   const { signOut } = useAuth();
-  const nav = useNav();
-  const mobileNav = useMobileNav();
+  const nav = useSharedNav();
   const pendingRequests = usePendingRequestCount();
 
   /*
@@ -273,36 +269,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Logo />
         </Link>
         {/*
-          Friends and Messages live here on the phone, matching the app's home
-          header. They left the bottom bar so both platforms could show the same
-          five destinations - see `useMobileNav`. The Create button goes with
-          them: it is the raised centre control in the bottom bar now, and two
-          Create buttons on one screen is one too many.
+          No Friends, Messages or Create buttons here.
+
+          Community is a tab one thumb-reach away in the bottom bar, and Create
+          is the raised control in the middle of it. Repeating either up here
+          was the same redundancy this pass removed everywhere else - a second
+          route to a destination already visible on screen.
+
+          Notifications keeps its bell: it is the one thing in this row that is
+          genuinely not a destination in the bar.
         */}
         <div className="flex items-center gap-1">
-          <Link
-            href="/friends"
-            aria-label={
-              pendingRequests > 0
-                ? `Friends, ${pendingRequests} pending requests`
-                : "Friends"
-            }
-            className="relative flex size-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-white transition-colors hover:border-brand-purple/40"
-          >
-            <Users className="size-[18px]" />
-            {pendingRequests > 0 ? (
-              <span className="absolute right-1 top-1 flex size-4 items-center justify-center rounded-full border-2 border-brand-bg bg-brand-purple text-[9px] font-bold text-white">
-                {pendingRequests > 9 ? "9+" : pendingRequests}
-              </span>
-            ) : null}
-          </Link>
-          <Link
-            href="/messages"
-            aria-label="Messages"
-            className="flex size-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-white transition-colors hover:border-brand-purple/40"
-          >
-            <MessageCircle className="size-[18px]" />
-          </Link>
           <NotificationBell />
           <Link href="/profile">
             <Avatar name={user.name} seed={user.id} size="sm" ring src={user.avatarUrl} />
@@ -325,7 +302,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         and not the six in the sidebar.
       */}
       <nav className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t border-white/10 bg-brand-bg/90 px-2 py-2 backdrop-blur-xl lg:hidden">
-        {mobileNav.map((item, index) => {
+        {nav.map((item, index) => {
           const active = isActive(pathname, item.href);
           const tab = (
             <Link

@@ -6,7 +6,6 @@ import {
   Award,
   CalendarPlus,
   Compass,
-  Plus,
   QrCode,
   Ticket,
   UserPlus,
@@ -31,17 +30,25 @@ import { isUpcoming } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /**
- * The app's home shortcuts, mirrored.
+ * The four shortcuts, matching the app's home screen exactly.
+ *
+ * Deliberately *not* including Create: it is the raised centre control in the
+ * bottom bar, always visible and always in the same place, and it was
+ * previously here as well as there as well as a hero button above.
+ *
+ * What is left is exactly the set with no nav entry of its own - Explore, the
+ * two things a person does at a door, and the wallet. Each of these is the only
+ * route to where it goes.
  *
  * `/checkin` with no query shows the "scan a ticket to check in" state, which
- * is the honest destination in a browser - the phone opens a camera, and a
- * desktop has nothing to open. See `app/(app)/checkin/page.tsx`.
+ * is the honest destination in a browser: the phone opens a camera, a desktop
+ * has nothing to open. See `app/(app)/checkin/page.tsx`.
  */
 const QUICK_ACTIONS = [
   {
-    href: "/create",
-    label: "Create",
-    icon: Plus,
+    href: "/explore",
+    label: "Explore",
+    icon: Compass,
     accent: "bg-brand-purple/10 text-brand-purple",
   },
   {
@@ -57,7 +64,7 @@ const QUICK_ACTIONS = [
     accent: "bg-brand-cyan/10 text-brand-cyan",
   },
   {
-    href: "/profile",
+    href: "/settings",
     label: "Wallet",
     icon: Wallet,
     accent: "bg-brand-green/10 text-brand-green",
@@ -160,35 +167,29 @@ export default function DashboardPage() {
             Welcome back, {user.name.split(" ")[0]} 👋
           </h1>
         </div>
-        <div className="flex gap-2">
-          <Button asChild>
-            <Link href="/create">
-              <CalendarPlus className="size-4" />
-              Create Event
-            </Link>
-          </Button>
-          <Button asChild variant="secondary">
-            <Link href="/explore">
-              <Compass className="size-4" />
-              Explore
-            </Link>
-          </Button>
-        </div>
+        {/*
+          No hero buttons.
+
+          "Create Event" and "Explore" sat here while Create was also the raised
+          centre control in the bottom bar and also a quick action, and Explore
+          was also a nav entry and also a quick action. Three routes to one
+          screen is not three times as discoverable - it is a dashboard where
+          most of what you see does nothing new. The quick-action row below is
+          the single set of shortcuts, and it holds only what has no nav entry
+          of its own.
+        */}
       </div>
 
       {/*
-        Quick actions.
+        Quick actions - the same four, in the same order, as the app's
+        `features/home/quick-actions.tsx`.
 
-        The app's home screen has had this four-up row since it shipped and the
-        dashboard had nothing like it, so Scan QR - the one thing a host needs
-        within one tap while standing at a door - was three navigations deep in
-        a browser and one tap away on a phone. Same four, same order, same
-        accents as `features/home/quick-actions.tsx`.
-
-        Hidden on `lg`, where the sidebar already puts every destination one
-        click away and this would be a second, redundant nav.
+        Shown at every width. These are no longer a mobile-only convenience
+        duplicating the sidebar: none of the four has a nav entry any more, so
+        on a desktop this row is the only route to Explore, the door tools and
+        the wallet.
       */}
-      <div className="grid grid-cols-4 gap-2.5 lg:hidden">
+      <div className="grid grid-cols-4 gap-2.5">
         {QUICK_ACTIONS.map((action) => (
           <Link
             key={action.href}
