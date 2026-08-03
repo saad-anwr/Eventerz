@@ -159,23 +159,54 @@ scraped: public repos are harvested for keys continuously. Removing it from HEAD
 stops it spreading; it does not make the leaked value stop working. Steps are in
 the root `README.md`.
 
+As of 3 Aug 2026 the leaked key is **still the value configured in
+`Eventerz dApp/.env` and `Eventerz/.env.local`**. Everything fixable in the
+codebase has been fixed; this is the part that needs the dashboard.
+
 The delivery mechanism is worth naming, because it will still be running after
 this is fixed: an automated process commits and pushes all three repositories on
 a timer (`update_DD/MM_HH:MM`). Nothing reviews a diff first, so anything written
-into a working tree is public within minutes. `.gitignore` is not hygiene here -
-it is the only control before publication.
+into a working tree is public within minutes. `.gitignore` was therefore the only
+control before publication - and it only ever covers paths somebody predicted.
 
-Two things did *not* leak, and the distinction matters:
+### What now stands in the way
+
+| Control | Where | Effect |
+| --- | --- | --- |
+| Pre-commit credential scan | `.githooks/pre-commit` -> `scripts/check-secrets.mjs`, **both repos** | Refuses a commit containing a key, a JWT, a private-key block or a signing artefact. Scans inside binaries too - the APK leaked because a key compiled into a bundle is plain ASCII inside the file. Override: `ALLOW_SECRETS=1` |
+| Production build gate | `lib/env.ts` | `next build` fails while `NEXT_PUBLIC_HELIUS_RPC_URL` carries the leaked key. Override: `ALLOW_COMPROMISED_RPC_KEY=1` |
+| Mainnet readiness gate | `Eventerz dApp/scripts/check-mainnet.mjs` | `npm run check:mainnet` exits non-zero on the same condition |
+
+Both gates match a **SHA-256** of the key rather than the key: these files are
+committed, and committing the value again is the whole mistake. A 128-bit key
+behind SHA-256 is not recoverable from the hash, but an exact match is
+detectable, which is all the check needs. Delete both constants once rotation is
+confirmed.
+
+### Audit, 3 Aug 2026 - HEAD and full history, all three repos
 
 | Value | Committed? | Action |
 | --- | --- | --- |
-| `HELIUS_RPC_URL` (API key) | Yes - `eas.json`, and inside the APK | **Rotate** |
-| `SUPABASE_ANON_KEY` | Yes - same block | None; public by design, RLS enforced |
-| `SUPABASE_SERVICE_ROLE_KEY` | **Never** | None |
+| `HELIUS_RPC_URL` (API key) | Yes - 6 commits in `eas.json`, plus 2 carrying the APK | **Rotate** |
+| `SUPABASE_ANON_KEY` | Yes - same block. Verified `"role":"anon"`, not service-role | None; public by design, RLS enforced |
+| `SUPABASE_SERVICE_ROLE_KEY` | **Never**, in either repo | None |
+| Upload keystore (`*.jks`) | **Never**; gitignored | None |
+| Anything in the `Eventerz` website repo | **Never** - no credential in any commit | None |
+| Hardcoded secrets in tracked source | **None**, all three projects | None |
+
+The local `eventerz-arm64-release.apk` was **deleted**: the live leaked key was
+recoverable from it with `grep`, and it would have been the artifact shipped to
+the Solana dApp Store. Rebuild with `npm run apk` after rotating.
 
 The anon key's safety is conditional, not inherent: it is safe *because* RLS is
-enabled on all 14 tables. Ship a table without a policy and that row of the table
-above becomes wrong.
+enabled on every table. Verified 3 Aug 2026 - **all 17** tables have
+`enable row level security`. Ship a table without a policy and that row of the
+table above becomes wrong.
+
+Rewriting history was considered and rejected. Force-pushing a rewritten
+`Eventerz-dApp` breaks every clone and fork, and cannot un-publish a value that
+was readable for 17 hours. Rotation makes the old key worthless, which is the
+only outcome that holds.
 
 ### Why a client-side RPC key cannot be fixed by hiding it
 
