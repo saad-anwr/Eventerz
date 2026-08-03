@@ -39,6 +39,7 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { useConnectModal } from "@/components/wallet/connect-modal-context";
 import { Avatar } from "@/components/app/avatar";
 import { DeleteAccountCard } from "@/components/app/delete-account-card";
+import { LinkedWallets } from "@/components/app/linked-wallets";
 import { LanguagePicker } from "@/components/app/language-picker";
 import { EventCard } from "@/components/app/event-card";
 import { Button } from "@/components/ui/button";
@@ -641,6 +642,14 @@ export default function ProfilePage() {
                   </Button>
                 )}
               </div>
+
+              {/*
+                The full set, below the main one. An account can hold several
+                wallets since 0022 and `user.walletAddress` shows only the
+                primary, so without this the other wallets a person has linked
+                are invisible and unmanageable.
+              */}
+              <LinkedWallets connectedAddress={user.walletAddress ?? null} />
             </div>
 
             <div className="grid grid-cols-2 gap-3">

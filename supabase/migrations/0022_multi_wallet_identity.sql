@@ -149,11 +149,27 @@ begin
   limit 1;
 
   /*
-   * No primary left - the user unlinked it. Promote the oldest remaining
-   * wallet rather than leaving the account with wallets it cannot be reached
+   * No primary left because the user unlinked it. Promote the oldest remaining
+   * wallet rather than leaving the account holding wallets it cannot be reached
    * by. Only when the set is genuinely empty does the column go null.
+   *
+   * # Why this is restricted to DELETE
+   *
+   * It used to run on any operation, and that made changing your main wallet
+   * impossible. `set_primary_wallet` demotes the old primary and then promotes
+   * the new one, which it has to do in that order - the partial unique index
+   * means two primaries is not a representable state, so promoting first
+   * raises. But the demote fired this trigger, which saw "no primary" and
+   * helpfully promoted the *oldest* wallet - usually the one just demoted. The
+   * promote that followed then made a second row primary and hit the unique
+   * violation.
+   *
+   * A row being updated is always somebody deliberately managing the set, and
+   * that somebody is mid-transition. A row being deleted is the only case where
+   * an account can be left with no primary and nothing on its way to fix that,
+   * which is exactly when a repair is wanted.
    */
-  if primary_address is null then
+  if primary_address is null and tg_op = 'DELETE' then
     select wl.address into primary_address
     from public.wallet_links wl
     where wl.profile_id = target
