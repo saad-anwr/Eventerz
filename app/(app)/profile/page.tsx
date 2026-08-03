@@ -35,12 +35,8 @@ import { profileToUser } from "@/lib/supabase/map-profile";
 import { useAppStore } from "@/lib/store/use-app-store";
 import { eventRowToItem } from "@/lib/supabase/map-event";
 import { useSession } from "@/components/auth/use-session";
-import { useAuth } from "@/components/auth/auth-provider";
 import { useConnectModal } from "@/components/wallet/connect-modal-context";
 import { Avatar } from "@/components/app/avatar";
-import { DeleteAccountCard } from "@/components/app/delete-account-card";
-import { LinkedWallets } from "@/components/app/linked-wallets";
-import { LanguagePicker } from "@/components/app/language-picker";
 import { EventCard } from "@/components/app/event-card";
 import { Button } from "@/components/ui/button";
 import { shortenAddress } from "@/lib/format";
@@ -73,9 +69,6 @@ const inputCls =
 
 export default function ProfilePage() {
   const { user, userId } = useSession();
-  // Deletion only means anything against a real backend; the demo store has
-  // no account to delete.
-  const { isLive } = useAuth();
   const updateProfile = useUpdateProfile(userId ?? undefined);
   const { data: hostedRows = [] } = useEventsByHost(userId ?? undefined);
   const { data: attendingRows = [] } = useEventsAttending(userId ?? undefined);
@@ -643,13 +636,6 @@ export default function ProfilePage() {
                 )}
               </div>
 
-              {/*
-                The full set, below the main one. An account can hold several
-                wallets since 0022 and `user.walletAddress` shows only the
-                primary, so without this the other wallets a person has linked
-                are invisible and unmanageable.
-              */}
-              <LinkedWallets connectedAddress={user.walletAddress ?? null} />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -667,9 +653,15 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            <LanguagePicker />
+            {/*
+              Language, account deletion and the wallet list moved to
+              `/settings`, which is now a nav destination on both platforms.
 
-            {isLive && <DeleteAccountCard />}
+              They were here because there was nowhere else to put them, and the
+              result was that the page showing you to other people also held the
+              irreversible controls. Profile is what a visitor sees; Settings is
+              what only you can change.
+            */}
           </aside>
         </div>
       )}
