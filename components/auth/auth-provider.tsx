@@ -30,6 +30,7 @@ import {
   signOut as signOutRemote,
 } from "@/lib/supabase/auth-service";
 import { profileToUser } from "@/lib/supabase/map-profile";
+import { myWallets, type LinkedWallet } from "@/lib/supabase/data";
 import { PROFILE_COLUMNS } from "@/lib/supabase/types";
 import type { ProfileRow } from "@/lib/supabase/types";
 import { AuthModal } from "./auth-modal";
@@ -88,6 +89,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     null
   );
   const [profile, setProfile] = React.useState<ProfileRow | null>(null);
+  /** Every wallet on the signed-in account (migration 0022), primary first. */
+  const [linkedWallets, setLinkedWallets] = React.useState<LinkedWallet[]>([]);
   const [loading, setLoading] = React.useState(isSupabaseConfigured);
 
   const hasHydrated = useAppStore((s) => s.hasHydrated);
@@ -118,6 +121,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .single();
 
       setProfile(data ?? null);
+
+      /*
+       * The wallet *set*, not just the primary. The auto-link effect below asks
+       * "is this wallet already mine?", and answering that from
+       * `profile.wallet_address` is only correct for accounts that hold exactly
+       * one wallet - for any other, a linked wallet reads as unlinked and the
+       * user is asked to sign a link challenge they have already signed.
+       */
+      if (data) {
+        setLinkedWallets(await myWallets());
+      } else {
+        setLinkedWallets([]);
+      }
 
       // Mirror the real account into the app store so `useSession()` - and
       // therefore the navbar, dashboard and every screen - reflects the actual
@@ -219,7 +235,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
              *     wallets omit `signMessage`; there is nothing to fall back
              *     to, and failing loudly is better than linking unverified.
              */
-            if (profile?.wallet_address === address) return;
+            if (linkedWallets.some((w) => w.address === address)) return;
             if (!signMessage) {
               setLinkError(
                 "This wallet cannot sign messages, so ownership cannot be verified. Try Phantom, Solflare or Backpack.",
@@ -231,6 +247,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const result = await linkWalletRemote(address, signMessage);
             if (result.ok) {
               setProfile(result.data);
+              setLinkedWallets(await myWallets());
               useAppStore.getState().syncRemoteUser(profileToUser(result.data));
             } else {
               // Surfaced rather than swallowed: the old code ignored failures,
@@ -287,7 +304,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // `profile` and `signMessage` are read inside: without them the effect
     // re-checks a stale linked address and re-prompts for a signature that has
     // already been given.
-  }, [connected, publicKey, hasHydrated, supabaseUser, profile, signMessage]);
+  }, [
+    connected,
+    publicKey,
+    hasHydrated,
+    supabaseUser,
+    profile,
+    signMessage,
+    linkedWallets,
+  ]);
 
   /* --------------------------------------------------------------------- */
   /*  Actions                                                               */

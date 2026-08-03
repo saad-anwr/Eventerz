@@ -35,20 +35,51 @@ interface NavItem {
   badge?: number;
 }
 
-function useNav(): NavItem[] {
+/** Requests waiting on this user to answer - the only badge worth showing. */
+function usePendingRequestCount(): number {
   const { userId } = useSession();
   const { data: requests = [] } = useFriendRequests(userId ?? undefined);
-
-  // Requests waiting on this user to answer.
-  const pending = requests.filter(
+  return requests.filter(
     (r) => r.status === "pending" && r.addressee_id === userId
   ).length;
+}
+
+/**
+ * The desktop sidebar's destinations - everything, because it has the room.
+ */
+function useNav(): NavItem[] {
+  const pending = usePendingRequestCount();
   return [
     { href: "/dashboard", label: "Home", icon: Home },
     { href: "/explore", label: "Explore", icon: Compass },
     { href: "/my-events", label: "My Events", icon: Ticket },
     { href: "/friends", label: "Friends", icon: Users, badge: pending },
     { href: "/messages", label: "Messages", icon: MessageCircle },
+    { href: "/profile", label: "Profile", icon: UserRound },
+  ];
+}
+
+/**
+ * The phone's bottom bar, and the app's tab bar, are the same five.
+ *
+ * They used to be the first five of `useNav()` - Home, Explore, My Events,
+ * Friends, Messages - while the app showed Home, Friends, Create, Tickets,
+ * Profile. Two of five matched. Someone moving between the site on their phone
+ * and the app on their Seeker had to relearn where everything was, which is the
+ * opposite of what having both is for.
+ *
+ * These five are the primary loop of an events product: find something, get a
+ * ticket, turn up, and the profile that accumulates from doing so. Create sits
+ * in the middle on both, raised, because it is the one thing a host does that
+ * is not navigation. Friends and Messages move to the top bar on both - they
+ * are correspondence, not destinations, and the pending-request badge follows
+ * them so nothing time-sensitive is buried.
+ */
+function useMobileNav(): NavItem[] {
+  return [
+    { href: "/dashboard", label: "Home", icon: Home },
+    { href: "/explore", label: "Explore", icon: Compass },
+    { href: "/my-events", label: "Tickets", icon: Ticket },
     { href: "/profile", label: "Profile", icon: UserRound },
   ];
 }
@@ -138,6 +169,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, userId, isSignedIn, isLoading } = useSession();
   const { signOut } = useAuth();
   const nav = useNav();
+  const mobileNav = useMobileNav();
+  const pendingRequests = usePendingRequestCount();
 
   /*
    * One subscription for the whole app section. Changes another user makes -
@@ -239,14 +272,38 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <Link href="/dashboard">
           <Logo />
         </Link>
-        <div className="flex items-center gap-2">
+        {/*
+          Friends and Messages live here on the phone, matching the app's home
+          header. They left the bottom bar so both platforms could show the same
+          five destinations - see `useMobileNav`. The Create button goes with
+          them: it is the raised centre control in the bottom bar now, and two
+          Create buttons on one screen is one too many.
+        */}
+        <div className="flex items-center gap-1">
+          <Link
+            href="/friends"
+            aria-label={
+              pendingRequests > 0
+                ? `Friends, ${pendingRequests} pending requests`
+                : "Friends"
+            }
+            className="relative flex size-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-white transition-colors hover:border-brand-purple/40"
+          >
+            <Users className="size-[18px]" />
+            {pendingRequests > 0 ? (
+              <span className="absolute right-1 top-1 flex size-4 items-center justify-center rounded-full border-2 border-brand-bg bg-brand-purple text-[9px] font-bold text-white">
+                {pendingRequests > 9 ? "9+" : pendingRequests}
+              </span>
+            ) : null}
+          </Link>
+          <Link
+            href="/messages"
+            aria-label="Messages"
+            className="flex size-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-white transition-colors hover:border-brand-purple/40"
+          >
+            <MessageCircle className="size-[18px]" />
+          </Link>
           <NotificationBell />
-          <Button asChild size="sm">
-            <Link href="/create">
-              <Plus className="size-4" />
-              Create
-            </Link>
-          </Button>
           <Link href="/profile">
             <Avatar name={user.name} seed={user.id} size="sm" ring src={user.avatarUrl} />
           </Link>
@@ -260,11 +317,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </main>
 
-      {/* Mobile bottom tabs */}
+      {/*
+        Mobile bottom tabs.
+
+        Four destinations with a raised Create between the second and third,
+        which is the app's bar exactly - see `useMobileNav` for why these five
+        and not the six in the sidebar.
+      */}
       <nav className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t border-white/10 bg-brand-bg/90 px-2 py-2 backdrop-blur-xl lg:hidden">
-        {nav.slice(0, 5).map((item) => {
+        {mobileNav.map((item, index) => {
           const active = isActive(pathname, item.href);
-          return (
+          const tab = (
             <Link
               key={item.href}
               href={item.href}
@@ -284,6 +347,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               ) : null}
             </Link>
           );
+
+          // The raised Create button, centred. `-mt-6` lifts it clear of the
+          // bar the way the app's does, so the two read as the same control.
+          if (index === 2) {
+            return (
+              <React.Fragment key="create-slot">
+                <Link
+                  href="/create"
+                  aria-label="Create event"
+                  className="-mt-6 flex size-14 shrink-0 items-center justify-center rounded-full border-4 border-brand-bg bg-gradient-to-br from-brand-purple to-brand-cyan text-white shadow-lg shadow-brand-purple/30 transition-transform active:scale-95"
+                >
+                  <Plus className="size-6" />
+                </Link>
+                {tab}
+              </React.Fragment>
+            );
+          }
+
+          return tab;
         })}
       </nav>
     </div>

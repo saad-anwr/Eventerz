@@ -42,35 +42,44 @@ Tree capacity is **fixed at creation** and cannot grow. `maxDepth` decides how
 many assets fit - 2^depth - and you pay rent for all of it up front, whether or
 not you use it.
 
-| maxDepth | Capacity | Roughly |
-| --- | ---: | --- |
-| 14 | 16,384 | a good starting tree |
-| 20 | 1,048,576 | plan for it, do not start here |
+Use `scripts/create-tree.mjs`, which quotes the cost from the cluster, checks the
+payer can cover it, and refuses mainnet without an explicit `--yes`:
 
 ```bash
-npm install @metaplex-foundation/mpl-bubblegum @metaplex-foundation/umi-bundle-defaults
+npm i -D @metaplex-foundation/mpl-bubblegum@4.2.1 \
+         @metaplex-foundation/umi@0.9.2 \
+         @metaplex-foundation/umi-bundle-defaults@0.9.2
+
+node scripts/create-tree.mjs --keypair ./tree-authority.json              # devnet
+node scripts/create-tree.mjs --keypair ./tree-authority.json --mainnet --yes
 ```
 
-```ts
-// scripts/create-tree.ts - run once, with tsx or ts-node
-import { createUmi } from '@metaplex-foundation/umi-bundle-defaults';
-import { createTree, mplBubblegum } from '@metaplex-foundation/mpl-bubblegum';
-import { generateSigner, keypairIdentity } from '@metaplex-foundation/umi';
-import { readFileSync } from 'node:fs';
+### Picking a depth
 
-const umi = createUmi('https://api.devnet.solana.com').use(mplBubblegum());
-const secret = new Uint8Array(JSON.parse(readFileSync('tree-authority.json', 'utf8')));
-umi.use(keypairIdentity(umi.eddsa.createKeypairFromSecretKey(secret)));
+Live mainnet rent quotes, via `getMinimumBalanceForRentExemption` on the real
+account size:
 
-const merkleTree = generateSigner(umi);
-await (await createTree(umi, {
-  merkleTree,
-  maxDepth: 14,
-  maxBufferSize: 64,
-})).sendAndConfirm(umi);
+| maxDepth | canopy | Capacity | One-time rent |
+| ---: | ---: | ---: | ---: |
+| 14 | 0 | 16,384 | 0.2222 SOL |
+| 20 | 0 | 1,048,576 | **0.3091 SOL** |
+| 14 | 10 | 16,384 | 0.6779 SOL |
 
-console.log('MERKLE_TREE_ADDRESS=', merkleTree.publicKey.toString());
-```
+An earlier version of this file said to start at depth 14 and treat 20 as
+something to grow into. The numbers say otherwise, and they are worth stating
+plainly because the choice is permanent: **depth 20 buys 64x the capacity for
+0.09 SOL more.** Rent is dominated by `maxBufferSize`, which sets the changelog
+size (`buffer * (32 + 32*depth + 8)` bytes); depth only moves the smaller term.
+Depth 20 is the default in the script.
+
+The canopy is the expensive knob, not the depth - it caches upper proof nodes
+on-chain so transfers carry shorter proofs. Eventerz tickets are largely
+soulbound (`tickets.soulbound`), so the path a canopy optimises is the one most
+tickets never take. Start at 0 and raise it only if tickets become freely
+tradable on marketplaces.
+
+Per mint there is no rent at all, only the transaction fee: 0.000005 SOL, so
+10,000 tickets cost about 0.05 SOL to issue.
 
 ## 3. Set the secrets
 

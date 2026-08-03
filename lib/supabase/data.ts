@@ -24,6 +24,7 @@ import type {
   ProfileUpdate,
   RsvpRow,
   RsvpStatus,
+  TicketRow,
 } from './types';
 import { PROFILE_COLUMNS } from './types';
 
@@ -1169,10 +1170,92 @@ export async function linkWalletWithSignature(args: {
   return payload.profile;
 }
 
-/** Detach the wallet from this account, leaving the account intact. */
-export async function unlinkWallet(): Promise<ProfileRow> {
-  const { data, error } = await client().rpc('unlink_wallet');
+/** One wallet on the signed-in account. */
+export type LinkedWallet = {
+  address: string;
+  isPrimary: boolean;
+  label: string | null;
+  linkedAt: string;
+};
+
+/**
+ * Every wallet linked to the signed-in account, primary first.
+ *
+ * An account holds a set of wallets since migration 0022, not one. Anything
+ * that used `profiles.wallet_address` as "is this wallet linked?" answers no
+ * for every wallet except the primary - and the auto-link path responded to
+ * that "no" by asking for another signature, for a wallet that was already
+ * linked.
+ */
+export async function myWallets(): Promise<LinkedWallet[]> {
+  const { data, error } = await client().rpc('my_wallets');
+  if (error) return [];
+
+  return (data ?? []).map((row) => ({
+    address: row.address,
+    isPrimary: row.is_primary,
+    label: row.label,
+    linkedAt: row.linked_at,
+  }));
+}
+
+/**
+ * Detach one wallet, leaving the account and its other wallets intact.
+ *
+ * Omitting the address detaches the primary, which is what this meant when an
+ * account could hold only one.
+ */
+export async function unlinkWallet(
+  walletAddress?: string,
+): Promise<ProfileRow> {
+  const { data, error } = walletAddress
+    ? await client().rpc('unlink_wallet_address', {
+        p_wallet_address: walletAddress,
+      })
+    : await client().rpc('unlink_wallet');
+
   if (error) fail('Unlinking your wallet', error);
+  return data;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Check-in                                                                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Redeem a ticket at the door. Host only, enforced by the server.
+ *
+ * The website had no check-in path at all: a host whose phone was flat, or who
+ * ran the door from a laptop, had no way to admit anybody. Now that a ticket QR
+ * carries an `https://.../checkin?...` URL, any camera on any phone resolves to
+ * the page that calls this - which is the point of moving off the custom
+ * scheme.
+ *
+ * Every check that matters is in `check_in_ticket` (migration 0002): the secret
+ * must match, the caller must host the event, and a ticket can be redeemed
+ * once. None of that is re-implemented here, and none of it can be skipped by
+ * calling this differently.
+ */
+export async function checkInTicket(
+  ticketId: string,
+  qrSecret: string,
+): Promise<TicketRow> {
+  const { data, error } = await client().rpc('check_in_ticket', {
+    p_ticket_id: ticketId,
+    p_qr_secret: qrSecret,
+  });
+  if (error) fail('Checking this guest in', error);
+  return data;
+}
+
+/** Promote one of the account's wallets to primary. */
+export async function setPrimaryWallet(
+  walletAddress: string,
+): Promise<ProfileRow> {
+  const { data, error } = await client().rpc('set_primary_wallet', {
+    p_wallet_address: walletAddress,
+  });
+  if (error) fail('Setting your main wallet', error);
   return data;
 }
 

@@ -6,9 +6,12 @@ import {
   Award,
   CalendarPlus,
   Compass,
+  Plus,
+  QrCode,
   Ticket,
   UserPlus,
   Users,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -26,6 +29,40 @@ import { Avatar } from "@/components/app/avatar";
 import { Button } from "@/components/ui/button";
 import { isUpcoming } from "@/lib/format";
 import { cn } from "@/lib/utils";
+
+/**
+ * The app's home shortcuts, mirrored.
+ *
+ * `/checkin` with no query shows the "scan a ticket to check in" state, which
+ * is the honest destination in a browser - the phone opens a camera, and a
+ * desktop has nothing to open. See `app/(app)/checkin/page.tsx`.
+ */
+const QUICK_ACTIONS = [
+  {
+    href: "/create",
+    label: "Create",
+    icon: Plus,
+    accent: "bg-brand-purple/10 text-brand-purple",
+  },
+  {
+    href: "/checkin",
+    label: "Scan QR",
+    icon: QrCode,
+    accent: "bg-brand-blue/10 text-brand-blue",
+  },
+  {
+    href: "/my-events",
+    label: "Tickets",
+    icon: Ticket,
+    accent: "bg-brand-cyan/10 text-brand-cyan",
+  },
+  {
+    href: "/profile",
+    label: "Wallet",
+    icon: Wallet,
+    accent: "bg-brand-green/10 text-brand-green",
+  },
+] as const;
 
 function StatTile({
   icon: Icon,
@@ -137,6 +174,40 @@ export default function DashboardPage() {
             </Link>
           </Button>
         </div>
+      </div>
+
+      {/*
+        Quick actions.
+
+        The app's home screen has had this four-up row since it shipped and the
+        dashboard had nothing like it, so Scan QR - the one thing a host needs
+        within one tap while standing at a door - was three navigations deep in
+        a browser and one tap away on a phone. Same four, same order, same
+        accents as `features/home/quick-actions.tsx`.
+
+        Hidden on `lg`, where the sidebar already puts every destination one
+        click away and this would be a second, redundant nav.
+      */}
+      <div className="grid grid-cols-4 gap-2.5 lg:hidden">
+        {QUICK_ACTIONS.map((action) => (
+          <Link
+            key={action.href}
+            href={action.href}
+            className="flex flex-col items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.035] px-2 py-4 transition-colors hover:border-brand-purple/30"
+          >
+            <span
+              className={cn(
+                "flex size-10 items-center justify-center rounded-xl",
+                action.accent
+              )}
+            >
+              <action.icon className="size-[18px]" />
+            </span>
+            <span className="text-[11px] font-medium text-white">
+              {action.label}
+            </span>
+          </Link>
+        ))}
       </div>
 
       {/* Stats */}

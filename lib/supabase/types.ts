@@ -519,6 +519,42 @@ export type Database = {
         Args: Record<string, never>;
         Returns: ProfileRow;
       };
+
+      /* ---- Multi-wallet accounts (migration 0022) --------------------------
+       * A profile holds a set of wallets, one primary and mirrored into
+       * `profiles.wallet_address` by trigger - which is why every existing
+       * reader of that column is still correct. See the migration header.
+       * -------------------------------------------------------------------- */
+
+      /** The caller's own wallets, primary first. RLS scopes it to them. */
+      my_wallets: {
+        Args: Record<string, never>;
+        Returns: {
+          address: string;
+          profile_id: string;
+          is_primary: boolean;
+          label: string | null;
+          linked_at: string;
+        }[];
+      };
+      /** Detach one wallet. `unlink_wallet` detaches the primary. */
+      unlink_wallet_address: {
+        Args: { p_wallet_address: string };
+        Returns: ProfileRow;
+      };
+      /** Promote one of the caller's wallets to primary. */
+      set_primary_wallet: {
+        Args: { p_wallet_address: string };
+        Returns: ProfileRow;
+      };
+      /**
+       * `unlinked` | `mine` | `taken` - a verdict, never an owner id, so the
+       * address space cannot be walked into a directory of accounts.
+       */
+      wallet_link_status: {
+        Args: { p_wallet_address: string };
+        Returns: 'unlinked' | 'mine' | 'taken';
+      };
       /**
        * @deprecated Revoked in 0011 - it linked a wallet without checking that
        * the caller held its key. Use the `link-wallet` Edge Function.
