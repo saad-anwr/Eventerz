@@ -296,13 +296,18 @@ Listed because an unlisted gap is a gap nobody fixes.
    The notifications are the only record, and they live in the recipient's row.
 
 4. **Release APK is signed with the debug keystore.** Fine for sideloading, not
-   for the dApp Store.
+   for the dApp Store. There is no release APK on disk right now: the previous
+   one was deleted because the leaked Helius key was extractable from it. The
+   next build must come after rotation.
 
 5. **The two hand-written Anchor clients must agree with the Rust by hand.**
-   `npm run idl:sync` in the program workspace recomputes every discriminator from
-   the built IDL and exits non-zero on a mismatch, and the website's test suite
-   recomputes them too - but neither runs automatically yet. See the CI item in
-   `HANDOFF.md`.
+   Two checks exist in the program workspace and neither runs automatically yet:
+   `npm run idl:sync` compares against the IDL that `anchor build` emits (the
+   authority, but it needs the Rust toolchain), and `npm run verify:clients`
+   derives the same discriminators straight from `lib.rs` with nothing but Node -
+   so it is the one that can actually run here. The website's test suite
+   recomputes them too. Last run 3 Aug 2026: both clients agree, 8 instructions
+   and 2 accounts. See the CI item in `HANDOFF.md`.
 
 6. **The public RPC is the fallback on both platforms.** With
    `NEXT_PUBLIC_HELIUS_RPC_URL` / `EXPO_PUBLIC_HELIUS_RPC_URL` unset, both fall
