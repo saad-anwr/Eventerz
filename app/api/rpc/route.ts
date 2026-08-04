@@ -255,7 +255,27 @@ export async function POST(request: Request): Promise<Response> {
     const response = await fetch(upstream(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: raw,
+      /*
+       * Re-serialised from `payload`, **not** the original `raw`.
+       *
+       * Forwarding the raw bytes means the allowlist is enforced against one
+       * parse of the body while a different parser sees another. JSON permits
+       * duplicate keys and leaves the winner to the implementation:
+       * `JSON.parse` keeps the last, and a parser that keeps the first reads
+       * something else entirely. So
+       *
+       *   {"method":"getProgramAccounts","method":"getBalance"}
+       *
+       * passes this route's check as `getBalance` and could reach the provider
+       * as `getProgramAccounts` - an unbounded scan we never allowlisted,
+       * billed to us.
+       *
+       * Whether any given provider actually splits that way is not the point
+       * and not something we control. Sending exactly the object that was
+       * validated removes the question: there is only one parse, and the guard
+       * ran against it.
+       */
+      body: JSON.stringify(payload),
       signal: AbortSignal.timeout(20_000),
     });
 
