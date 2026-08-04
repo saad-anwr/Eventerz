@@ -1,6 +1,6 @@
 # Eventerz - Wallet-native Event Infrastructure on Solana
 
-> **Everything is On-chain. Why not your events?**
+> **Everything is On-chain. Why not your Meetups?**
 
 A production-quality, premium marketing site for **Eventerz** - the wallet-native
 event platform on Solana. Discover events, RSVP on-chain, mint NFT tickets,

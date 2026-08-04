@@ -25,6 +25,7 @@ import {
 
 import { IS_MAINNET } from './cluster';
 import { explorerTxUrl } from './cluster';
+import { confirmSignature } from './confirm';
 import { computeBudgetInstructions } from './priority-fee';
 import {
   FEE_LABEL,
@@ -140,7 +141,8 @@ export function useFee(kind: FeeKind) {
        * Stopping on a confirmed failure is safe: a failed transaction moved no
        * money, so retrying costs the user nothing.
        */
-      const result = await connection.confirmTransaction(
+      const result = await confirmSignature(
+        connection,
         { signature, blockhash, lastValidBlockHeight },
         'confirmed',
       );

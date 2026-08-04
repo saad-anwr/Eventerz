@@ -18,7 +18,7 @@ const canonicalUrl =
 export const siteConfig = {
   name: "Eventerz",
   shortName: "Eventerz",
-  tagline: "Everything is On-chain. Why not your events?",
+  tagline: "Everything is On-chain. Why not your Meetups?",
   description:
     "Eventerz is wallet-native event infrastructure on Solana. Discover events, RSVP on-chain, receive NFT tickets and Proof-of-Attendance, build portable reputation and join token-gated communities.",
   url: canonicalUrl,

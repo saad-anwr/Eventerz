@@ -56,28 +56,42 @@ export const SOLANA_CLUSTER: SolanaCluster = resolveCluster();
 /** True on the network where a mistake costs real money. */
 export const IS_MAINNET = SOLANA_CLUSTER === "mainnet-beta";
 
+/** Where the browser sends RPC. Same-origin, so no credential travels with it. */
+export const RPC_PROXY_PATH = "/api/rpc";
+
 /**
- * The RPC this app should use.
+ * The RPC endpoint the client should use.
  *
- * `NEXT_PUBLIC_HELIUS_RPC_URL` wins when set. The fallback is the public
- * endpoint, which works and is **not suitable for production traffic**: it is
- * aggressively rate-limited and shared with the world, so under real load
- * balance reads fail and transfers get stuck at "confirming". Set a dedicated
- * RPC before launch.
+ * This is **our own origin**, not Helius. `app/api/rpc/route.ts` forwards to the
+ * provider using a server-only `HELIUS_RPC_URL`, so the key is never inlined
+ * into the bundle and never reaches a browser. The full reasoning is in that
+ * file; the short version is that `NEXT_PUBLIC_` means published, and a billable
+ * RPC key should not be.
+ *
+ * `web3.js` needs an absolute URL, so this resolves an origin rather than
+ * returning a bare path:
+ *
+ *   - in the browser, whatever the page is actually served from, which is
+ *     correct on production, on a preview URL and on localhost alike;
+ *   - during SSR and static generation there is no `window`, so it falls back to
+ *     `NEXT_PUBLIC_SITE_URL`, then to `VERCEL_URL` for preview builds that have
+ *     no configured site URL.
+ *
+ * If neither is set - a fresh clone with no `.env`, building statically - it
+ * returns the public cluster endpoint. That keeps `next build` working; the
+ * browser re-resolves to the proxy on hydration, so nothing ships pointing at
+ * the public RPC.
  */
 export function rpcEndpoint(): string {
-  const custom = process.env.NEXT_PUBLIC_HELIUS_RPC_URL?.trim();
-  if (custom && /^https?:\/\//i.test(custom)) return custom;
-
-  if (IS_MAINNET && typeof window !== "undefined") {
-    // Browser-side only: this runs once per page load, and warning during the
-    // server render would print on every request in the Vercel logs.
-    // eslint-disable-next-line no-console
-    console.warn(
-      "[solana] Using the public mainnet RPC. It is rate-limited and not " +
-        "suitable for production traffic - set NEXT_PUBLIC_HELIUS_RPC_URL.",
-    );
+  if (typeof window !== "undefined") {
+    return `${window.location.origin}${RPC_PROXY_PATH}`;
   }
+
+  const site = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/$/, "");
+  if (site && /^https?:\/\//i.test(site)) return `${site}${RPC_PROXY_PATH}`;
+
+  const vercelUrl = process.env.VERCEL_URL?.trim();
+  if (vercelUrl) return `https://${vercelUrl}${RPC_PROXY_PATH}`;
 
   return clusterApiUrl(SOLANA_CLUSTER);
 }

@@ -23,6 +23,7 @@ import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { Transaction, type TransactionInstruction } from '@solana/web3.js';
 
 import { explorerTxUrl } from './cluster';
+import { confirmSignature } from './confirm';
 import { computeBudgetInstructions, type ComputeKind } from './priority-fee';
 import {
   cancelEventInstruction,
@@ -87,7 +88,8 @@ export function useOnChainActions() {
 
       const signature = await sendTransaction(transaction, connection);
 
-      const result = await connection.confirmTransaction(
+      const result = await confirmSignature(
+        connection,
         { signature, blockhash, lastValidBlockHeight },
         'confirmed',
       );

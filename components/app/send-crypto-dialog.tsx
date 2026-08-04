@@ -29,6 +29,7 @@ import {
   solToLamports,
 } from "@/lib/solana/amount";
 import { explorerTxUrl } from "@/lib/solana/cluster";
+import { confirmSignature } from "@/lib/solana/confirm";
 import { shortenAddress } from "@/lib/format";
 import { useScrollLock } from "@/hooks/use-scroll-lock";
 import { cn } from "@/lib/utils";
@@ -229,7 +230,8 @@ export function SendCryptoDialog({
        * guarantee nobody is asking for at the cost of a chat message that
        * appears to hang.
        */
-      const result = await connection.confirmTransaction(
+      const result = await confirmSignature(
+        connection,
         { signature: sent, blockhash, lastValidBlockHeight },
         "confirmed",
       );

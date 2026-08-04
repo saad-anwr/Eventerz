@@ -134,7 +134,7 @@ a party to, even though it read the row with a key that ignores the policy.
 
 ---
 
-## Secrets in git history - **rotation outstanding**
+## Secrets in git history - **rotated; revocation outstanding**
 
 Recorded here because a leak that has been tidied up looks identical to one that
 never happened, and only one of them still needs action.
@@ -159,49 +159,44 @@ scraped: public repos are harvested for keys continuously. Removing it from HEAD
 stops it spreading; it does not make the leaked value stop working. Steps are in
 the root `README.md`.
 
-**Status, 4 Aug 2026: rotated locally, not yet everywhere.**
+**Status, 4 Aug 2026: rotated. One step left.**
 
 | | |
 | --- | --- |
-| New key issued | yes |
-| `Eventerz/.env.local` | rotated ✓ |
-| `Eventerz dApp/.env` | rotated ✓ |
-| EAS environment variables | **still the old key** |
-| Vercel project | **still the old key** |
-| Old key revoked in Helius | **no - still live** |
+| New key issued | done |
+| `Eventerz/.env.local`, `Eventerz dApp/.env` | done |
+| EAS variable (`preview`, `production`, sensitive) | done |
+| Build guards retired | done |
+| Vercel | **never held this key** - the site has used the public RPC fallback throughout |
+| **Old key revoked in Helius** | **outstanding - it still serves requests** |
 
-So the exposure is not closed. The leaked value continues to serve requests until
-it is deleted in the dashboard, and production still uses it until both remotes
-are updated and rebuilt. The build guards below stay armed precisely because of
-that gap.
+Revocation is the step that closes this. Everything else moves *new* traffic to
+the new key; none of it stops the old one, which was public for ~17½ hours and
+should be assumed scraped.
 
-Rotation itself cannot be automated: a Helius RPC key grants RPC scope only, with
-no account-management capability, so creating and revoking keys is possible only
-from an authenticated dashboard session. Everything downstream of those two
-clicks is: `npm run rotate:helius -- YOUR_NEW_KEY` from `C:\Eventerz` validates the
-replacement against mainnet before writing it, updates both `.env` files, and
-prints the EAS and Vercel commands. It refuses the leaked key by hash, and writes
-nothing if the new key fails to authenticate.
+Revoking carries no risk to the website: `NEXT_PUBLIC_HELIUS_RPC_URL` was never
+configured on Vercel, so production has been using the public
+`api.mainnet-beta.solana.com` fallback rather than the leaked key. That is its
+own problem - see *Known gaps* - but it means the leak never reached the web
+deployment at all.
 
-The delivery mechanism is worth naming, because it will still be running after
-this is fixed: an automated process commits and pushes all three repositories on
-a timer (`update_DD/MM_HH:MM`). Nothing reviews a diff first, so anything written
-into a working tree is public within minutes. `.gitignore` was therefore the only
-control before publication - and it only ever covers paths somebody predicted.
+### What stands in the way
 
-### What now stands in the way
+Two of these were temporary and were retired on rotation; the first is permanent
+and is the one that matters for next time.
 
 | Control | Where | Effect |
 | --- | --- | --- |
 | Pre-commit credential scan | `.githooks/pre-commit` -> `scripts/check-secrets.mjs`, **both repos** | Refuses a commit containing a key, a JWT, a private-key block or a signing artefact. Scans inside binaries too - the APK leaked because a key compiled into a bundle is plain ASCII inside the file. Override: `ALLOW_SECRETS=1` |
-| Production build gate | `lib/env.ts` | `next build` fails while `NEXT_PUBLIC_HELIUS_RPC_URL` carries the leaked key. Override: `ALLOW_COMPROMISED_RPC_KEY=1` |
-| Mainnet readiness gate | `Eventerz dApp/scripts/check-mainnet.mjs` | `npm run check:mainnet` exits non-zero on the same condition |
+| ~~Production build gate~~ | `lib/env.ts` | **retired 4 Aug 2026** on rotation. Failed `next build` while the leaked key was configured |
+| ~~Mainnet readiness gate~~ | `Eventerz dApp/scripts/check-mainnet.mjs` | **retired 4 Aug 2026** on rotation. Exited non-zero on the same condition |
 
-Both gates match a **SHA-256** of the key rather than the key: these files are
+Both gates matched a **SHA-256** of the key rather than the key: these files are
 committed, and committing the value again is the whole mistake. A 128-bit key
-behind SHA-256 is not recoverable from the hash, but an exact match is
-detectable, which is all the check needs. Delete both constants once rotation is
-confirmed.
+behind SHA-256 is not recoverable from a hash, but an exact match is detectable,
+which is all a check needs. They were removed by `npm run rotate:helius:finish`
+once the key they guarded against was gone, so they live in git history rather
+than as a permanent monument to a fixed problem.
 
 ### Audit, 3 Aug 2026 - HEAD and full history, all three repos
 
@@ -228,18 +223,47 @@ Rewriting history was considered and rejected. Force-pushing a rewritten
 was readable for 17 hours. Rotation makes the old key worthless, which is the
 only outcome that holds.
 
-### Why a client-side RPC key cannot be fixed by hiding it
+### The RPC key is no longer client-side - it goes through a proxy
 
 `NEXT_PUBLIC_` and `EXPO_PUBLIC_` values are inlined into the bundle at build
-time. The Helius URL is therefore extractable from any published web bundle or
-APK - `unzip -p app.apk | grep api-key` is the whole attack. EAS's
-`--visibility sensitive` keeps it out of build logs and the dashboard, which is
-worth having, but it does not keep it out of the artifact.
+time. A Helius URL shipped that way is extractable from any published web bundle
+or APK with `grep api-key`, which is exactly how the leaked key was recoverable
+from the committed APK. EAS's `--visibility sensitive` keeps it out of build logs
+and the dashboard, which is worth having, but it does not keep it out of the
+artifact.
 
-So the control is economic rather than cryptographic: a spend cap plus a
-domain/bundle restriction on the key. Rotation closes this incident; the cap is
-what bounds the next one. Proxying RPC through an Edge Function is the only way
-to actually hide it, and is worth doing if usage ever justifies the added hop.
+For the **website** that is now fixed rather than mitigated. The browser talks to
+`/api/rpc` on our own origin; `app/api/rpc/route.ts` forwards to Helius using a
+**server-only `HELIUS_RPC_URL`** with no `NEXT_PUBLIC_` prefix, so the value is
+read at runtime and never enters the client bundle. Verified by building and
+grepping: zero occurrences of the key, of `api-key=`, or of `helius-rpc.com` in
+`.next/static`.
+
+A bare pass-through would be worse than the leak - an unauthenticated public RPC
+billed to us, which needs no extraction and cannot be revoked without a deploy.
+So the route carries three controls, and they are load-bearing:
+
+| Control | What it stops |
+| --- | --- |
+| **Method allowlist** (18 methods, derived from the call sites) | The endpoint being used as a general-purpose RPC. Anything absent is refused by name, so a genuine omission is a clear error rather than a mystery inside web3.js |
+| **Same-origin check** (`Origin`, then `Referer`) | Another site pointing its wallet adapter at us. `Origin` is set by the browser and cannot be forged by page JavaScript - it does *not* stop `curl`, which is what the limit below is for |
+| **Per-IP rate limit** + body and batch caps | A script hammering the endpoint. Best-effort: edge instances are ephemeral, so it counts per instance rather than globally. Exactness would need a shared store (KV/Upstash), not a bigger map |
+
+One consequence worth knowing: **confirmation had to stop using WebSockets.**
+`connection.confirmTransaction` confirms via `signatureSubscribe`, and a route
+handler serves HTTP - the derived `wss://…/api/rpc` has nothing listening. Left
+alone that fails in the worst available shape: the transaction lands, the socket
+never answers, and the UI sits on "confirming" while the money has already moved.
+`lib/solana/confirm.ts` polls `getSignatureStatuses` instead and compares against
+`lastValidBlockHeight`, so an expired blockhash is reported as "did not go
+through" immediately rather than after an arbitrary timeout.
+
+**The dApp still ships its key in the APK.** `EXPO_PUBLIC_HELIUS_RPC_URL` is
+inlined into the bundle and extractable, unchanged by any of the above. It could
+point at the same proxy, at the cost of coupling the app's availability to the
+website's; until it does, the mobile key's protection is the Helius domain
+allowlist and its spend cap. Treat the two keys as separate credentials with
+separate blast radii.
 
 ---
 
@@ -329,19 +353,32 @@ Listed because an unlisted gap is a gap nobody fixes.
    recomputes them too. Last run 3 Aug 2026: both clients agree, 8 instructions
    and 2 accounts. See the CI item in `HANDOFF.md`.
 
-6. **The public RPC is the fallback on both platforms.** With
-   `NEXT_PUBLIC_HELIUS_RPC_URL` / `EXPO_PUBLIC_HELIUS_RPC_URL` unset, both fall
-   back to `api.mainnet-beta.solana.com`, which is shared, aggressively
-   rate-limited, and explicitly not intended for production traffic. It works in
-   testing and degrades under load in the worst possible place: balance reads
-   fail and a transfer sits at "confirming" while the user wonders whether their
-   money moved. **Set a dedicated RPC before launch.**
+6. ~~**The website has been running on the public RPC in production.**~~ Found
+   4 Aug 2026 - `NEXT_PUBLIC_HELIUS_RPC_URL` had never been set on the Vercel
+   project, so `rpcEndpoint()` fell back to `api.mainnet-beta.solana.com` for the
+   life of the deployment. Silent apart from one browser-console warning per page
+   load, which is why it went unnoticed.
 
-7. ~~**`Eventerz Program/` is not under version control.**~~ Fixed - the folder
+   Now superseded by the proxy: the variable to set is **`HELIUS_RPC_URL`**, no
+   prefix, read server-side by `/api/rpc`. **Outstanding until that is set on
+   Vercel** - a prefixed leftover republishes the key and is warned about at build
+   time.
+
+   One accidental upside of the gap: the key that leaked never reached Vercel, so
+   the website was never serving it.
+
+7. **`NEXT_PUBLIC_SITE_URL` is scoped to Production only.** It is in `REQUIRED`
+   in `lib/env.ts`, and a Vercel *Preview* build runs `next build` with
+   `NODE_ENV=production` - so `assertProductionEnv()` fires and throws on a
+   missing required variable. Preview deployments should be failing at build.
+   Either scope the variable to Preview as well, or narrow the check to
+   `VERCEL_ENV === 'production'`.
+
+8. ~~**`Eventerz Program/` is not under version control.**~~ Fixed - the folder
    is now a git repo with an initial commit and a `.gitattributes` pinning LF,
    so the Rust that builds under WSL2 does not churn against CRLF checkouts.
 
-8. **The generated Android project can drift from `app.json`, silently.**
+9. **The generated Android project can drift from `app.json`, silently.**
    `android/` is produced by `expo prebuild` and is gitignored, so it is not
    regenerated by a normal build. It had fallen behind: `app.json` set
    `recordAudioAndroid: false`, and the installed APK requested the microphone
