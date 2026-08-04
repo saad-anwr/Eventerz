@@ -159,15 +159,26 @@ scraped: public repos are harvested for keys continuously. Removing it from HEAD
 stops it spreading; it does not make the leaked value stop working. Steps are in
 the root `README.md`.
 
-As of 4 Aug 2026 the leaked key is **still the value configured in
-`Eventerz dApp/.env` and `Eventerz/.env.local`, and still answers requests** -
-checked directly with `getHealth`, which returned `ok`. Everything fixable in the
-codebase has been fixed; this is the part that needs the dashboard.
+**Status, 4 Aug 2026: rotated locally, not yet everywhere.**
+
+| | |
+| --- | --- |
+| New key issued | yes |
+| `Eventerz/.env.local` | rotated ✓ |
+| `Eventerz dApp/.env` | rotated ✓ |
+| EAS environment variables | **still the old key** |
+| Vercel project | **still the old key** |
+| Old key revoked in Helius | **no - still live** |
+
+So the exposure is not closed. The leaked value continues to serve requests until
+it is deleted in the dashboard, and production still uses it until both remotes
+are updated and rebuilt. The build guards below stay armed precisely because of
+that gap.
 
 Rotation itself cannot be automated: a Helius RPC key grants RPC scope only, with
 no account-management capability, so creating and revoking keys is possible only
 from an authenticated dashboard session. Everything downstream of those two
-clicks is: `npm run rotate:helius -- <new-key>` from `C:\Eventerz` validates the
+clicks is: `npm run rotate:helius -- YOUR_NEW_KEY` from `C:\Eventerz` validates the
 replacement against mainnet before writing it, updates both `.env` files, and
 prints the EAS and Vercel commands. It refuses the leaked key by hash, and writes
 nothing if the new key fails to authenticate.

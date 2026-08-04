@@ -1,6 +1,8 @@
 import 'server-only';
 
+/* rotation-guard:start */
 import { createHash } from 'node:crypto';
+/* rotation-guard:end */
 
 /**
  * Fail a production build that is missing something it cannot work without,
@@ -70,6 +72,7 @@ const RECOMMENDED: Check[] = [
   },
 ];
 
+/* rotation-guard:start */
 /**
  * SHA-256 of the Helius key that was published to a public repository on
  * 31 Jul 2026 and stayed readable for ~17 hours.
@@ -80,7 +83,8 @@ const RECOMMENDED: Check[] = [
  * check needs. `Eventerz dApp/scripts/check-mainnet.mjs` carries the same
  * constant for the same reason.
  *
- * Delete this and `assertKeyRotated` once rotation is done and confirmed.
+ * Removed automatically by `npm run rotate:helius` - the markers around this
+ * block are what it keys on, so keep them if you move the code.
  */
 const COMPROMISED_RPC_KEY_SHA256 =
   '03d54d4cbe0375f08a0866088591a593c936648c9f419b721b46f27d23ea94e8';
@@ -123,11 +127,14 @@ function assertKeyRotated(): void {
       'that as a countdown, not a resolution.\n',
   );
 }
+/* rotation-guard:end */
 
 function assertProductionEnv(): void {
   if (process.env.NODE_ENV !== 'production') return;
 
+  /* rotation-guard:start */
   assertKeyRotated();
+  /* rotation-guard:end */
 
   const missing = REQUIRED.filter((c) => !c.value?.trim());
 
