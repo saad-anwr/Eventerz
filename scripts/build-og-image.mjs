@@ -53,8 +53,15 @@ const svg = readFileSync(SRC);
 
 // density lifts the rasterisation resolution so text edges are not soft; the
 // explicit resize pins the output to exactly 1200x630 regardless.
+//
+// `flatten` composites onto the brand background and drops the alpha channel.
+// A card image is never shown over anything but an opaque timeline row, so
+// transparency buys nothing - and several crawlers' image pipelines handle an
+// RGBA PNG less predictably than an opaque one. Dropping the channel also cuts
+// roughly a quarter of the bytes.
 const png = await sharp(svg, { density: 288 })
   .resize(WIDTH, HEIGHT, { fit: 'contain', background: '#050816' })
+  .flatten({ background: '#050816' })
   .png({ compressionLevel: 9 })
   .toBuffer();
 
@@ -65,6 +72,11 @@ const kb = (png.length / 1024).toFixed(1);
 
 if (meta.width !== WIDTH || meta.height !== HEIGHT) {
   console.error(`wrong size: ${meta.width}x${meta.height}, expected ${WIDTH}x${HEIGHT}`);
+  process.exit(1);
+}
+
+if (meta.hasAlpha) {
+  console.error('output still has an alpha channel; flatten() did not apply');
   process.exit(1);
 }
 

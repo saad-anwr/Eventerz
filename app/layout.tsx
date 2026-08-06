@@ -65,7 +65,15 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: `${siteConfig.name} - Wallet-native Events on Solana`,
     description: siteConfig.description,
-    images: [siteConfig.ogImage],
+    // Object form rather than a bare string so `twitter:image:alt` is emitted -
+    // X drops a large card back to a small one when it cannot describe the
+    // image, which is one of the ways a card renders without its picture.
+    images: [
+      {
+        url: siteConfig.ogImage,
+        alt: `${siteConfig.name} - ${siteConfig.tagline}`,
+      },
+    ],
     creator: "@eventerz_web",
   },
   icons: {
