@@ -22,7 +22,17 @@ export const siteConfig = {
   description:
     "Eventerz is wallet-native event infrastructure on Solana. Discover events, RSVP on-chain, receive NFT tickets and Proof-of-Attendance, build portable reputation and join token-gated communities.",
   url: canonicalUrl,
-  ogImage: "/og.svg",
+  /**
+   * Social card image. **Must be a raster format.**
+   *
+   * X, Facebook, LinkedIn, Discord, Slack, WhatsApp and iMessage all reject
+   * `image/svg+xml` and show a blank card instead - the title and domain still
+   * resolve, which is what makes the failure look like a caching problem
+   * rather than a format one. `og.svg` is the editable source; `og.png` is
+   * what ships. Regenerate with `npm run og:build` after editing the SVG.
+   */
+  ogImage: "/og.png",
+  ogImageType: "image/png",
   keywords: [
     "Eventerz",
     "Solana events",

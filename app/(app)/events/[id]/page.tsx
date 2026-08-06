@@ -97,7 +97,10 @@ export async function generateMetadata({
     siteConfig.description
   ).slice(0, 200);
 
-  const images = event.cover_image ? [{ url: event.cover_image }] : undefined;
+  // Metadata is shallow-merged: declaring `openGraph` here replaces the root
+  // layout's object entirely rather than inheriting its image. So an event with
+  // no cover has to name the site card explicitly, or the link previews blank.
+  const images = [{ url: event.cover_image || siteConfig.ogImage }];
 
   return {
     title,
@@ -111,10 +114,10 @@ export async function generateMetadata({
       images,
     },
     twitter: {
-      card: images ? "summary_large_image" : "summary",
+      card: "summary_large_image",
       title,
       description,
-      images: event.cover_image ? [event.cover_image] : undefined,
+      images,
     },
     // A cancelled event should still resolve for anyone holding the link, but
     // it is not something to surface in search.
