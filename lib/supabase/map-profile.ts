@@ -31,10 +31,29 @@ function fallbackHandle(profile: ProfileRow): string {
  */
 export function profileToUser(profile: ProfileRow, email?: string): User {
   /*
-   * The wallet is the primary credential, so a profile that has one is a
-   * wallet account regardless of how the person happened to sign in this time.
+   * How this account is rooted.
+   *
+   * The rule here used to be "a profile with a wallet is a wallet account,
+   * regardless of how the person signed in this time", on the reasoning that
+   * the wallet was the primary credential. Migration 0022 inverted exactly
+   * that: the Google account is the root and wallets attach to it 1:N, because
+   * a keypair costs nothing to mass-produce and a Google account carries both
+   * a per-account cost and a recovery path. Under the new model a linked
+   * wallet is evidence *for* a Google-rooted account, not against one - so the
+   * old derivation reported "via wallet" for precisely the users who had done
+   * the thing the model wants.
+   *
+   * A session email is the one unambiguous signal available: the client cannot
+   * read `email` for anybody else (0015), so its presence means this is the
+   * signed-in user and they hold a Google session. Without it - other people's
+   * profiles, and wallet-only accounts predating 0022 - the wallet column is
+   * still the only evidence there is.
    */
-  const authMethod: AuthMethod = profile.wallet_address ? 'wallet' : 'google';
+  const authMethod: AuthMethod = email
+    ? 'google'
+    : profile.wallet_address
+      ? 'wallet'
+      : 'google';
 
   return {
     id: profile.id,
