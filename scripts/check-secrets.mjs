@@ -105,6 +105,24 @@ const DOC_LIKE = /(^|\/)(\.env\.example|.*\.md)$/i;
 const PLACEHOLDER =
   /^(<.*>|\.{3}|x{4,}|y{4,}|your[-_ ]|placeholder|example|changeme|redacted|dummy|test|abc123|\$\{|process\.env)/i;
 
+/**
+ * Per-line escape hatch: `check-secrets: allow <reason>`, in a comment on the
+ * offending line or the one directly above it.
+ *
+ * `ALLOW_SECRETS=1` was the only way past this scanner, and it switches off
+ * every rule for every file in the commit. So a test fixture named `SECRET`
+ * would also wave through a real key pasted into a different file in the same
+ * commit - the failure mode this whole script exists to prevent. This narrows
+ * the exemption to one line and puts it in the diff, where review can see it.
+ *
+ * The reason is mandatory: `allow` on its own does not match. An unexplained
+ * suppression is indistinguishable from a leak the next time somebody reads it.
+ *
+ * Suppressions are always printed, including on a clean run. A silent exemption
+ * is one nobody re-examines.
+ */
+const ALLOW_PRAGMA = /check-secrets:\s*allow\s+(\S.*?)\s*$/;
+
 const isBinary = (buf) => buf.includes(0);
 
 function filesToCheck() {
@@ -118,6 +136,7 @@ function filesToCheck() {
 }
 
 const findings = [];
+const suppressed = [];
 const files = filesToCheck();
 
 for (const file of files) {
@@ -164,6 +183,10 @@ for (const file of files) {
 
   const lines = buf.toString('utf8').split(/\r?\n/);
   lines.forEach((text, i) => {
+    // The pragma may sit on the line itself or on the one above it - a long
+    // literal is usually already at the line-length limit without a comment.
+    const allow = ALLOW_PRAGMA.exec(text) ?? (i > 0 ? ALLOW_PRAGMA.exec(lines[i - 1]) : null);
+
     for (const rule of RULES) {
       rule.re.lastIndex = 0;
       let m;
@@ -171,6 +194,10 @@ for (const file of files) {
         const value = m[0];
         const after = value.split(/[=:]/).slice(1).join('=').replace(/['"]/g, '').trim();
         if (after && PLACEHOLDER.test(after)) continue;
+        if (allow) {
+          suppressed.push({ file, line: i + 1, rule: rule.name, reason: allow[1] });
+          continue;
+        }
         findings.push({ file, line: i + 1, rule: rule.name, snippet: redact(value) });
       }
     }
@@ -181,6 +208,17 @@ for (const file of files) {
 function redact(s) {
   if (s.length <= 12) return `${s.slice(0, 4)}…`;
   return `${s.slice(0, 10)}…${s.slice(-4)}  ${c.dim(`(${s.length} chars)`)}`;
+}
+
+if (suppressed.length > 0) {
+  console.error(
+    c.yellow(
+      `check-secrets: ${suppressed.length} finding${suppressed.length === 1 ? '' : 's'} suppressed by pragma`,
+    ),
+  );
+  for (const s of suppressed) {
+    console.error(c.dim(`  - ${s.file}:${s.line}  ${s.rule} - ${s.reason}`));
+  }
 }
 
 if (findings.length === 0) {
@@ -202,7 +240,11 @@ console.error(
     'Move the value into a gitignored .env (or a Vercel environment variable) and\n' +
       'reference it by name. If the value has already been committed once, it is\n' +
       'public: rotate it at the source rather than only deleting it.\n\n' +
-      'Genuine false positive? ALLOW_SECRETS=1 git commit ...\n',
+      'Genuine false positive - a test fixture, a sample payload? Exempt the one\n' +
+      'line, with a reason, so the next reader can tell it apart from a real leak:\n' +
+      '  // check-secrets: allow fixed test fixture, not a live credential\n\n' +
+      'ALLOW_SECRETS=1 git commit ... still exists, but it disables every rule for\n' +
+      'every file in the commit. Prefer the pragma.\n',
   ),
 );
 process.exit(1);
