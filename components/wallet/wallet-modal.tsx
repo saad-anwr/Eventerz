@@ -76,6 +76,34 @@ const CURATED = [
   { name: "Jupiter", url: "https://jup.ag/mobile", color: "#22D3EE" },
 ] as const;
 
+/**
+ * Why a Mobile Wallet Adapter connection failed, in the user's terms.
+ *
+ * MWA on the web cannot use the Android intent the native app uses. It reaches
+ * the wallet over a `localhost` WebSocket, which Chrome gates behind its Local
+ * Network Access permission - the "Allow connections to your wallet" screen.
+ * The library raises two distinct outcomes there and they need different
+ * answers, so the generic wallet vocabulary is not enough:
+ *
+ *   * the permission was refused, which is recoverable in site settings; and
+ *   * the prompt never resolved, which is the known browser-compatibility gap
+ *     (Solana Mobile only tests Chrome, and cites "differences in browser
+ *     configurations for required permissions" for everything else).
+ *
+ * Neither is fixed by "try again", so neither says it. Both point at the in-app
+ * browser rows, which do not depend on that permission at all.
+ */
+function mwaFailureMessage(error: unknown): string {
+  const raw =
+    error instanceof Error ? `${error.name} ${error.message}` : String(error);
+
+  if (/LOOPBACK_ACCESS_BLOCKED|permission denied/i.test(raw)) {
+    return "Chrome is blocking the local connection your wallet needs. Allow it for this site in Chrome's site settings, or open this page in your wallet's own browser below - that route needs no permission.";
+  }
+
+  return "Your wallet app did not open. Chrome has to grant a local-network permission first and does not always ask - opening this page inside your wallet's own browser below works without it.";
+}
+
 function WalletRow({
   wallet,
   pending,
@@ -131,19 +159,56 @@ export function WalletModal() {
 
   useScrollLock(visible);
 
-  // Detected (installed / loadable) wallets, installed first.
+  /*
+   * Has the browser already refused the permission MWA depends on?
+   *
+   * MWA reaches the wallet over a localhost socket, gated by Chrome's Local
+   * Network Access permission. Once that is `denied` for the site, every
+   * attempt fails at the same place with no prompt - so offering the row is
+   * offering a button that cannot work. Better to hide it and leave the routes
+   * that do, than to let someone tap the same dead end repeatedly.
+   *
+   * `permissions.query` throws on browsers that do not know this permission
+   * name, which is not a refusal - those are left alone and MWA stays offered.
+   */
+  const [loopbackDenied, setLoopbackDenied] = React.useState(false);
+  React.useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const status = await navigator.permissions.query({
+          name: "loopback-network" as PermissionName,
+        });
+        if (cancelled) return;
+        setLoopbackDenied(status.state === "denied");
+        status.onchange = () => setLoopbackDenied(status.state === "denied");
+      } catch {
+        // Permission name unknown here - say nothing about it.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Detected (installed / loadable) wallets, installed first. MWA is dropped
+  // when the browser has already refused the permission it needs.
   const detected = React.useMemo(
     () =>
       wallets
         .filter(
           (w) =>
-            w.readyState === WalletReadyState.Installed ||
-            w.readyState === WalletReadyState.Loadable
+            (w.readyState === WalletReadyState.Installed ||
+              w.readyState === WalletReadyState.Loadable) &&
+            !(
+              loopbackDenied &&
+              w.adapter.name === SolanaMobileWalletAdapterWalletName
+            )
         )
         .sort((a, b) =>
           a.readyState === WalletReadyState.Installed ? -1 : 1
         ),
-    [wallets]
+    [wallets, loopbackDenied]
   );
 
   /**
@@ -201,26 +266,16 @@ export function WalletModal() {
    */
   React.useEffect(() => {
     if (!pending) return;
+    // Skip when the click handler already started this connection inside the
+    // user gesture - see `handleSelect`. This effect is only the fallback for
+    // adapters that need the provider to finish selecting first.
+    if (directConnect.current === pending) return;
     if (wallet?.adapter.name === pending && !connected && !connecting) {
       const attempted = pending;
       connect()
         .catch((e: unknown) => {
-          /*
-           * Mobile Wallet Adapter fails differently, and generically, so it
-           * gets its own sentence.
-           *
-           * On web MWA cannot use the Android intent the native app uses. It
-           * reaches the wallet over a localhost socket, which first needs
-           * Chrome's local-network permission - the "Allow connections to your
-           * wallet" prompt. When that prompt does not appear, or was declined
-           * once, the handshake dies with nothing specific to report. Saying
-           * "try again" there sends people round the same loop; the in-app
-           * browser rows below are the route that does not depend on it.
-           */
           if (attempted === SolanaMobileWalletAdapterWalletName) {
-            setError(
-              "Your wallet app did not open. Chrome needs permission to reach it, which it does not always ask for - opening this page inside your wallet's own browser below works without that."
-            );
+            setError(mwaFailureMessage(e));
             return;
           }
           setError(describeWalletError(e));
@@ -245,11 +300,48 @@ export function WalletModal() {
     return () => window.removeEventListener("keydown", onKey);
   }, [visible, close]);
 
+  /** Names we started connecting from inside the click, not from the effect. */
+  const directConnect = React.useRef<string | null>(null);
+
   const handleSelect = (name: string) => {
     setError(null);
     setPending(name);
     // `WalletName` is a branded string; the adapter name is exactly that type.
     select(name as Parameters<typeof select>[0]);
+
+    /*
+     * Start the connection here, in the click, rather than leaving it to the
+     * effect below.
+     *
+     * Chrome on Android blocks any navigation that does not originate from an
+     * explicit user gesture. Mobile Wallet Adapter has to navigate to the
+     * wallet app, so it needs that gesture - and a `connect()` called from a
+     * `useEffect` is several tasks removed from the tap that caused it, by
+     * which point the activation is gone. Extensions never cared, because they
+     * navigate nowhere, which is why this went unnoticed until MWA appeared in
+     * the list.
+     *
+     * The adapter is connected directly rather than through the provider's
+     * `connect()`, because that one operates on the *selected* wallet and
+     * selection is a state update that has not landed yet at this point.
+     */
+    const entry = wallets.find((w) => w.adapter.name === name);
+    if (!entry) return;
+
+    directConnect.current = name;
+    void entry.adapter
+      .connect()
+      .catch((e: unknown) => {
+        if (name === SolanaMobileWalletAdapterWalletName) {
+          setError(mwaFailureMessage(e));
+          return;
+        }
+        setError(describeWalletError(e));
+      })
+      .finally(() => {
+        directConnect.current = null;
+        setPending(null);
+      });
   };
 
   /**
