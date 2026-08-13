@@ -63,7 +63,11 @@ registerMwa({
       typeof window !== "undefined"
         ? window.location.origin
         : "https://www.eventerz.xyz",
-    icon: "favicon.ico",
+    // Relative to `uri` above, fetched and rendered by the wallet. This was
+    // `favicon.ico`, which the site does not serve - see the same fix in the
+    // app's `APP_IDENTITY`. `public/icon.png` is the app icon itself, so both
+    // surfaces now show the same mark in the approval sheet.
+    icon: "icon.png",
   },
   chains: [MWA_CHAIN],
   authorizationCache: createDefaultAuthorizationCache(),
