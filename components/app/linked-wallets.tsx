@@ -22,8 +22,14 @@ import { Check, Loader2, Plus, Star, Trash2, Wallet } from "lucide-react";
 
 import { useConnectModal } from "@/components/wallet/connect-modal-context";
 
-/** Matches `max_wallets_per_profile()` in migration 0022. */
-const MAX_WALLETS = 10;
+/**
+ * Matches `max_wallets_per_profile()`, lowered from 10 to 3 in migration 0025.
+ *
+ * Advisory only - it disables the button and writes the caption. The database
+ * enforces the real limit, so a client left on the old number is a stale label
+ * rather than a way past the cap.
+ */
+const MAX_WALLETS = 3;
 
 import {
   myWallets,
