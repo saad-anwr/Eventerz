@@ -845,7 +845,24 @@ export async function startXLink(returnTo: string): Promise<void> {
 export async function syncXIdentity(): Promise<ProfileRow> {
   const { data, error } = await client().rpc('sync_x_identity');
   if (error) fail('Confirming your X account', error);
-  return data as ProfileRow;
+
+  /*
+   * Checked rather than cast. `sync_x_identity` is declared `returns
+   * public.profiles` - a bare composite, which Postgres answers with exactly
+   * one row, all columns NULL when the inner select matched nothing. PostgREST
+   * reports that as an object, so `data` is truthy and the cast type-checks
+   * while handing back a profile whose `id` is null.
+   *
+   * That exact shape crashed wallet onboarding in the mobile app (see the
+   * header of migration 0024). Here it would quietly replace a real profile
+   * with an empty one, so it throws instead - `fail` is already how every other
+   * error in this module surfaces.
+   */
+  const row = data as Partial<ProfileRow> | null;
+  if (!row || typeof row.id !== 'string' || row.id.length === 0) {
+    fail('Confirming your X account', null);
+  }
+  return row as ProfileRow;
 }
 
 /** True when this login already has an X identity attached. */
