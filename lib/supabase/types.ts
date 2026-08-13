@@ -563,9 +563,16 @@ export type Database = {
         Args: { p_wallet_address: string };
         Returns: ProfileRow;
       };
+      /**
+       * An array, since 0024 made this `returns setof public.profiles`.
+       *
+       * It was a bare composite, which Postgres always answers with exactly
+       * one row - all-NULL when nothing matched - and that row crashed the
+       * app's wallet onboarding. A set returns nothing when there is nothing.
+       */
       profile_for_wallet: {
         Args: { p_wallet_address: string };
-        Returns: ProfileRow;
+        Returns: ProfileRow[];
       };
       /** Legacy alias for `request_to_join`, kept for installed mobile builds. */
       rsvp: {

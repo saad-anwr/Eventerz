@@ -45,7 +45,23 @@
  * one schema change away from this same crash.
  */
 
-create or replace function public.profile_for_wallet(p_wallet_address text)
+/*
+ * Dropped rather than replaced, because `create or replace` cannot change a
+ * return type:
+ *
+ *     ERROR: 42P13: cannot change return type of existing function
+ *
+ * Safe to drop: nothing in the schema references it. The only callers are
+ * clients going through PostgREST, and the drop and create below run in one
+ * transaction, so no request can arrive in between and find it missing.
+ *
+ * No `cascade` on purpose. If a future view or function ever does depend on
+ * this, the drop should fail loudly here rather than quietly take that
+ * dependency down with it.
+ */
+drop function if exists public.profile_for_wallet(text);
+
+create function public.profile_for_wallet(p_wallet_address text)
 returns setof public.profiles
 language sql
 stable
@@ -58,3 +74,15 @@ as $$
 $$;
 
 grant execute on function public.profile_for_wallet(text) to anon, authenticated;
+
+/*
+ * A note on the client, because the response shape changes with the return
+ * type: a set-returning function is a JSON *array* over PostgREST, where the
+ * composite was a single object.
+ *
+ * Both callers use `.maybeSingle()`, which asks for
+ * `Accept: application/vnd.pgrst.object+json`. That coerces a one-row array to
+ * an object and - the point of this migration - yields `null` for zero rows
+ * instead of a row of NULLs. So the client code is correct across the change,
+ * and correct in a way it was not before.
+ */
