@@ -30,7 +30,17 @@
  * "Apps on device" entry in Chrome's site settings at all - not blocked,
  * *absent*, because the site never asked.
  *
- * So this module does the library's job with the name Chrome actually ships.
+ * # Why this only reads
+ *
+ * The obvious repair - ask under the name Chrome ships, from inside the tap -
+ * was tried and does not work. Chrome leaves the permission on `prompt` and
+ * puts up no dialog for a loopback request, so there is nothing for the user
+ * to allow. Verified on device: the state never moves off `prompt`.
+ *
+ * So there is no `request` here, deliberately. What the state is good for is
+ * telling the truth in the UI: `prompt` and `denied` both mean MWA cannot
+ * connect on this browser, and the connect sheet offers the routes that do
+ * work instead of failing again. See `mwaIsHopeless` in the wallet modal.
  *
  * @see https://developer.chrome.com/blog/local-network-access
  */
@@ -46,25 +56,6 @@ export type LocalNetworkAccess = "granted" | "denied" | "prompt" | "unsupported"
  * be left to connect exactly as it did before.
  */
 const PERMISSION_NAMES = ["local-network-access", "loopback-network"] as const;
-
-/**
- * The request that makes Chrome ask.
- *
- * Copied verbatim from the library's own permission sheet rather than improved
- * on: plain `fetch`, no `mode`, no headers. It is the call Solana Mobile tests
- * against Chrome, and the point is to trigger the permission check, not to get
- * a response - nothing is listening on port 80 and nothing needs to be.
- */
-const PROBE_URL = "http://localhost";
-
-/**
- * How long to wait on an unanswered prompt before giving the UI back.
- *
- * The fetch stays pending for as long as the permission prompt is open, which
- * is the point - it resolves when the user answers. But an ignored prompt would
- * otherwise leave a spinner running forever.
- */
-const PROMPT_TIMEOUT_MS = 60_000;
 
 /** The permission status object, under whichever name this browser knows. */
 async function queryStatus(): Promise<PermissionStatus | null> {
@@ -119,26 +110,4 @@ export function watchLocalNetworkAccess(
     cancelled = true;
     detach?.();
   };
-}
-
-/**
- * Ask for the permission, and report where that left it.
- *
- * Must be called from inside a user gesture: Chrome will not put up a
- * permission prompt for a page that is not responding to a tap.
- *
- * Note that a grant here does *not* mean the caller can go straight on to
- * connect. Answering the prompt takes seconds, and the transient activation
- * that authorised this request will be gone by the time it resolves - so the
- * navigation to the wallet app needs a fresh tap. See the caller.
- */
-export async function requestLocalNetworkAccess(): Promise<LocalNetworkAccess> {
-  await Promise.race([
-    // The failure is expected and carries no information: connection refused
-    // means the permission let the request through.
-    fetch(PROBE_URL).catch(() => undefined),
-    new Promise((resolve) => setTimeout(resolve, PROMPT_TIMEOUT_MS)),
-  ]);
-
-  return readLocalNetworkAccess();
 }

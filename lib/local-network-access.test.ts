@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   readLocalNetworkAccess,
-  requestLocalNetworkAccess,
   watchLocalNetworkAccess,
 } from "./local-network-access";
 
@@ -18,6 +17,12 @@ import {
  * that asks.
  *
  * A one-word mistake, invisible in every log, so the naming is pinned here.
+ *
+ * Asking correctly turned out not to help - Chrome raises no dialog for a
+ * loopback request and the state stays on `prompt` - so what this module is
+ * for now is telling the connect sheet when MWA is not worth attempting. That
+ * decision is only as good as the states below, and in particular on
+ * `unsupported` never being confused for `denied`.
  */
 
 /** A `PermissionStatus` that can change, like the real one. */
@@ -95,38 +100,6 @@ describe("the name that broke Mobile Wallet Adapter", () => {
   it("reports unsupported rather than throwing without a Permissions API", async () => {
     vi.stubGlobal("navigator", {});
     expect(await readLocalNetworkAccess()).toBe("unsupported");
-  });
-});
-
-describe("requestLocalNetworkAccess", () => {
-  it("makes the request that triggers Chrome's prompt", async () => {
-    const status = fakeStatus("prompt");
-    stubPermissions({ "local-network-access": status.status });
-
-    // A real probe is refused - nothing listens on port 80. The rejection is
-    // the normal case, not a failure, and must not propagate.
-    const fetchMock = vi.fn(async () => {
-      status.set("granted");
-      throw new TypeError("Failed to fetch");
-    });
-    vi.stubGlobal("fetch", fetchMock);
-
-    expect(await requestLocalNetworkAccess()).toBe("granted");
-    expect(fetchMock).toHaveBeenCalledWith("http://localhost");
-  });
-
-  it("reports the refusal when the user declines", async () => {
-    const status = fakeStatus("prompt");
-    stubPermissions({ "local-network-access": status.status });
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => {
-        status.set("denied");
-        throw new TypeError("Failed to fetch");
-      })
-    );
-
-    expect(await requestLocalNetworkAccess()).toBe("denied");
   });
 });
 

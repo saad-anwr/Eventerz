@@ -7,6 +7,7 @@ import { WalletReadyState } from "@solana/wallet-adapter-base";
 import { SolanaMobileWalletAdapterWalletName } from "@solana-mobile/wallet-standard-mobile";
 import {
   ArrowUpRight,
+  ChevronLeft,
   ChevronRight,
   Loader2,
   ShieldCheck,
@@ -19,7 +20,6 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { GoogleMark } from "@/components/auth/google-gate";
 import { describeWalletError } from "@/lib/wallet-errors";
 import {
-  requestLocalNetworkAccess,
   watchLocalNetworkAccess,
   type LocalNetworkAccess,
 } from "@/lib/local-network-access";
@@ -82,42 +82,109 @@ const CURATED = [
 ] as const;
 
 /**
- * What to say when Chrome has blocked the permission MWA needs.
- *
- * Named the way Chrome names it on the screen the user has to open, because a
- * message that says "local network access" sends them looking for a setting
- * that is labelled "Apps on device" on any Chrome past 144.
- */
-const LNA_DENIED =
-  "Chrome is blocking this site from reaching apps on your device, which is how your wallet app is opened. Tap the icon to the left of the address bar, then Permissions, and allow “Apps on device”. Or open this page in your wallet's own browser below, which needs no permission.";
-
-/** What to say when the prompt went up and came back with nothing. */
-const LNA_UNANSWERED =
-  "Chrome did not grant access to apps on this device, so your wallet could not be opened. Try again, or open this page in your wallet's own browser below - that route needs no permission.";
-
-/** What to say once it is granted and only a fresh tap is missing. */
-const LNA_GRANTED =
-  "Access granted. Tap your wallet once more to open it.";
-
-/**
  * Why a Mobile Wallet Adapter connection failed, in the user's terms.
  *
- * MWA on the web cannot use the Android intent the native app uses. It reaches
- * the wallet over a `localhost` WebSocket, which Chrome gates behind the
- * permission handled in `lib/local-network-access`. The library raises a
- * distinct error when that permission is the blocker, and it needs a different
- * answer from a generic connection failure - "try again" does not fix a refused
- * permission, so it is not offered for one.
+ * Only reached on browsers where MWA is worth attempting at all - see
+ * `mwaIsHopeless`. Anywhere the permission gate is known to be in the way, the
+ * modal explains the alternatives instead of failing.
  */
 function mwaFailureMessage(error: unknown): string {
   const raw =
     error instanceof Error ? `${error.name} ${error.message}` : String(error);
 
   if (/LOOPBACK_ACCESS_BLOCKED|permission denied/i.test(raw)) {
-    return LNA_DENIED;
+    return "Chrome blocked the local connection your wallet needs. Open this page in your wallet's own browser below - that route needs no permission.";
   }
 
   return "Your wallet app did not open. Make sure a Solana wallet is installed, or open this page in your wallet's own browser below.";
+}
+
+/**
+ * Is Mobile Wallet Adapter a dead end on this browser?
+ *
+ * MWA on the web reaches the wallet over `ws://localhost:<port>`, which Chrome
+ * 142 put behind the permission it labels "Apps on device". Unless that is
+ * already granted, it cannot connect - and on Android Chrome the permission
+ * cannot be obtained either:
+ *
+ *   * the library asks for it under `loopback-network`, the origin-trial name,
+ *     so on a shipping Chrome the query throws and it never asks at all; and
+ *   * asking correctly, as `local-network-access` from inside the tap, is not
+ *     enough either. Chrome leaves the permission on `prompt` and puts up no
+ *     dialog for a loopback request, so there is nothing for a user to allow.
+ *     Verified on device: the state never moves.
+ *
+ * So `prompt` is not a state to work towards, it is a wall. Treating it as
+ * "try again" is what produced the loop of identical failures this replaces.
+ *
+ * `unsupported` means the browser has no such gate - older Chrome, or not
+ * Chromium - and MWA is left to connect exactly as it always did. `granted`
+ * means someone has the permission and it genuinely works.
+ */
+function mwaIsHopeless(lna: LocalNetworkAccess): boolean {
+  return lna === "prompt" || lna === "denied";
+}
+
+/** A wallet we can only reach by handing the page to its own browser. */
+type CuratedWallet = (typeof CURATED)[number];
+
+/**
+ * A curated wallet as a link: into its in-app browser on a phone, to its
+ * download page otherwise.
+ *
+ * Shared by the wallet list and by the "can't open a wallet app" explainer, so
+ * the two cannot drift into offering different routes to the same wallet.
+ */
+function WalletLinkRow({
+  wallet,
+  isMobile,
+  browseTarget,
+}: {
+  wallet: CuratedWallet;
+  isMobile: boolean;
+  browseTarget: string;
+}) {
+  /*
+   * On a phone, hand off to the wallet's in-app browser - the page reopens
+   * there and the wallet injects, which is the only route that reliably
+   * connects. Falls back to the download link for Jupiter, which publishes no
+   * browse deeplink, and for every wallet on desktop.
+   */
+  const deepLink =
+    isMobile && "browse" in wallet && browseTarget
+      ? wallet.browse(browseTarget, window.location.origin)
+      : null;
+
+  return (
+    <a
+      href={deepLink ?? wallet.url}
+      {...(deepLink ? {} : { target: "_blank", rel: "noopener noreferrer" })}
+      className="group flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.02] p-3 transition-all duration-200 hover:border-white/20 hover:bg-white/[0.04]"
+    >
+      <span
+        className="flex size-10 shrink-0 items-center justify-center rounded-xl"
+        style={{ backgroundColor: `${wallet.color}22`, color: wallet.color }}
+      >
+        <WalletIcon className="size-5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold text-white">
+          {wallet.name}
+        </span>
+        <span className="text-xs text-muted-foreground">
+          {deepLink
+            ? `Opens in ${wallet.name}`
+            : isMobile
+              ? "Get the app"
+              : "Not installed"}
+        </span>
+      </span>
+      <span className="flex items-center gap-1 text-xs font-medium text-brand-cyan">
+        {deepLink ? "Open" : "Install"}
+        <ArrowUpRight className="size-3.5" />
+      </span>
+    </a>
+  );
 }
 
 function WalletRow({
@@ -199,11 +266,19 @@ export function WalletModal() {
   const [lna, setLna] = React.useState<LocalNetworkAccess>("unsupported");
   React.useEffect(() => watchLocalNetworkAccess(setLna), []);
 
-  /** True while Chrome's permission prompt is up, so the row can spin. */
-  const [priming, setPriming] = React.useState(false);
+  /**
+   * Which panel the sheet is showing.
+   *
+   * `"no-mwa"` is the explainer that replaces a connection attempt that cannot
+   * succeed - see `mwaIsHopeless`.
+   */
+  const [view, setView] = React.useState<"wallets" | "no-mwa">("wallets");
 
-  /** Progress that is not a failure, so it does not use the error banner. */
-  const [notice, setNotice] = React.useState<string | null>(null);
+  // Always reopen on the wallet list; the explainer is a detour, not a state
+  // the sheet should remember.
+  React.useEffect(() => {
+    if (visible) setView("wallets");
+  }, [visible]);
 
   // Detected (installed / loadable) wallets, installed first.
   const detected = React.useMemo(
@@ -302,47 +377,20 @@ export function WalletModal() {
 
   const handleSelect = (name: string) => {
     setError(null);
-    setNotice(null);
 
     /*
-     * Mobile Wallet Adapter needs Chrome's "Apps on device" permission before
-     * it can reach the wallet, and nothing else asks for it.
+     * Say so, rather than fail again.
      *
-     * The library does try - but it queries `loopback-network`, the name from
-     * the origin trial, while Chrome ships `local-network-access`. That query
-     * throws, the library reads the throw as "this browser has no such
-     * permission", and hands off to a WebSocket that Chrome then refuses. No
-     * prompt is ever raised, which is why the site had no "Apps on device"
-     * entry in site settings at all: not blocked, never asked. See
-     * `lib/local-network-access`.
-     *
-     * So ask here, from inside the tap, because Chrome will not prompt a page
-     * that is not responding to one.
+     * Every attempt on this browser ends the same way, for a reason no retry
+     * touches - so the row stops attempting and shows what does work instead.
+     * The three routes out are a wallet's own browser, a desktop extension, and
+     * Google; all three are on the panel.
      */
     if (
       name === SolanaMobileWalletAdapterWalletName &&
-      (lna === "prompt" || lna === "denied")
+      mwaIsHopeless(lna)
     ) {
-      if (lna === "denied") {
-        setError(LNA_DENIED);
-        return;
-      }
-
-      setPriming(true);
-      void requestLocalNetworkAccess()
-        .then((state) => {
-          setLna(state);
-          /*
-           * A grant is not a green light to connect from here. Answering the
-           * prompt takes seconds and the activation that authorised it is long
-           * gone, so navigating to the wallet app now would be blocked as a
-           * gesture-less navigation. One more tap, and it has a live one.
-           */
-          if (state === "granted") setNotice(LNA_GRANTED);
-          else if (state === "denied") setError(LNA_DENIED);
-          else setError(LNA_UNANSWERED);
-        })
-        .finally(() => setPriming(false));
+      setView("no-mwa");
       return;
     }
 
@@ -427,17 +475,31 @@ export function WalletModal() {
             {/* Header */}
             <div className="flex shrink-0 items-start justify-between gap-4 border-b border-white/10 p-5">
               <div className="flex items-center gap-3">
-                <span className="flex size-10 items-center justify-center rounded-2xl bg-brand-purple/15 text-brand-purple">
-                  <WalletIcon className="size-5" />
-                </span>
+                {view === "no-mwa" ? (
+                  <button
+                    onClick={() => setView("wallets")}
+                    aria-label="Back to wallets"
+                    className="flex size-10 items-center justify-center rounded-2xl bg-white/[0.06] text-muted-foreground transition-colors hover:bg-white/10 hover:text-white"
+                  >
+                    <ChevronLeft className="size-5" />
+                  </button>
+                ) : (
+                  <span className="flex size-10 items-center justify-center rounded-2xl bg-brand-purple/15 text-brand-purple">
+                    <WalletIcon className="size-5" />
+                  </span>
+                )}
                 <div>
                   <h2 className="font-display text-lg font-semibold text-white">
-                    Connect a wallet
+                    {view === "no-mwa"
+                      ? "Wallet apps can't open here"
+                      : "Connect a wallet"}
                   </h2>
                   {/* The website's own line, kept as it was. Mirroring the
                       app's wording belongs after sign-in, not here. */}
                   <p className="text-xs text-muted-foreground">
-                    Choose how you want to connect
+                    {view === "no-mwa"
+                      ? "Here are three ways in that do work"
+                      : "Choose how you want to connect"}
                   </p>
                 </div>
               </div>
@@ -451,144 +513,137 @@ export function WalletModal() {
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto p-5">
-              {/* A failed connection has to say so - see the handshake effect. */}
-              {error && (
-                <p
-                  role="alert"
-                  className="mb-4 rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs text-red-300"
-                >
-                  {error}
-                </p>
-              )}
-
-              {/* Granting the permission is a step forward, not a failure, so
-                  it does not borrow the red banner. */}
-              {notice && !error && (
-                <p
-                  role="status"
-                  className="mb-4 rounded-xl border border-brand-green/30 bg-brand-green/10 px-3 py-2 text-xs text-brand-green"
-                >
-                  {notice}
-                </p>
-              )}
-
-              {/* Detected wallets */}
-              {detected.length > 0 ? (
-                <div className="space-y-2">
-                  {detected.map((w) => {
-                    const isMwa =
-                      w.adapter.name === SolanaMobileWalletAdapterWalletName;
-                    return (
-                      <WalletRow
-                        key={w.adapter.name}
-                        wallet={w}
-                        pending={
-                          pending === w.adapter.name || (isMwa && priming)
-                        }
-                        onSelect={() => handleSelect(w.adapter.name)}
-                        /* "Detected" is right for an extension and misleading
-                           for MWA, which has not detected anything - it opens a
-                           chooser and hands off to whichever wallet app
-                           answers. When Chrome has blocked the permission it
-                           needs, the row says so rather than waiting to be
-                           tapped and fail. */
-                        caption={
-                          isMwa
-                            ? lna === "denied"
-                              ? "Blocked in Chrome settings"
-                              : lna === "prompt"
-                                ? "Needs permission to open your wallet"
-                                : "Opens your wallet app"
-                            : "Detected"
-                        }
-                        captionTone={
-                          isMwa && lna === "denied" ? "blocked" : "ready"
-                        }
-                      />
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 text-center">
-                  <div className="mx-auto flex size-11 items-center justify-center rounded-2xl bg-white/[0.05] text-muted-foreground">
-                    <WalletIcon className="size-5" />
-                  </div>
-                  <p className="mt-3 text-sm font-medium text-white">
-                    No Solana wallet detected
+              {view === "no-mwa" ? (
+                <>
+                  {/*
+                    Said plainly and once, instead of a fourth identical
+                    failure. Every part of this is what the user can act on -
+                    the reason is one sentence and the rest is routes out.
+                  */}
+                  <p className="rounded-xl border border-amber-400/25 bg-amber-500/10 px-3.5 py-3 text-xs leading-relaxed text-amber-200/90">
+                    A mobile browser can&apos;t open your wallet app. Chrome has
+                    to grant this site access to apps on your device first, and
+                    it never offers the choice - so there is nothing to allow
+                    and nothing for the connection to reach.
                   </p>
-                  {/* On a phone "install one below" is wrong - the apps are
-                      very likely already there, just invisible to a web page. */}
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {isMobile
-                      ? "A web page cannot see wallet apps. Open this page in your wallet's browser below."
-                      : "Install one of the wallets below to continue."}
-                  </p>
-                </div>
-              )}
 
-              {/* Discovery */}
-              {discover.length > 0 && (
-                <div className="mt-6">
-                  <p className="mb-2 px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    {isMobile
-                      ? "Open in a wallet app"
-                      : detected.length > 0
-                        ? "More wallets"
-                        : "Get a wallet"}
-                  </p>
-                  <div className="space-y-2">
-                    {discover.map((c) => {
-                      /*
-                       * On a phone, hand off to the wallet's in-app browser -
-                       * the page reopens there and the wallet injects, which is
-                       * the only route that reliably connects. Falls back to the
-                       * download link for Jupiter, which publishes no browse
-                       * deeplink, and for every wallet on desktop.
-                       */
-                      const deepLink =
-                        isMobile && "browse" in c && browseTarget
-                          ? c.browse(browseTarget, window.location.origin)
-                          : null;
-
-                      return (
-                        <a
+                  <div className="mt-5">
+                    <p className="px-1 text-sm font-semibold text-white">
+                      Open Eventerz in your wallet
+                    </p>
+                    <p className="mb-2.5 mt-1 px-1 text-xs leading-relaxed text-muted-foreground">
+                      Every wallet ships its own browser. The page reopens
+                      inside it and connects straight away, with no permission
+                      involved. This is the one to use on a phone.
+                    </p>
+                    <div className="space-y-2">
+                      {discover.map((c) => (
+                        <WalletLinkRow
                           key={c.name}
-                          href={deepLink ?? c.url}
-                          {...(deepLink
-                            ? {}
-                            : { target: "_blank", rel: "noopener noreferrer" })}
-                          className="group flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.02] p-3 transition-all duration-200 hover:border-white/20 hover:bg-white/[0.04]"
-                        >
-                          <span
-                            className="flex size-10 shrink-0 items-center justify-center rounded-xl"
-                            style={{
-                              backgroundColor: `${c.color}22`,
-                              color: c.color,
-                            }}
-                          >
-                            <WalletIcon className="size-5" />
-                          </span>
-                          <span className="min-w-0 flex-1">
-                            <span className="block text-sm font-semibold text-white">
-                              {c.name}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {deepLink
-                                ? `Opens in ${c.name}`
-                                : isMobile
-                                  ? "Get the app"
-                                  : "Not installed"}
-                            </span>
-                          </span>
-                          <span className="flex items-center gap-1 text-xs font-medium text-brand-cyan">
-                            {deepLink ? "Open" : "Install"}
-                            <ArrowUpRight className="size-3.5" />
-                          </span>
-                        </a>
+                          wallet={c}
+                          isMobile={isMobile}
+                          browseTarget={browseTarget}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.02] p-3.5">
+                    <p className="text-sm font-semibold text-white">
+                      Or use a computer
+                    </p>
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                      On a desktop browser, connect with a wallet extension as
+                      normal. It is the same account either way - whatever you
+                      do there shows up here.
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                {/* A failed connection has to say so - see the handshake effect. */}
+                {error && (
+                  <p
+                    role="alert"
+                    className="mb-4 rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs text-red-300"
+                  >
+                    {error}
+                  </p>
+                )}
+
+                {/* Detected wallets */}
+                {detected.length > 0 ? (
+                  <div className="space-y-2">
+                    {detected.map((w) => {
+                      const isMwa =
+                        w.adapter.name === SolanaMobileWalletAdapterWalletName;
+                      return (
+                        <WalletRow
+                          key={w.adapter.name}
+                          wallet={w}
+                          pending={pending === w.adapter.name}
+                          onSelect={() => handleSelect(w.adapter.name)}
+                          /* "Detected" is right for an extension and misleading
+                             for MWA, which has not detected anything - it opens a
+                             chooser and hands off to whichever wallet app
+                             answers. Where that hand-off cannot work, the row
+                             says so up front and explains when tapped, rather
+                             than looking like every other row and failing. */
+                          caption={
+                            isMwa
+                              ? mwaIsHopeless(lna)
+                                ? "Not available in this browser"
+                                : "Opens your wallet app"
+                              : "Detected"
+                          }
+                          captionTone={
+                            isMwa && mwaIsHopeless(lna) ? "blocked" : "ready"
+                          }
+                        />
                       );
                     })}
                   </div>
-                </div>
+                ) : (
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 text-center">
+                    <div className="mx-auto flex size-11 items-center justify-center rounded-2xl bg-white/[0.05] text-muted-foreground">
+                      <WalletIcon className="size-5" />
+                    </div>
+                    <p className="mt-3 text-sm font-medium text-white">
+                      No Solana wallet detected
+                    </p>
+                    {/* On a phone "install one below" is wrong - the apps are
+                        very likely already there, just invisible to a web page. */}
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {isMobile
+                        ? "A web page cannot see wallet apps. Open this page in your wallet's browser below."
+                        : "Install one of the wallets below to continue."}
+                    </p>
+                  </div>
+                )}
+
+                {/* Discovery */}
+                {discover.length > 0 && (
+                  <div className="mt-6">
+                    <p className="mb-2 px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      {isMobile
+                        ? "Open in a wallet app"
+                        : detected.length > 0
+                          ? "More wallets"
+                          : "Get a wallet"}
+                    </p>
+                    <div className="space-y-2">
+                      {discover.map((c) => (
+                        <WalletLinkRow
+                          key={c.name}
+                          wallet={c}
+                          isMobile={isMobile}
+                          browseTarget={browseTarget}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  )}
+                </>
               )}
 
               {/*
@@ -614,9 +669,10 @@ export function WalletModal() {
                     Continue with Google
                   </button>
 
-                  <p className="mt-2.5 text-center text-xs text-muted-foreground">
-                    Google makes your profile discoverable and the account
-                    recoverable. Tickets and check-in still need a wallet.
+                  <p className="mt-2.5 text-center text-xs leading-relaxed text-muted-foreground">
+                    {view === "no-mwa"
+                      ? "Carry on here with Google - discover events, message friends, build your profile. Add a wallet later, from any browser, to claim tickets."
+                      : "Google makes your profile discoverable and the account recoverable. Tickets and check-in still need a wallet."}
                   </p>
                 </>
               )}
