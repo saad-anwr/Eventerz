@@ -40,6 +40,7 @@ import {
 } from "@/lib/hooks/use-eventerz-data";
 import { profileToUser } from "@/lib/supabase/map-profile";
 import { useSession } from "@/components/auth/use-session";
+import { GoogleGate, useHasGoogleAccount } from "@/components/auth/google-gate";
 import { PageHeader } from "@/components/app/page-header";
 import { UserCard } from "@/components/app/user-card";
 import { EmptyState } from "@/components/app/empty-state";
@@ -52,6 +53,8 @@ type Segment = "friends" | "requests" | "messages";
 
 export default function CommunityPage() {
   const { userId: me } = useSession();
+  // Community is Google-gated - see the note at the gate below.
+  const hasGoogle = useHasGoogleAccount();
   const [segment, setSegment] = React.useState<Segment>("friends");
   const [query, setQuery] = React.useState("");
 
@@ -113,6 +116,16 @@ export default function CommunityPage() {
         description="Your people - friends, requests and conversations."
       />
 
+      {/*
+        Community is the one surface that needs a Google account - the same rule
+        the app enforces, so the two behave identically. Showing the segments
+        and three empty lists instead would read as "nobody uses this" rather
+        than "you are not signed in".
+      */}
+      {!hasGoogle ? (
+        <GoogleGate />
+      ) : (
+      <>
       {/* Segments */}
       <div className="mb-6 inline-flex rounded-2xl border border-white/10 bg-white/[0.03] p-1">
         {segments.map((s) => (
@@ -368,6 +381,8 @@ export default function CommunityPage() {
             ))}
           </div>
         ))}
+      </>
+      )}
     </div>
   );
 }
