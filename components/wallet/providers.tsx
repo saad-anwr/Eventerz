@@ -8,7 +8,6 @@ import {
 import { WalletError } from "@solana/wallet-adapter-base";
 import { rpcEndpoint } from "@/lib/solana/cluster";
 import { ConnectModalProvider } from "./connect-modal-context";
-import { WalletModal } from "./wallet-modal";
 
 /**
  * Root wallet providers for the whole app.
@@ -41,10 +40,20 @@ export function WalletProviders({ children }: { children: React.ReactNode }) {
   return (
     <ConnectionProvider endpoint={endpoint}>
       <WalletProvider wallets={[]} autoConnect onError={onError}>
-        <ConnectModalProvider>
-          {children}
-          <WalletModal />
-        </ConnectModalProvider>
+        {/*
+          `<WalletModal />` is deliberately *not* rendered here.
+
+          It offers "Continue with Google" alongside the wallet list - the same
+          shape as the app's connect sheet - which means it reads auth context.
+          This provider sits above `<AuthProvider>` in the tree, so a modal
+          mounted at this level would call `useAuth()` outside its provider and
+          throw on first render of every page.
+
+          It is mounted inside `<AuthProvider>` in `app/layout.tsx` instead,
+          which is still within `ConnectModalProvider` below, so `open()` from
+          anywhere in the app continues to reach it.
+        */}
+        <ConnectModalProvider>{children}</ConnectModalProvider>
       </WalletProvider>
     </ConnectionProvider>
   );

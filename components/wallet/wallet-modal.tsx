@@ -14,6 +14,9 @@ import {
 } from "lucide-react";
 import { useConnectModal } from "./connect-modal-context";
 import { useScrollLock } from "@/hooks/use-scroll-lock";
+import { useAuth } from "@/components/auth/auth-provider";
+import { GoogleMark } from "@/components/auth/google-gate";
+import { describeWalletError } from "@/lib/wallet-errors";
 import { cn } from "@/lib/utils";
 
 /** Popular wallets to surface for discovery when not already installed. */
@@ -71,6 +74,9 @@ export function WalletModal() {
   const { wallets, select, connect, connected, connecting, wallet } =
     useWallet();
   const [pending, setPending] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const { isLive, signInWithGoogle, loading: authLoading } = useAuth();
 
   useScrollLock(visible);
 
@@ -95,12 +101,21 @@ export function WalletModal() {
     return CURATED.filter((c) => !names.has(c.name.toLowerCase()));
   }, [detected]);
 
-  // Drive the select -> connect handshake.
+  /*
+   * Drive the select -> connect handshake.
+   *
+   * The catch used to be `.catch(() => {})` - every connection failure
+   * discarded in silence. Clicking a wallet and having the modal do absolutely
+   * nothing is indistinguishable from a dead button, and it is the same class
+   * of bug that got the Android build rejected, just failing quietly instead of
+   * loudly. Errors now go through the shared vocabulary, so the browser reports
+   * what the phone reports.
+   */
   React.useEffect(() => {
     if (!pending) return;
     if (wallet?.adapter.name === pending && !connected && !connecting) {
       connect()
-        .catch(() => {})
+        .catch((e: unknown) => setError(describeWalletError(e)))
         .finally(() => setPending(null));
     }
   }, [pending, wallet, connected, connecting, connect]);
@@ -122,10 +137,25 @@ export function WalletModal() {
   }, [visible, close]);
 
   const handleSelect = (name: string) => {
+    setError(null);
     setPending(name);
     // `WalletName` is a branded string; the adapter name is exactly that type.
     select(name as Parameters<typeof select>[0]);
   };
+
+  /**
+   * Google, in the same place and with the same words as the app's sheet.
+   *
+   * It was missing here entirely. On mobile the connect sheet offers "Continue
+   * with Google" under an "or" divider - the path for anyone without a wallet,
+   * and the one that carries the profile and social graph. The website offered
+   * wallets and nothing else, so a visitor with no extension reached a dead end
+   * that the app does not have.
+   */
+  const handleGoogle = React.useCallback(() => {
+    setError(null);
+    void signInWithGoogle();
+  }, [signInWithGoogle]);
 
   return (
     <AnimatePresence>
@@ -162,8 +192,12 @@ export function WalletModal() {
                   <h2 className="font-display text-lg font-semibold text-white">
                     Connect a wallet
                   </h2>
+                  {/* Same line the app's sheet uses. It used to read "Your
+                      wallet is your Eventerz identity" there, which stopped
+                      being true at migration 0022 and told anyone without a
+                      wallet there was no way in. */}
                   <p className="text-xs text-muted-foreground">
-                    Choose how you want to connect
+                    Or continue with Google - no wallet needed to look around
                   </p>
                 </div>
               </div>
@@ -177,6 +211,16 @@ export function WalletModal() {
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto p-5">
+              {/* A failed connection has to say so - see the handshake effect. */}
+              {error && (
+                <p
+                  role="alert"
+                  className="mb-4 rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs text-red-300"
+                >
+                  {error}
+                </p>
+              )}
+
               {/* Detected wallets */}
               {detected.length > 0 ? (
                 <div className="space-y-2">
@@ -240,6 +284,36 @@ export function WalletModal() {
                     ))}
                   </div>
                 </div>
+              )}
+
+              {/*
+                Google, below the wallets and behind an "or" - the same order,
+                divider and helper text as the app's connect sheet, so the two
+                onboarding surfaces read as one product.
+              */}
+              {isLive && (
+                <>
+                  <div className="my-5 flex items-center gap-3">
+                    <span className="h-px flex-1 bg-white/10" />
+                    <span className="text-xs text-muted-foreground">or</span>
+                    <span className="h-px flex-1 bg-white/10" />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleGoogle}
+                    disabled={authLoading}
+                    className="flex h-[52px] w-full items-center justify-center gap-2.5 rounded-full border border-white/[0.12] bg-white/[0.05] text-sm font-semibold text-white transition-colors hover:bg-white/[0.08] disabled:opacity-60"
+                  >
+                    <GoogleMark className="size-[18px]" />
+                    Continue with Google
+                  </button>
+
+                  <p className="mt-2.5 text-center text-xs text-muted-foreground">
+                    Google makes your profile discoverable and the account
+                    recoverable. Tickets and check-in still need a wallet.
+                  </p>
+                </>
               )}
             </div>
 

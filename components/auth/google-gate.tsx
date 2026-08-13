@@ -35,8 +35,13 @@ export function useHasGoogleAccount(): boolean {
   return Boolean(isLive && supabaseUser);
 }
 
-/** Google's mark, inline so the page stays self-contained (CSP-safe). */
-function GoogleMark({ className }: { className?: string }) {
+/**
+ * Google's mark, inline so the page stays self-contained (CSP-safe).
+ *
+ * Exported because the connect modal shows the same button; a second copy of
+ * this path data is a second thing to keep in step for no benefit.
+ */
+export function GoogleMark({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
       <path

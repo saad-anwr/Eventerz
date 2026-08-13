@@ -36,6 +36,8 @@ import { EventMap } from "@/components/app/event-map";
 import { GuestManager } from "@/components/app/guest-manager";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { useConnectModal } from "@/components/wallet/connect-modal-context";
 import { useOnChainActions } from "@/lib/solana/use-onchain-actions";
 import { FeeCancelled, useFee } from "@/lib/solana/use-fee";
 import { formatEventDate } from "@/lib/format";
@@ -67,6 +69,10 @@ export function EventDetail() {
   const { data: host } = useProfile(row?.host_id);
   const onChain = useOnChainActions();
 
+  // RSVP is the wallet half of the access model - see `handleJoin`.
+  const { connected: walletConnected } = useWallet();
+  const { open: openConnectModal } = useConnectModal();
+
   /** $1 in SOL, taken before the seat is claimed. Free off mainnet. */
   const {
     pay: payRsvpFee,
@@ -91,6 +97,22 @@ export function EventDetail() {
   const handleJoin = React.useCallback(async () => {
     if (!event || joining) return;
     setJoinError('');
+
+    /*
+     * RSVP needs a wallet, and asking for one is not an error.
+     *
+     * The app gates this with `requireWallet`, which opens the connect sheet and
+     * resumes afterwards. The website had no gate at all: a visitor signed in
+     * with Google fell straight into `payRsvpFee`, which needs a signer, and got
+     * a wallet-adapter failure phrased as though the RSVP itself had gone wrong.
+     *
+     * This is the half of the access model that pushes a Google user toward a
+     * wallet - so it has to read as "one more step", not as a fault.
+     */
+    if (!walletConnected) {
+      openConnectModal();
+      return;
+    }
 
     /*
      * The $1 fee comes first, and it is non-refundable.
@@ -139,8 +161,10 @@ export function EventDetail() {
     host?.wallet_address,
     joining,
     onChain,
+    openConnectModal,
     payRsvpFee,
     requestToJoin,
+    walletConnected,
   ]);
 
   if (isLoading) {

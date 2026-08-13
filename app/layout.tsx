@@ -6,6 +6,7 @@ import { Inter, Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import "@/lib/env";
 import { siteConfig } from "@/lib/site";
 import { WalletProviders } from "@/components/wallet/providers";
+import { WalletModal } from "@/components/wallet/wallet-modal";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { QueryProvider } from "@/components/query-provider";
 import { TranslationProvider } from "@/components/layout/translation-provider";
@@ -120,7 +121,13 @@ export default function RootLayout({
         <TranslationProvider>
           <QueryProvider>
             <WalletProviders>
-              <AuthProvider>{children}</AuthProvider>
+              {/* `WalletModal` lives inside `AuthProvider`, not beside it: the
+                  modal offers Google sign-in next to the wallet list, so it
+                  reads auth context. See the note in `wallet/providers.tsx`. */}
+              <AuthProvider>
+                {children}
+                <WalletModal />
+              </AuthProvider>
             </WalletProviders>
           </QueryProvider>
         </TranslationProvider>
