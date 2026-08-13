@@ -20,11 +20,59 @@ import { GoogleMark } from "@/components/auth/google-gate";
 import { describeWalletError } from "@/lib/wallet-errors";
 import { cn } from "@/lib/utils";
 
-/** Popular wallets to surface for discovery when not already installed. */
+/**
+ * Popular wallets, and how to reach each one on a phone.
+ *
+ * # Why `browse` exists
+ *
+ * A mobile web page cannot connect to a wallet *app*. Nothing injects into the
+ * tab, and no browser API enumerates installed apps - so these rows previously
+ * said "Not installed" and offered an extension download, on a phone that had
+ * every one of them.
+ *
+ * There are exactly two mechanisms that work, and this is the reliable one:
+ * hand the page off to the wallet's own in-app browser, where the wallet does
+ * inject and connects normally. The other is Mobile Wallet Adapter, which on
+ * web has to reach the wallet over a localhost socket and depends on a Chrome
+ * permission prompt that does not always appear - so it is offered alongside
+ * these rather than instead of them.
+ *
+ * Formats are per-wallet and taken from each vendor's deeplink docs; both the
+ * target URL and the referrer are percent-encoded.
+ *
+ * Jupiter deliberately has no `browse`. Jupiter Mobile ships an in-app browser
+ * but publishes no `ul/browse` universal link, and inventing a URL shape would
+ * produce exactly the dead row this is meant to remove. It stays reachable
+ * through Mobile Wallet Adapter, which Jupiter Mobile supports on Android.
+ */
 const CURATED = [
-  { name: "Phantom", url: "https://phantom.app/download", color: "#AB9FF2" },
-  { name: "Solflare", url: "https://solflare.com/download", color: "#FFC10A" },
-  { name: "Backpack", url: "https://backpack.app/download", color: "#E33E3F" },
+  {
+    name: "Phantom",
+    url: "https://phantom.app/download",
+    color: "#AB9FF2",
+    browse: (target: string, ref: string) =>
+      `https://phantom.app/ul/browse/${encodeURIComponent(
+        target
+      )}?ref=${encodeURIComponent(ref)}`,
+  },
+  {
+    name: "Solflare",
+    url: "https://solflare.com/download",
+    color: "#FFC10A",
+    browse: (target: string, ref: string) =>
+      `https://solflare.com/ul/v1/browse/${encodeURIComponent(
+        target
+      )}?ref=${encodeURIComponent(ref)}`,
+  },
+  {
+    name: "Backpack",
+    url: "https://backpack.app/download",
+    color: "#E33E3F",
+    browse: (target: string, ref: string) =>
+      `https://backpack.app/ul/v1/browse/${encodeURIComponent(
+        target
+      )}?ref=${encodeURIComponent(ref)}`,
+  },
   { name: "Jupiter", url: "https://jup.ag/mobile", color: "#22D3EE" },
 ] as const;
 
@@ -111,20 +159,35 @@ export function WalletModal() {
   );
 
   /*
-   * Curated wallets that aren't already detected -> offer install links.
+   * Are we on a phone?
    *
-   * Suppressed entirely once MWA is available, because on a phone these links
-   * are actively wrong. They point at browser-extension downloads, and the row
-   * says "Not installed" about apps the user very likely *does* have installed -
-   * a page cannot see native apps, so absence from this list means nothing about
-   * the device. Telling somebody with four wallets to install a fifth is worse
-   * than showing nothing. MWA reaches all of them in one entry anyway.
+   * Read in an effect rather than during render: `navigator` does not exist
+   * during the server pass, and branching the markup on it directly would
+   * produce a hydration mismatch on every page load.
+   */
+  const [isMobile, setIsMobile] = React.useState(false);
+  React.useEffect(() => {
+    setIsMobile(/android|iphone|ipad|ipod/i.test(navigator.userAgent));
+  }, []);
+
+  /** The page to reopen inside a wallet's in-app browser. */
+  const browseTarget = React.useMemo(() => {
+    if (typeof window === "undefined") return "";
+    return window.location.href;
+  }, []);
+
+  /*
+   * Curated wallets that aren't already detected.
+   *
+   * Kept on both platforms - the earlier version suppressed them entirely once
+   * MWA registered, which removed the only rows that actually connect on a
+   * phone. What changes by platform is *what the row does*: an extension
+   * download on desktop, a hand-off into the wallet's own browser on mobile.
    */
   const discover = React.useMemo(() => {
-    if (mwaAvailable) return [];
     const names = new Set(detected.map((w) => w.adapter.name.toLowerCase()));
     return CURATED.filter((c) => !names.has(c.name.toLowerCase()));
-  }, [detected, mwaAvailable]);
+  }, [detected]);
 
   /*
    * Drive the select -> connect handshake.
@@ -139,8 +202,29 @@ export function WalletModal() {
   React.useEffect(() => {
     if (!pending) return;
     if (wallet?.adapter.name === pending && !connected && !connecting) {
+      const attempted = pending;
       connect()
-        .catch((e: unknown) => setError(describeWalletError(e)))
+        .catch((e: unknown) => {
+          /*
+           * Mobile Wallet Adapter fails differently, and generically, so it
+           * gets its own sentence.
+           *
+           * On web MWA cannot use the Android intent the native app uses. It
+           * reaches the wallet over a localhost socket, which first needs
+           * Chrome's local-network permission - the "Allow connections to your
+           * wallet" prompt. When that prompt does not appear, or was declined
+           * once, the handshake dies with nothing specific to report. Saying
+           * "try again" there sends people round the same loop; the in-app
+           * browser rows below are the route that does not depend on it.
+           */
+          if (attempted === SolanaMobileWalletAdapterWalletName) {
+            setError(
+              "Your wallet app did not open. Chrome needs permission to reach it, which it does not always ask for - opening this page inside your wallet's own browser below works without that."
+            );
+            return;
+          }
+          setError(describeWalletError(e));
+        })
         .finally(() => setPending(null));
     }
   }, [pending, wallet, connected, connecting, connect]);
@@ -217,12 +301,10 @@ export function WalletModal() {
                   <h2 className="font-display text-lg font-semibold text-white">
                     Connect a wallet
                   </h2>
-                  {/* Same line the app's sheet uses. It used to read "Your
-                      wallet is your Eventerz identity" there, which stopped
-                      being true at migration 0022 and told anyone without a
-                      wallet there was no way in. */}
+                  {/* The website's own line, kept as it was. Mirroring the
+                      app's wording belongs after sign-in, not here. */}
                   <p className="text-xs text-muted-foreground">
-                    Or continue with Google - no wallet needed to look around
+                    Choose how you want to connect
                   </p>
                 </div>
               </div>
@@ -274,8 +356,12 @@ export function WalletModal() {
                   <p className="mt-3 text-sm font-medium text-white">
                     No Solana wallet detected
                   </p>
+                  {/* On a phone "install one below" is wrong - the apps are
+                      very likely already there, just invisible to a web page. */}
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Install one of the wallets below to continue.
+                    {isMobile
+                      ? "A web page cannot see wallet apps. Open this page in your wallet's browser below."
+                      : "Install one of the wallets below to continue."}
                   </p>
                 </div>
               )}
@@ -284,37 +370,63 @@ export function WalletModal() {
               {discover.length > 0 && (
                 <div className="mt-6">
                   <p className="mb-2 px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    {detected.length > 0 ? "More wallets" : "Get a wallet"}
+                    {isMobile
+                      ? "Open in a wallet app"
+                      : detected.length > 0
+                        ? "More wallets"
+                        : "Get a wallet"}
                   </p>
                   <div className="space-y-2">
-                    {discover.map((c) => (
-                      <a
-                        key={c.name}
-                        href={c.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="group flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.02] p-3 transition-all duration-200 hover:border-white/20 hover:bg-white/[0.04]"
-                      >
-                        <span
-                          className="flex size-10 shrink-0 items-center justify-center rounded-xl"
-                          style={{ backgroundColor: `${c.color}22`, color: c.color }}
+                    {discover.map((c) => {
+                      /*
+                       * On a phone, hand off to the wallet's in-app browser -
+                       * the page reopens there and the wallet injects, which is
+                       * the only route that reliably connects. Falls back to the
+                       * download link for Jupiter, which publishes no browse
+                       * deeplink, and for every wallet on desktop.
+                       */
+                      const deepLink =
+                        isMobile && "browse" in c && browseTarget
+                          ? c.browse(browseTarget, window.location.origin)
+                          : null;
+
+                      return (
+                        <a
+                          key={c.name}
+                          href={deepLink ?? c.url}
+                          {...(deepLink
+                            ? {}
+                            : { target: "_blank", rel: "noopener noreferrer" })}
+                          className="group flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.02] p-3 transition-all duration-200 hover:border-white/20 hover:bg-white/[0.04]"
                         >
-                          <WalletIcon className="size-5" />
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block text-sm font-semibold text-white">
-                            {c.name}
+                          <span
+                            className="flex size-10 shrink-0 items-center justify-center rounded-xl"
+                            style={{
+                              backgroundColor: `${c.color}22`,
+                              color: c.color,
+                            }}
+                          >
+                            <WalletIcon className="size-5" />
                           </span>
-                          <span className="text-xs text-muted-foreground">
-                            Not installed
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-sm font-semibold text-white">
+                              {c.name}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {deepLink
+                                ? `Opens in ${c.name}`
+                                : isMobile
+                                  ? "Get the app"
+                                  : "Not installed"}
+                            </span>
                           </span>
-                        </span>
-                        <span className="flex items-center gap-1 text-xs font-medium text-brand-cyan">
-                          Install
-                          <ArrowUpRight className="size-3.5" />
-                        </span>
-                      </a>
-                    ))}
+                          <span className="flex items-center gap-1 text-xs font-medium text-brand-cyan">
+                            {deepLink ? "Open" : "Install"}
+                            <ArrowUpRight className="size-3.5" />
+                          </span>
+                        </a>
+                      );
+                    })}
                   </div>
                 </div>
               )}
