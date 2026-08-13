@@ -4,6 +4,7 @@ import * as React from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useWallet, type Wallet } from "@solana/wallet-adapter-react";
 import { WalletReadyState } from "@solana/wallet-adapter-base";
+import { SolanaMobileWalletAdapterWalletName } from "@solana-mobile/wallet-standard-mobile";
 import {
   ArrowUpRight,
   ChevronRight,
@@ -31,10 +32,12 @@ function WalletRow({
   wallet,
   pending,
   onSelect,
+  caption = "Detected",
 }: {
   wallet: Wallet;
   pending: boolean;
   onSelect: () => void;
+  caption?: string;
 }) {
   return (
     <button
@@ -58,7 +61,7 @@ function WalletRow({
         <span className="block text-sm font-semibold text-white">
           {wallet.adapter.name}
         </span>
-        <span className="text-xs text-brand-green">Detected</span>
+        <span className="text-xs text-brand-green">{caption}</span>
       </span>
       {pending ? (
         <Loader2 className="size-4 animate-spin text-brand-purple" />
@@ -95,11 +98,33 @@ export function WalletModal() {
     [wallets]
   );
 
-  // Curated wallets that aren't already detected -> offer install links.
+  /**
+   * True when Mobile Wallet Adapter registered, i.e. we are on Android and the
+   * page can hand off to a wallet *app*. See `registerMwa` in `providers.tsx`.
+   */
+  const mwaAvailable = React.useMemo(
+    () =>
+      detected.some(
+        (w) => w.adapter.name === SolanaMobileWalletAdapterWalletName
+      ),
+    [detected]
+  );
+
+  /*
+   * Curated wallets that aren't already detected -> offer install links.
+   *
+   * Suppressed entirely once MWA is available, because on a phone these links
+   * are actively wrong. They point at browser-extension downloads, and the row
+   * says "Not installed" about apps the user very likely *does* have installed -
+   * a page cannot see native apps, so absence from this list means nothing about
+   * the device. Telling somebody with four wallets to install a fifth is worse
+   * than showing nothing. MWA reaches all of them in one entry anyway.
+   */
   const discover = React.useMemo(() => {
+    if (mwaAvailable) return [];
     const names = new Set(detected.map((w) => w.adapter.name.toLowerCase()));
     return CURATED.filter((c) => !names.has(c.name.toLowerCase()));
-  }, [detected]);
+  }, [detected, mwaAvailable]);
 
   /*
    * Drive the select -> connect handshake.
@@ -230,6 +255,14 @@ export function WalletModal() {
                       wallet={w}
                       pending={pending === w.adapter.name}
                       onSelect={() => handleSelect(w.adapter.name)}
+                      /* "Detected" is right for an extension and misleading for
+                         MWA, which has not detected anything - it opens a
+                         chooser and hands off to whichever wallet app answers. */
+                      caption={
+                        w.adapter.name === SolanaMobileWalletAdapterWalletName
+                          ? "Opens your wallet app"
+                          : "Detected"
+                      }
                     />
                   ))}
                 </div>

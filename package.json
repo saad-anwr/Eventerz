@@ -2,7 +2,7 @@
   "name": "eventerz",
   "version": "1.0.0",
   "private": true,
-  "description": "Eventerz \u2014 Wallet-native event infrastructure on Solana.",
+  "description": "Eventerz — Wallet-native event infrastructure on Solana.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -23,6 +23,7 @@
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.2",
     "@radix-ui/react-slot": "^1.1.1",
+    "@solana-mobile/wallet-standard-mobile": "^0.5.3",
     "@solana/wallet-adapter-base": "^0.9.27",
     "@solana/wallet-adapter-react": "^0.15.39",
     "@solana/web3.js": "^1.98.4",
@@ -41,7 +42,7 @@
     "tailwindcss-animate": "^1.0.7",
     "zustand": "^5.0.14"
   },
-  "//overrides": "Forced transitive versions that `npm audit fix` cannot reach \u2014 nested copies pinned by packages with no published bump. Each is patch-or-minor inside the same major, so `next build` proves the API is unchanged. postcss: sourceMappingURL path traversal + arbitrary file read + </style> XSS (Next 15.5 bundles 8.4.31). sharp: inherited libvips CVEs; Next declares ^0.34.3 and 0.35 is the patched line. brace-expansion: unbounded-expansion DoS, reached via two minimatch majors. NOT overridden: uuid@8.3.2 under jayson under @solana/web3.js \u2014 the advisory is a bounds check in v3/v5/v6 when the caller supplies a buffer, and jayson only calls v4() with no buffer, so the code is unreachable. Forcing uuid 11 is a major bump across a CJS/ESM boundary to fix a path that cannot be hit. The real fix is the @solana/web3.js v2 migration. See docs/SECURITY.md.",
+  "//overrides": "Forced transitive versions that `npm audit fix` cannot reach — nested copies pinned by packages with no published bump. Each is patch-or-minor inside the same major, so `next build` proves the API is unchanged. postcss: sourceMappingURL path traversal + arbitrary file read + </style> XSS (Next 15.5 bundles 8.4.31). sharp: inherited libvips CVEs; Next declares ^0.34.3 and 0.35 is the patched line. brace-expansion: unbounded-expansion DoS, reached via two minimatch majors. NOT overridden: uuid@8.3.2 under jayson under @solana/web3.js — the advisory is a bounds check in v3/v5/v6 when the caller supplies a buffer, and jayson only calls v4() with no buffer, so the code is unreachable. Forcing uuid 11 is a major bump across a CJS/ESM boundary to fix a path that cannot be hit. The real fix is the @solana/web3.js v2 migration. See docs/SECURITY.md.",
   "overrides": {
     "postcss": "^8.5.22",
     "sharp": "^0.35.0",
