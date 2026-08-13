@@ -18,6 +18,11 @@ import { useScrollLock } from "@/hooks/use-scroll-lock";
 import { useAuth } from "@/components/auth/auth-provider";
 import { GoogleMark } from "@/components/auth/google-gate";
 import { describeWalletError } from "@/lib/wallet-errors";
+import {
+  requestLocalNetworkAccess,
+  watchLocalNetworkAccess,
+  type LocalNetworkAccess,
+} from "@/lib/local-network-access";
 import { cn } from "@/lib/utils";
 
 /**
@@ -77,31 +82,42 @@ const CURATED = [
 ] as const;
 
 /**
+ * What to say when Chrome has blocked the permission MWA needs.
+ *
+ * Named the way Chrome names it on the screen the user has to open, because a
+ * message that says "local network access" sends them looking for a setting
+ * that is labelled "Apps on device" on any Chrome past 144.
+ */
+const LNA_DENIED =
+  "Chrome is blocking this site from reaching apps on your device, which is how your wallet app is opened. Tap the icon to the left of the address bar, then Permissions, and allow “Apps on device”. Or open this page in your wallet's own browser below, which needs no permission.";
+
+/** What to say when the prompt went up and came back with nothing. */
+const LNA_UNANSWERED =
+  "Chrome did not grant access to apps on this device, so your wallet could not be opened. Try again, or open this page in your wallet's own browser below - that route needs no permission.";
+
+/** What to say once it is granted and only a fresh tap is missing. */
+const LNA_GRANTED =
+  "Access granted. Tap your wallet once more to open it.";
+
+/**
  * Why a Mobile Wallet Adapter connection failed, in the user's terms.
  *
  * MWA on the web cannot use the Android intent the native app uses. It reaches
- * the wallet over a `localhost` WebSocket, which Chrome gates behind its Local
- * Network Access permission - the "Allow connections to your wallet" screen.
- * The library raises two distinct outcomes there and they need different
- * answers, so the generic wallet vocabulary is not enough:
- *
- *   * the permission was refused, which is recoverable in site settings; and
- *   * the prompt never resolved, which is the known browser-compatibility gap
- *     (Solana Mobile only tests Chrome, and cites "differences in browser
- *     configurations for required permissions" for everything else).
- *
- * Neither is fixed by "try again", so neither says it. Both point at the in-app
- * browser rows, which do not depend on that permission at all.
+ * the wallet over a `localhost` WebSocket, which Chrome gates behind the
+ * permission handled in `lib/local-network-access`. The library raises a
+ * distinct error when that permission is the blocker, and it needs a different
+ * answer from a generic connection failure - "try again" does not fix a refused
+ * permission, so it is not offered for one.
  */
 function mwaFailureMessage(error: unknown): string {
   const raw =
     error instanceof Error ? `${error.name} ${error.message}` : String(error);
 
   if (/LOOPBACK_ACCESS_BLOCKED|permission denied/i.test(raw)) {
-    return "Chrome is blocking the local connection your wallet needs. Allow it for this site in Chrome's site settings, or open this page in your wallet's own browser below - that route needs no permission.";
+    return LNA_DENIED;
   }
 
-  return "Your wallet app did not open. Chrome has to grant a local-network permission first and does not always ask - opening this page inside your wallet's own browser below works without it.";
+  return "Your wallet app did not open. Make sure a Solana wallet is installed, or open this page in your wallet's own browser below.";
 }
 
 function WalletRow({
@@ -109,11 +125,14 @@ function WalletRow({
   pending,
   onSelect,
   caption = "Detected",
+  captionTone = "ready",
 }: {
   wallet: Wallet;
   pending: boolean;
   onSelect: () => void;
   caption?: string;
+  /** "ready" is the green that means detected; "blocked" must not be green. */
+  captionTone?: "ready" | "blocked";
 }) {
   return (
     <button
@@ -137,7 +156,14 @@ function WalletRow({
         <span className="block text-sm font-semibold text-white">
           {wallet.adapter.name}
         </span>
-        <span className="text-xs text-brand-green">{caption}</span>
+        <span
+          className={cn(
+            "text-xs",
+            captionTone === "blocked" ? "text-amber-400" : "text-brand-green"
+          )}
+        >
+          {caption}
+        </span>
       </span>
       {pending ? (
         <Loader2 className="size-4 animate-spin text-brand-purple" />
@@ -160,67 +186,38 @@ export function WalletModal() {
   useScrollLock(visible);
 
   /*
-   * Has the browser already refused the permission MWA depends on?
+   * The permission MWA cannot work without.
    *
-   * MWA reaches the wallet over a localhost socket, gated by Chrome's Local
-   * Network Access permission. Once that is `denied` for the site, every
-   * attempt fails at the same place with no prompt - so offering the row is
-   * offering a button that cannot work. Better to hide it and leave the routes
-   * that do, than to let someone tap the same dead end repeatedly.
+   * Tracked here rather than read at click time because reading it is async,
+   * and an `await` before `connect()` spends the tap - see `handleSelect`. By
+   * the time a row is tapped this already holds the answer.
    *
-   * `permissions.query` throws on browsers that do not know this permission
-   * name, which is not a refusal - those are left alone and MWA stays offered.
+   * Watching rather than polling also means a user who grants the permission in
+   * Chrome's site settings, in another tab, comes back to a working button
+   * without reloading.
    */
-  const [loopbackDenied, setLoopbackDenied] = React.useState(false);
-  React.useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const status = await navigator.permissions.query({
-          name: "loopback-network" as PermissionName,
-        });
-        if (cancelled) return;
-        setLoopbackDenied(status.state === "denied");
-        status.onchange = () => setLoopbackDenied(status.state === "denied");
-      } catch {
-        // Permission name unknown here - say nothing about it.
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const [lna, setLna] = React.useState<LocalNetworkAccess>("unsupported");
+  React.useEffect(() => watchLocalNetworkAccess(setLna), []);
 
-  // Detected (installed / loadable) wallets, installed first. MWA is dropped
-  // when the browser has already refused the permission it needs.
+  /** True while Chrome's permission prompt is up, so the row can spin. */
+  const [priming, setPriming] = React.useState(false);
+
+  /** Progress that is not a failure, so it does not use the error banner. */
+  const [notice, setNotice] = React.useState<string | null>(null);
+
+  // Detected (installed / loadable) wallets, installed first.
   const detected = React.useMemo(
     () =>
       wallets
         .filter(
           (w) =>
-            (w.readyState === WalletReadyState.Installed ||
-              w.readyState === WalletReadyState.Loadable) &&
-            !(
-              loopbackDenied &&
-              w.adapter.name === SolanaMobileWalletAdapterWalletName
-            )
+            w.readyState === WalletReadyState.Installed ||
+            w.readyState === WalletReadyState.Loadable
         )
         .sort((a, b) =>
           a.readyState === WalletReadyState.Installed ? -1 : 1
         ),
-    [wallets, loopbackDenied]
-  );
-
-  /**
-   * True when Mobile Wallet Adapter registered, i.e. we are on Android and the
-   * page can hand off to a wallet *app*. See `registerMwa` in `providers.tsx`.
-   */
-  const mwaAvailable = React.useMemo(
-    () =>
-      detected.some(
-        (w) => w.adapter.name === SolanaMobileWalletAdapterWalletName
-      ),
-    [detected]
+    [wallets]
   );
 
   /*
@@ -305,6 +302,50 @@ export function WalletModal() {
 
   const handleSelect = (name: string) => {
     setError(null);
+    setNotice(null);
+
+    /*
+     * Mobile Wallet Adapter needs Chrome's "Apps on device" permission before
+     * it can reach the wallet, and nothing else asks for it.
+     *
+     * The library does try - but it queries `loopback-network`, the name from
+     * the origin trial, while Chrome ships `local-network-access`. That query
+     * throws, the library reads the throw as "this browser has no such
+     * permission", and hands off to a WebSocket that Chrome then refuses. No
+     * prompt is ever raised, which is why the site had no "Apps on device"
+     * entry in site settings at all: not blocked, never asked. See
+     * `lib/local-network-access`.
+     *
+     * So ask here, from inside the tap, because Chrome will not prompt a page
+     * that is not responding to one.
+     */
+    if (
+      name === SolanaMobileWalletAdapterWalletName &&
+      (lna === "prompt" || lna === "denied")
+    ) {
+      if (lna === "denied") {
+        setError(LNA_DENIED);
+        return;
+      }
+
+      setPriming(true);
+      void requestLocalNetworkAccess()
+        .then((state) => {
+          setLna(state);
+          /*
+           * A grant is not a green light to connect from here. Answering the
+           * prompt takes seconds and the activation that authorised it is long
+           * gone, so navigating to the wallet app now would be blocked as a
+           * gesture-less navigation. One more tap, and it has a live one.
+           */
+          if (state === "granted") setNotice(LNA_GRANTED);
+          else if (state === "denied") setError(LNA_DENIED);
+          else setError(LNA_UNANSWERED);
+        })
+        .finally(() => setPriming(false));
+      return;
+    }
+
     setPending(name);
     // `WalletName` is a branded string; the adapter name is exactly that type.
     select(name as Parameters<typeof select>[0]);
@@ -420,25 +461,52 @@ export function WalletModal() {
                 </p>
               )}
 
+              {/* Granting the permission is a step forward, not a failure, so
+                  it does not borrow the red banner. */}
+              {notice && !error && (
+                <p
+                  role="status"
+                  className="mb-4 rounded-xl border border-brand-green/30 bg-brand-green/10 px-3 py-2 text-xs text-brand-green"
+                >
+                  {notice}
+                </p>
+              )}
+
               {/* Detected wallets */}
               {detected.length > 0 ? (
                 <div className="space-y-2">
-                  {detected.map((w) => (
-                    <WalletRow
-                      key={w.adapter.name}
-                      wallet={w}
-                      pending={pending === w.adapter.name}
-                      onSelect={() => handleSelect(w.adapter.name)}
-                      /* "Detected" is right for an extension and misleading for
-                         MWA, which has not detected anything - it opens a
-                         chooser and hands off to whichever wallet app answers. */
-                      caption={
-                        w.adapter.name === SolanaMobileWalletAdapterWalletName
-                          ? "Opens your wallet app"
-                          : "Detected"
-                      }
-                    />
-                  ))}
+                  {detected.map((w) => {
+                    const isMwa =
+                      w.adapter.name === SolanaMobileWalletAdapterWalletName;
+                    return (
+                      <WalletRow
+                        key={w.adapter.name}
+                        wallet={w}
+                        pending={
+                          pending === w.adapter.name || (isMwa && priming)
+                        }
+                        onSelect={() => handleSelect(w.adapter.name)}
+                        /* "Detected" is right for an extension and misleading
+                           for MWA, which has not detected anything - it opens a
+                           chooser and hands off to whichever wallet app
+                           answers. When Chrome has blocked the permission it
+                           needs, the row says so rather than waiting to be
+                           tapped and fail. */
+                        caption={
+                          isMwa
+                            ? lna === "denied"
+                              ? "Blocked in Chrome settings"
+                              : lna === "prompt"
+                                ? "Needs permission to open your wallet"
+                                : "Opens your wallet app"
+                            : "Detected"
+                        }
+                        captionTone={
+                          isMwa && lna === "denied" ? "blocked" : "ready"
+                        }
+                      />
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 text-center">
