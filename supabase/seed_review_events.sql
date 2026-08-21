@@ -43,6 +43,19 @@
 do $$
 declare
   host uuid;
+  /*
+   * Midnight tonight in Delhi, as the base every start time is offset from.
+   *
+   * The first cut of this script added intervals to `now()` directly, which
+   * carried the current minutes and seconds through: events landed at 3:01 PM
+   * and 5:31 AM. Nobody schedules a meetup at 3:01, and content that is
+   * obviously machine-generated is content a reviewer reads as filler.
+   *
+   * Truncating in `Asia/Kolkata` rather than UTC because these are Delhi
+   * events - a clean UTC hour is 5:30 past the hour locally, which is the same
+   * problem wearing a different timezone.
+   */
+  ist_midnight timestamp := date_trunc('day', now() at time zone 'Asia/Kolkata');
 begin
   -- Prefer the project owner's profile; fall back to the oldest one that
   -- exists so this still runs on a database where that handle was renamed.
@@ -66,8 +79,8 @@ begin
       'Solana Delhi Builders Meetup',
       E'An evening for people building on Solana in Delhi NCR.\n\nLightning talks from local builders, then open floor. Bring a laptop if you want to demo something - we keep the last hour for whoever wants to show what they are working on.\n\nNew to Solana? Come anyway. Roughly half the room usually is.',
       host, 'Meetup', 'purple-blue',
-      now() + interval '4 days' + interval '11 hours',
-      now() + interval '4 days' + interval '14 hours',
+      (ist_midnight + interval '4 days 19 hours') at time zone 'Asia/Kolkata',
+      (ist_midnight + interval '4 days 22 hours') at time zone 'Asia/Kolkata',
       'Innov8 Connaught Place, New Delhi',
       'Innov8, 44 Regal Building, Connaught Place, New Delhi 110001',
       28.6304, 77.2177,
@@ -81,8 +94,8 @@ begin
       'Eventerz Community AMA',
       E'Open call with the Eventerz team.\n\nWe walk through what shipped this month, then answer whatever you ask - roadmap, on-chain ticketing, reputation, or why we made a particular call. Questions can be sent ahead in the event chat.',
       host, 'AMA', 'blue-cyan',
-      now() + interval '2 days' + interval '15 hours',
-      now() + interval '2 days' + interval '16 hours',
+      (ist_midnight + interval '2 days 20 hours') at time zone 'Asia/Kolkata',
+      (ist_midnight + interval '2 days 21 hours') at time zone 'Asia/Kolkata',
       'Online', null, null, null,
       true, 300, 'Free', 'public', false,
       array['ama','community','online']
@@ -93,8 +106,8 @@ begin
       'Seeker Workshop: Mobile Wallet Adapter',
       E'A hands-on session on building for the Solana Seeker.\n\nWe go from an empty React Native project to a working Mobile Wallet Adapter connection, cover the Android package-visibility trap that silently breaks wallet discovery, and finish on signing and sending a real transaction.\n\nBring an Android device if you have one. Emulators work too.',
       host, 'Workshop', 'cyan-green',
-      now() + interval '8 days' + interval '10 hours',
-      now() + interval '8 days' + interval '13 hours',
+      (ist_midnight + interval '8 days 11 hours') at time zone 'Asia/Kolkata',
+      (ist_midnight + interval '8 days 14 hours') at time zone 'Asia/Kolkata',
       'WeWork Berger Delhi One, Noida',
       'WeWork Berger Delhi One, Sector 16B, Noida 201301',
       28.5708, 77.3260,
@@ -108,8 +121,8 @@ begin
       'Superteam India Hackathon Kickoff',
       E'Kickoff for the next Superteam India hackathon cycle.\n\nTracks, prizes and judging criteria, followed by team formation for anyone still looking. Approval is on so we can keep the room to people actually intending to ship - say a line about what you want to build when you request.',
       host, 'Hackathon', 'fuchsia-purple',
-      now() + interval '13 days' + interval '9 hours',
-      now() + interval '13 days' + interval '18 hours',
+      (ist_midnight + interval '13 days 10 hours') at time zone 'Asia/Kolkata',
+      (ist_midnight + interval '13 days 19 hours') at time zone 'Asia/Kolkata',
       'Superteam House, Gurugram',
       'Superteam House, Sector 44, Gurugram 122003',
       28.4529, 77.0783,
@@ -123,8 +136,8 @@ begin
       'Web3 Founders Dinner',
       E'A small dinner for founders building in web3, capped at one table.\n\nNo talks and no pitching - it is a dinner. Approval is on because the table is the point; the ticket covers the meal and settles straight to the host wallet.',
       host, 'Party', 'violet-purple',
-      now() + interval '19 days' + interval '19 hours',
-      now() + interval '19 days' + interval '22 hours',
+      (ist_midnight + interval '19 days 20 hours') at time zone 'Asia/Kolkata',
+      (ist_midnight + interval '19 days 23 hours') at time zone 'Asia/Kolkata',
       'Olive Bar & Kitchen, Mehrauli',
       'Olive Bar & Kitchen, One Style Mile, Mehrauli, New Delhi 110030',
       28.5183, 77.1772,
@@ -157,9 +170,10 @@ begin
   raise notice 'Seeded 5 upcoming events, hosted by profile %', host;
 end $$;
 
--- What the app will now show.
+-- What the app will now show. Times rendered in IST, which is both where these
+-- events are and the only way to eyeball that they land on a sane hour.
 select title,
-       starts_at,
+       to_char(starts_at at time zone 'Asia/Kolkata', 'Dy DD Mon, HH12:MI AM') as starts_ist,
        capacity,
        price,
        requires_approval,
