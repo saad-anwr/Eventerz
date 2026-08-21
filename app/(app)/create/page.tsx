@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   CalendarPlus,
   Globe,
@@ -24,6 +25,7 @@ import {
 } from "@/components/app/location-picker";
 import { Button } from "@/components/ui/button";
 import { formatEventDate } from "@/lib/format";
+import { queryKeys } from "@/lib/hooks/use-realtime";
 import { useEventClaim } from "@/lib/solana/use-event-claim";
 import {
   PRICE_CURRENCIES,
@@ -123,6 +125,7 @@ export default function CreateEventPage() {
    * `lib/solana/event-claim.ts`.
    */
   const { claim, signing } = useEventClaim();
+  const queryClient = useQueryClient();
 
   /*
    * Covers the write and the signature that follows it. The button must not go
@@ -201,6 +204,18 @@ export default function CreateEventPage() {
            * sees if they come back tomorrow.
            */
           await claim(event.id);
+
+          /*
+           * Invalidate *after* the claim, not before.
+           *
+           * `useCreateEvent` already invalidated `['events']` on success - but
+           * that ran before this signature existed. Without this second call,
+           * whether the event page opens showing the claim depends on whether
+           * a refetch happened to be in flight during the wallet prompt, which
+           * is a race that would pass every time in development and fail for
+           * whoever signs slowly.
+           */
+          queryClient.invalidateQueries({ queryKey: queryKeys.event(event.id) });
           router.push(`/events/${event.id}`);
         })();
       },

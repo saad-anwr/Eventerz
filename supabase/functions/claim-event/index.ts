@@ -340,19 +340,42 @@ Deno.serve(async (request: Request) => {
    * Written with the service client, which is the only thing that can: there is
    * no INSERT or UPDATE grant on this column for `authenticated`, by design.
    *
-   * The `is` null guard makes the write itself idempotent under a race - two
-   * clients claiming at once cannot overwrite each other, and the first
-   * signature to verify is the one that stands.
+   * The `is` null guard makes the write idempotent under a race - two clients
+   * claiming at once cannot overwrite each other, and the first signature to
+   * verify is the one that stands. `select()` is what tells the two apart:
+   * without it a losing write is indistinguishable from a winning one, and this
+   * would answer "claimed: <your signature>" while the row holds a different
+   * one. Reporting a signature that is not the stored signature is worse than
+   * losing the race, because the caller would go on to render an explorer link
+   * for a claim nobody can look up on this event.
    */
-  const { error: writeError } = await supabase
+  const { data: written, error: writeError } = await supabase
     .from('events')
     .update({ onchain_signature: signature })
     .eq('id', eventId)
-    .is('onchain_signature', null);
+    .is('onchain_signature', null)
+    .select('onchain_signature');
 
   if (writeError) {
     logError('[claim-event] write failed', writeError);
     return json(request, { error: 'Could not save the claim.' }, 500);
+  }
+
+  if (!written || written.length === 0) {
+    // Somebody else's claim landed first. Theirs is the record; re-read it
+    // rather than reporting ours, and treat it as a success - the event does
+    // now carry a verified claim, which is what the caller wanted.
+    const { data: current } = await supabase
+      .from('events')
+      .select('onchain_signature')
+      .eq('id', eventId)
+      .maybeSingle<{ onchain_signature: string | null }>();
+
+    return json(request, {
+      claimed: Boolean(current?.onchain_signature),
+      alreadyClaimed: true,
+      signature: current?.onchain_signature ?? null,
+    });
   }
 
   return json(request, { claimed: true, signature });

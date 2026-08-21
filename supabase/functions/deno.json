@@ -9,6 +9,6 @@
     "lib": ["deno.window", "dom"]
   },
   "tasks": {
-    "check": "deno check link-wallet/index.ts verify-payment/index.ts"
+    "check": "deno check link-wallet/index.ts verify-payment/index.ts claim-event/index.ts"
   }
 }

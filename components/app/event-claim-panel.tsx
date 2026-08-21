@@ -17,10 +17,11 @@
  */
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { Check, ExternalLink, Loader2, ShieldCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { queryKeys } from "@/lib/hooks/use-realtime";
 import { explorerTxUrl } from "@/lib/solana/cluster";
 import { useEventClaim } from "@/lib/solana/use-event-claim";
 
@@ -32,7 +33,7 @@ export function EventClaimPanel({
   /** Undefined means unclaimed - an ordinary state, not a broken one. */
   signature?: string;
 }) {
-  const router = useRouter();
+  const queryClient = useQueryClient();
   const { claim, signing, canClaim } = useEventClaim();
   const [error, setError] = React.useState("");
 
@@ -42,8 +43,16 @@ export function EventClaimPanel({
     const result = await claim(eventId);
 
     if (result.ok) {
-      // Re-fetch the server component so the signed state replaces the button.
-      router.refresh();
+      /*
+       * Invalidate the query, not `router.refresh()`.
+       *
+       * The page around this is a `"use client"` component reading the event
+       * through react-query (`useEvent`). `router.refresh()` re-renders the
+       * server tree, which here is only the `<head>` wrapper that exists for
+       * `generateMetadata` - it does not touch the query cache, so the panel
+       * would keep saying "no on-chain claim yet" until a hard reload.
+       */
+      void queryClient.invalidateQueries({ queryKey: queryKeys.event(eventId) });
       return;
     }
     // Closing the popup is a decision, not a fault, and nothing changed.
