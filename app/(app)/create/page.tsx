@@ -13,7 +13,6 @@ import {
   X,
 } from "lucide-react";
 import { useCreateEvent } from "@/lib/hooks/use-eventerz-data";
-import { FeeCancelled, useFee } from "@/lib/solana/use-fee";
 import { useSession } from "@/components/auth/use-session";
 import { uploadEventBanner, type CreateEventInput } from "@/lib/supabase/data";
 import type { EventCategory } from "@/lib/store/types";
@@ -25,6 +24,12 @@ import {
 } from "@/components/app/location-picker";
 import { Button } from "@/components/ui/button";
 import { formatEventDate } from "@/lib/format";
+import {
+  PRICE_CURRENCIES,
+  formatPrice,
+  sanitizeAmount,
+  type PriceCurrency,
+} from "@/lib/price";
 import { cn } from "@/lib/utils";
 import {
   EVENT_CATEGORIES,
@@ -49,13 +54,6 @@ export default function CreateEventPage() {
   const { user } = useSession();
   const { userId } = useSession();
   const createEvent = useCreateEvent(userId ?? undefined);
-
-  /** $5 in SOL, taken before the event is written. Free off mainnet. */
-  const {
-    pay: payCreateFee,
-    paying: payingFee,
-    label: feeLabel,
-  } = useFee("createEvent");
 
   const [bannerUrl, setBannerUrl] = React.useState("");
   const [uploading, setUploading] = React.useState(false);
@@ -95,7 +93,10 @@ export default function CreateEventPage() {
     location: "",
     isOnline: false,
     capacity: "100",
-    price: "Free",
+    // The bare amount, never "0.5 SOL" - `priceCurrency` carries the unit and
+    // `formatPrice` is the only thing that joins them. Empty means free.
+    price: "",
+    priceCurrency: "SOL" as PriceCurrency,
     visibility: "public" as "public" | "private",
     requiresApproval: false,
     tokenGated: false,
@@ -115,12 +116,12 @@ export default function CreateEventPage() {
     setForm((f) => ({ ...f, [key]: value }));
 
   /*
-   * Covers the fee step as well as the write. The wallet is open while the
-   * charge waits to be approved, and a button that still looks idle invites a
-   * second submit - which on a non-refundable charge is the expensive kind of
-   * double-click.
+   * Just the write now. This used to cover a wallet approval too, where a
+   * button that still looked idle invited the expensive kind of double-click;
+   * a duplicate publish is merely untidy by comparison, but the guard is still
+   * worth keeping.
    */
-  const busy = payingFee || createEvent.isPending;
+  const busy = createEvent.isPending;
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -139,7 +140,7 @@ export default function CreateEventPage() {
       location: form.isOnline ? "Online" : form.location.trim(),
       isOnline: form.isOnline,
       capacity: Math.max(1, parseInt(form.capacity) || 100),
-      price: form.price.trim() || "Free",
+      price: formatPrice(form.price, form.priceCurrency),
       visibility: form.visibility,
       requiresApproval: form.requiresApproval,
       tokenGated: form.tokenGated,
@@ -165,40 +166,24 @@ export default function CreateEventPage() {
     }
 
     /*
-     * The $5 fee is taken before the event is written, and it is
-     * non-refundable. Publishing first would give away a free event whenever
-     * the payment failed, and an event cannot be un-published once guests can
-     * see it. The mobile app charges the same fee in the same order.
+     * Publishing is free and touches no wallet, so this is a plain write.
+     *
+     * A $5 charge used to come first, and the pay-then-act ordering existed
+     * because the reverse gave away a free event whenever payment failed. With
+     * nothing to pay there is nothing to order, and no "your fee was taken but
+     * the event was not created" case to write copy for - a failed publish now
+     * means retry, at no cost.
+     *
+     * Publishing writes to Supabase, so the event is visible to everyone -
+     * previously it only ever reached this browser's local store.
      */
-    void (async () => {
-      let paid = false;
-      try {
-        paid = (await payCreateFee()) !== null;
-      } catch (err) {
-        if (err instanceof FeeCancelled) return;
-        return setError(
-          err instanceof Error
-            ? err.message
-            : "Could not take the creation fee.",
-        );
-      }
-
-      // Publishing writes to Supabase, so the event is visible to everyone -
-      // previously it only ever reached this browser's local store.
-      createEvent.mutate(input, {
-        onSuccess: (event) => router.push(`/events/${event.id}`),
-        onError: (err) =>
-          setError(
-            paid
-              ? // Money moved and no event exists. "Try again" would invite a
-                // second $5 charge for the same event.
-                "Your fee was taken but the event was not created. Contact support with your wallet address - do not pay again."
-              : err instanceof Error
-                ? err.message
-                : "Could not publish the event.",
-          ),
-      });
-    })();
+    createEvent.mutate(input, {
+      onSuccess: (event) => router.push(`/events/${event.id}`),
+      onError: (err) =>
+        setError(
+          err instanceof Error ? err.message : "Could not publish the event.",
+        ),
+    });
   };
 
   return (
@@ -206,7 +191,7 @@ export default function CreateEventPage() {
       <PageHeader
         eyebrow="Host"
         title="Create Event"
-        description="Set up your event, choose access rules and publish it on-chain."
+        description="Set up your event, choose access rules and open it for RSVPs."
       />
 
       <form onSubmit={submit} className="grid gap-8 lg:grid-cols-[1.5fr_1fr]">
@@ -299,12 +284,48 @@ export default function CreateEventPage() {
                 onChange={(e) => set("capacity", e.target.value)}
               />
             </Field>
-            <Field label="Price" hint='e.g. "Free" or "0.5 SOL"'>
-              <input
-                className={inputCls}
-                value={form.price}
-                onChange={(e) => set("price", e.target.value)}
-              />
+            {/*
+              Amount and unit, matching the app's Access step. This was one
+              free-text box hinting 'e.g. "Free" or "0.5 SOL"', which accepted
+              "0.5 sol", ".5", "half a sol" and "5 dollars" equally and wrote
+              all of them to the same shared `price` column - so a price set in
+              a browser could not be read back reliably by anything, including
+              the app that renders it.
+            */}
+            <Field label="Ticket price" hint="Leave empty for a free event">
+              <div className="flex items-center gap-2">
+                <input
+                  className={inputCls}
+                  inputMode="decimal"
+                  placeholder="0.00"
+                  value={form.price}
+                  onChange={(e) =>
+                    set("price", sanitizeAmount(e.target.value))
+                  }
+                />
+                <div
+                  role="radiogroup"
+                  aria-label="Ticket currency"
+                  className="flex shrink-0 items-center gap-0.5 rounded-xl bg-white/5 p-0.5"
+                >
+                  {PRICE_CURRENCIES.map((currency) => (
+                    <button
+                      key={currency}
+                      type="button"
+                      role="radio"
+                      aria-checked={form.priceCurrency === currency}
+                      onClick={() => set("priceCurrency", currency)}
+                      className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+                        form.priceCurrency === currency
+                          ? "bg-brand-purple text-white"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {currency}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </Field>
           </div>
 
@@ -419,17 +440,15 @@ export default function CreateEventPage() {
           )}
 
           {/*
-            State the price before the button, not inside the wallet popup. A
-            non-refundable charge should never be the first thing someone learns
-            about their event from a signature request.
+            This used to disclose a one-off $5 charge before the button, so a
+            non-refundable fee was never something someone first learned about
+            from a signature request. The charge is gone, so the disclosure is
+            too - see `lib/solana/fees.ts`.
           */}
-          {feeLabel && (
-            <p className="text-xs text-muted-foreground">
-              Publishing costs a one-off{" "}
-              <span className="text-foreground">{feeLabel}</span>, charged from
-              your connected wallet. This fee is not refundable.
-            </p>
-          )}
+          <p className="text-xs text-muted-foreground">
+            Publishing is free. Your wallet is only opened when a guest pays for
+            a ticket.
+          </p>
 
           <div className="flex gap-3">
             <Button type="submit" size="lg" disabled={busy}>
@@ -438,11 +457,7 @@ export default function CreateEventPage() {
               ) : (
                 <CalendarPlus className="size-4" />
               )}
-              {payingFee
-                ? "Confirm in your wallet..."
-                : createEvent.isPending
-                  ? "Publishing..."
-                  : "Publish Event"}
+              {createEvent.isPending ? "Publishing..." : "Publish Event"}
             </Button>
             <Button
               type="button"
@@ -480,8 +495,11 @@ export default function CreateEventPage() {
               <span className="absolute left-3 top-3 rounded-full bg-black/30 px-2.5 py-1 text-[10px] font-semibold text-white backdrop-blur-md">
                 {form.category}
               </span>
+              {/* `formatPrice`, not `form.price` - the form holds the bare
+                  amount, so this badge would otherwise preview "0.5" where the
+                  published card reads "0.5 USDC". */}
               <span className="absolute bottom-3 right-3 rounded-full bg-black/40 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-md">
-                {form.price || "Free"}
+                {formatPrice(form.price, form.priceCurrency)}
               </span>
             </div>
             <div className="p-4">

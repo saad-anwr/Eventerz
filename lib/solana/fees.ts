@@ -1,17 +1,21 @@
 /**
  * Platform fees - the web half.
  *
- * Creating an event costs $5, RSVPing costs $1, both settled in SOL from the
- * connected wallet straight to the Eventerz treasury. Neither is refundable.
+ * RSVPing costs $1, settled in SOL from the connected wallet straight to the
+ * Eventerz treasury. It is not refundable.
  *
  * # Why this file exists at all
  *
  * The mobile app already charged these. The website did not, and both write to
- * the same Supabase project - so the identical action cost $5 on a phone and
+ * the same Supabase project - so the identical action cost money on a phone and
  * nothing in a browser. That is not only revenue walking out of the door: it is
  * two different products wearing one name, and the first person to notice would
  * simply stop using the app. A fee that can be avoided by changing tab is not a
  * fee.
+ *
+ * That is also why creating an event went free **here at the same time as in
+ * the app**, and not a release later. The asymmetry cuts both ways: a $5 charge
+ * that only the website still takes is the same bug wearing the other face.
  *
  * Kept deliberately in step with `Eventerz dApp/src/services/solana/fees.ts` -
  * same amounts, same treasury, same rounding, same refusal to guess a price. If
@@ -38,15 +42,20 @@
  */
 export const TREASURY_ADDRESS = 'HUTXvjrFNbyCYeu9GxpK5aGYmuyAFC6HHECC781Pw5oJ';
 
+/**
+ * `createEvent` is **removed rather than set to `0`**, matching the app.
+ *
+ * A zero amount still walks the charge path - quote, open the wallet, sign a
+ * transfer of nothing - and every step of it can still fail and block a
+ * publish. Deleting the key makes the type checker find the callers instead.
+ */
 export const FEE_USD = {
-  createEvent: 5,
   rsvp: 1,
 } as const;
 
 export type FeeKind = keyof typeof FEE_USD;
 
 export const FEE_LABEL: Record<FeeKind, string> = {
-  createEvent: 'Event creation fee',
   rsvp: 'RSVP fee',
 };
 
