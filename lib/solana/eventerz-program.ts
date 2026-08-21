@@ -15,7 +15,7 @@
  *      runtime that is not already known.
  *
  * The cost is that this file and `programs/eventerz/src/lib.rs` have to agree
- * by hand. `lib/solana/__tests__/eventerz-program.test.ts` recomputes every
+ * by hand. `lib/solana/eventerz-program.test.ts` recomputes every
  * discriminator from the instruction name, so a rename in Rust that is not
  * mirrored here fails the test suite rather than failing in a user's wallet.
  *
