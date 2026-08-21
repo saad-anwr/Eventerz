@@ -68,6 +68,11 @@ export function eventRowToItem(row: EventWithMeta): EventItem {
     cancelledAt: row.cancelled_at ?? undefined,
     cancelReason: row.cancel_reason ?? undefined,
 
+    // The host's signed record of authorship, once `claim-event` has verified
+    // it against the cluster. Undefined means unclaimed - a normal state, not a
+    // broken one: signing is optional and the event is live either way.
+    onchainSignature: row.onchain_signature ?? undefined,
+
     // `?? undefined` rather than `?? 0`: a missing coordinate has to stay
     // missing. Zero is the Gulf of Guinea, and a confident pin in the wrong
     // ocean is worse than no map at all.

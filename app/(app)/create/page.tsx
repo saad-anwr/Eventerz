@@ -24,6 +24,7 @@ import {
 } from "@/components/app/location-picker";
 import { Button } from "@/components/ui/button";
 import { formatEventDate } from "@/lib/format";
+import { useEventClaim } from "@/lib/solana/use-event-claim";
 import {
   PRICE_CURRENCIES,
   formatPrice,
@@ -115,13 +116,20 @@ export default function CreateEventPage() {
   const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
 
-  /*
-   * Just the write now. This used to cover a wallet approval too, where a
-   * button that still looked idle invited the expensive kind of double-click;
-   * a duplicate publish is merely untidy by comparison, but the guard is still
-   * worth keeping.
+  /**
+   * The host's on-chain claim, signed straight after the write.
+   *
+   * Free: the wallet is asked for a signature, not a payment. See
+   * `lib/solana/event-claim.ts`.
    */
-  const busy = createEvent.isPending;
+  const { claim, signing } = useEventClaim();
+
+  /*
+   * Covers the write and the signature that follows it. The button must not go
+   * idle between the two - the wallet popup is open during `signing`, and a
+   * form that looks ready to submit again invites a second event.
+   */
+  const busy = createEvent.isPending || signing;
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -166,19 +174,36 @@ export default function CreateEventPage() {
     }
 
     /*
-     * Publishing is free and touches no wallet, so this is a plain write.
+     * Write first, then sign the on-chain claim.
      *
      * A $5 charge used to come first, and the pay-then-act ordering existed
-     * because the reverse gave away a free event whenever payment failed. With
-     * nothing to pay there is nothing to order, and no "your fee was taken but
-     * the event was not created" case to write copy for - a failed publish now
-     * means retry, at no cost.
+     * because the reverse gave away a free event whenever payment failed. There
+     * is nothing to pay now, so the ordering is decided by something else: the
+     * claim's memo names `event.id`, which Postgres generates, so there is
+     * nothing to sign until the insert has returned.
      *
-     * Publishing writes to Supabase, so the event is visible to everyone -
-     * previously it only ever reached this browser's local store.
+     * That also decides what a closed wallet popup means. The event is already
+     * live, so it stays live and simply carries no claim yet - and the host is
+     * told exactly that, then sent to the event where they can sign it. The
+     * alternative, treating an unsigned claim as a failed publish, would be a
+     * lie that costs them the whole form and produces a duplicate event.
      */
     createEvent.mutate(input, {
-      onSuccess: (event) => router.push(`/events/${event.id}`),
+      onSuccess: (event) => {
+        void (async () => {
+          /*
+           * Never throws - every outcome is a result. See `useEventClaim`.
+           *
+           * The result is deliberately not surfaced here: this page unmounts on
+           * the next line, so any message set on it would flash or never paint.
+           * The event page renders the claim state from the database instead,
+           * which is durable, correct on a reload, and the same thing the host
+           * sees if they come back tomorrow.
+           */
+          await claim(event.id);
+          router.push(`/events/${event.id}`);
+        })();
+      },
       onError: (err) =>
         setError(
           err instanceof Error ? err.message : "Could not publish the event.",
@@ -440,14 +465,17 @@ export default function CreateEventPage() {
           )}
 
           {/*
-            This used to disclose a one-off $5 charge before the button, so a
-            non-refundable fee was never something someone first learned about
-            from a signature request. The charge is gone, so the disclosure is
-            too - see `lib/solana/fees.ts`.
+            This used to disclose a one-off $5 charge. The charge is gone, but
+            the wallet still opens - for a signature - so the disclosure stays
+            and says which of the two it is. Dropping it entirely would leave a
+            wallet popup appearing unannounced, which anyone who used this
+            before will read as the fee they thought had been removed.
           */}
           <p className="text-xs text-muted-foreground">
-            Publishing is free. Your wallet is only opened when a guest pays for
-            a ticket.
+            <span className="text-foreground">Publishing is free.</span> Your
+            wallet will ask you to sign a short message recording that you
+            published this event - no fee is charged and no SOL is sent, only
+            the Solana network fee. You can skip it and sign later.
           </p>
 
           <div className="flex gap-3">
@@ -457,7 +485,11 @@ export default function CreateEventPage() {
               ) : (
                 <CalendarPlus className="size-4" />
               )}
-              {createEvent.isPending ? "Publishing..." : "Publish Event"}
+              {signing
+                ? "Sign in your wallet..."
+                : createEvent.isPending
+                  ? "Publishing..."
+                  : "Publish Event"}
             </Button>
             <Button
               type="button"

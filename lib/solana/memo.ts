@@ -66,11 +66,21 @@ export function truncateMemoBytes(text: string): Buffer {
 }
 
 /** The instruction that puts `text` on-chain beside a transfer. */
-export function memoInstruction(text: string): TransactionInstruction {
+export function memoInstruction(
+  text: string,
+  signer?: PublicKey,
+): TransactionInstruction {
   return new TransactionInstruction({
-    // Memo v2 accepts zero accounts. Naming the payer as a signer would be
-    // valid too, and would add nothing the transfer does not already prove.
-    keys: [],
+    /*
+     * Beside a transfer, pass nothing: Memo v2 accepts zero accounts, and
+     * naming the payer adds nothing the transfer does not already prove.
+     *
+     * In a **memo-only** transaction there is no transfer to prove anything,
+     * and the distinction stops being cosmetic. Memo v2 verifies that every
+     * account handed to it signed the transaction, so a named signer is the
+     * difference between a note and an attestation. See `event-claim.ts`.
+     */
+    keys: signer ? [{ pubkey: signer, isSigner: true, isWritable: false }] : [],
     programId: MEMO_PROGRAM_ID,
     data: truncateMemoBytes(text),
   });

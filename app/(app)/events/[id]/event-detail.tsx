@@ -33,6 +33,7 @@ import { EmptyState } from "@/components/app/empty-state";
 import { Avatar } from "@/components/app/avatar";
 import { AttendeeList } from "@/components/app/attendee-list";
 import { ChatPanel } from "@/components/app/chat-panel";
+import { EventClaimPanel } from "@/components/app/event-claim-panel";
 import { EventMap } from "@/components/app/event-map";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -257,6 +258,19 @@ export function EventDetail() {
           </Button>
         )}
       </div>
+
+      {/*
+        Host-only: the on-chain claim, signed or still outstanding.
+
+        This is what makes the create page's "you can skip it and sign later"
+        true. A host who closed the wallet popup while publishing lands here.
+      */}
+      {isHost && (
+        <EventClaimPanel
+          eventId={event.id}
+          signature={event.onchainSignature}
+        />
+      )}
 
       {cancelled && (
         <div className="mb-5 flex items-start gap-2.5 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3.5">

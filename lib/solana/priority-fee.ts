@@ -46,6 +46,21 @@ export const COMPUTE_UNITS = {
   claimSeat: 50_000,
   /** Mutates one or two existing accounts. */
   simple: 30_000,
+  /**
+   * SPL Memo and nothing else - the on-chain event claim.
+   *
+   * Memo v2 writes no account; almost all of its cost is logging the text,
+   * which is charged per byte. A ~150-byte claim lands near 2,500 CU including
+   * the two budget instructions, so this is roughly double that.
+   *
+   * Sized on its own rather than borrowed from a neighbour, because both
+   * neighbours are wrong in a way that matters. `transfer` (2,000) would abort
+   * the transaction mid-execution, which is the expensive failure - the network
+   * fee is still charged for a claim that did not land. `simple` (30,000) would
+   * not abort, but the priority fee is `limit x price`, so it would silently
+   * charge about five times over for the same memo.
+   */
+  memo: 6_000,
 } as const;
 
 export type ComputeKind = keyof typeof COMPUTE_UNITS;

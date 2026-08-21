@@ -102,6 +102,17 @@ export interface EventItem {
   cancelReason?: string;
 
   /**
+   * The host's on-chain record of authorship, once verified.
+   *
+   * Undefined means unclaimed, which is an ordinary state: signing is optional
+   * and the event is live either way. Only ever written by the `claim-event`
+   * Edge Function after it has read the transaction back off the cluster - a
+   * signature a client supplied is a string, not a proof, which is why there is
+   * no client write grant for the column (migration 0017).
+   */
+  onchainSignature?: string;
+
+  /**
    * Structured location, when the host's input resolved to a place. Undefined
    * is a supported state, not a gap - the UI falls back to a map search on the
    * `location` string.
