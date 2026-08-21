@@ -56,8 +56,6 @@ export function eventerzProgramId(): PublicKey | null {
   }
 }
 
-export const isProgramDeployed = (): boolean => eventerzProgramId() !== null;
-
 const EVENT_SEED = new TextEncoder().encode('event');
 const SEAT_SEED = new TextEncoder().encode('seat');
 
