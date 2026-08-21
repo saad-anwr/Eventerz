@@ -330,18 +330,28 @@ Listed because an unlisted gap is a gap nobody fixes.
    DoS) are pinned out via `overrides` in `package.json`, all patch-or-minor
    inside the same major, with `next build` as the proof.
 
-2. **Rate limiting is now partial** (0016, 0018). Every Edge Function consumes
-   quota from `check_rate_limit` keyed on the caller's profile id, `messages`
-   has a 30/minute flood ceiling enforced by trigger, and
-   `subscribe_newsletter` allows an address 3 attempts an hour.
+2. ~~**Rate limiting is now partial** (0016, 0018).~~ **Closed 21 Aug 2026.**
+   Every Edge Function consumes quota from `check_rate_limit` keyed on the
+   caller's profile id, `messages` has a 30/minute flood ceiling enforced by
+   trigger, and `subscribe_newsletter` allows an address 3 attempts an hour.
 
-   What is still open is the anonymous case. The subject that matters for the
+   The anonymous case is now covered too. The subject that matters for the
    newsletter form is the caller's **IP**, and Postgres cannot see it -
    PostgREST terminates the connection, so the database only ever sees its own
-   client. The per-address limit closes a form retried in a loop with one
-   address and does nothing against a flood that varies the address each time.
-   The fix is to move that form behind an Edge Function and call `rateLimit()`
-   with `x-forwarded-for`, exactly as the other functions do.
+   client. The per-address limit closed a form retried in a loop with one
+   address and did nothing against a flood that varies the address each time,
+   which is the shape every real signup-spam wave takes.
+
+   That form now posts to the **`subscribe-newsletter` Edge Function**, which
+   calls `rateLimit()` with `x-forwarded-for` as the subject - 5 per IP per
+   hour - exactly as the other functions do. The per-address limit stays in the
+   database: the two catch different attacks and neither replaces the other,
+   and `subscribe_newsletter` remains directly callable by `anon`, so its own
+   validation stays where it is rather than being delegated to a caller.
+
+   **Deploy it, or the footer form 404s**: `supabase functions deploy
+   subscribe-newsletter`. Until then the form reports an error rather than a
+   false success, which is the intended failure but a visible one.
 
 3. **No host-side audit trail** for approve / decline / remove / edit decisions.
    The notifications are the only record, and they live in the recipient's row.

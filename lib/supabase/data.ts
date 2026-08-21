@@ -1083,21 +1083,49 @@ export async function verifyPayment(signature: string): Promise<boolean> {
 /**
  * Add an address to the newsletter list.
  *
- * Works signed-out - the form lives in the marketing footer. The function is
- * idempotent and silent about whether the address was already there, so a
- * caller cannot use it to test who is subscribed; the UI therefore shows the
- * same confirmation either way, which is also the truthful answer to "am I on
- * the list?".
+ * Works signed-out - the form lives in the marketing footer. Idempotent and
+ * silent about whether the address was already there, so a caller cannot use it
+ * to test who is subscribed; the UI therefore shows the same confirmation
+ * either way, which is also the truthful answer to "am I on the list?".
+ *
+ * # Why this goes through an Edge Function rather than `rpc()`
+ *
+ * It used to call `subscribe_newsletter` directly. That function is safe to
+ * expose to `anon` and rate-limits three attempts an hour **per address** - but
+ * the subject that matters for an anonymous form is the caller's IP, and
+ * Postgres cannot see it: PostgREST terminates the connection, so the database
+ * only ever sees its own client. A flood that varies the address each time -
+ * which is every real signup-spam wave - walked straight past the limit.
+ *
+ * `subscribe-newsletter` sees `x-forwarded-for` and keys on it. The per-address
+ * limit stays in the database, because the two catch different attacks.
  */
 export async function subscribeToNewsletter(
   email: string,
   source = 'website',
 ): Promise<void> {
-  const { error } = await client().rpc('subscribe_newsletter', {
-    p_email: email,
-    p_source: source,
+  const { error } = await client().functions.invoke('subscribe-newsletter', {
+    body: { email, source },
   });
-  if (error) fail('Subscribing', error);
+
+  if (error) {
+    /*
+     * `FunctionsHttpError.message` is always "Edge Function returned a non-2xx
+     * status code" - the sentence worth showing is in the response body, which
+     * the function writes for exactly this purpose. Without this, being rate
+     * limited reads as a generic failure and the user retries into it.
+     */
+    const response = (error as { context?: Response }).context;
+    if (response && typeof response.json === 'function') {
+      try {
+        const body = await response.json();
+        if (typeof body?.error === 'string') throw new Error(body.error);
+      } catch (parsed) {
+        if (parsed instanceof Error && parsed.message) throw parsed;
+      }
+    }
+    fail('Subscribing', error);
+  }
 }
 
 /* -------------------------------------------------------------------------- */

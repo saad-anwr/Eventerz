@@ -203,19 +203,26 @@ export default function TermsPage() {
 
       <h2>11. Governing law</h2>
       {/*
-        The one clause in this document that cannot be derived from how the
-        product behaves. It needs the legal entity's actual jurisdiction naming
-        before launch - a forum-selection clause with no named forum is the
-        clause most likely to be held unenforceable, which is the opposite of
-        what it is for. Flagged in HANDOFF.md.
+        Named, as of 21 Aug 2026: India, seat New Delhi.
+
+        This was the one clause in the document that could not be derived from
+        how the product behaves - it is a fact about the operating entity, not
+        about the software - and it sat unnamed ("the jurisdiction in which
+        Eventerz Labs is established") through two store submissions. A
+        forum-selection clause with no named forum is the clause most likely to
+        be held unenforceable, which is the exact opposite of what it is for.
+
+        Still worth a lawyer's eye before launch: the *facts* here are right,
+        but whether this drafting is sufficient for consumer contracts under
+        Indian law is not something this comment can vouch for.
       */}
       <p>
         These terms, and any dispute arising from them or from your use of{" "}
-        {siteConfig.name}, are governed by the laws of the jurisdiction in which{" "}
-        {siteConfig.creator} is established, without regard to conflict-of-law
-        rules. You and we submit to the exclusive jurisdiction of the courts of
-        that place, except that either of us may seek injunctive relief wherever
-        it is needed.
+        {siteConfig.name}, are governed by the laws of{" "}
+        <strong>India</strong>, without regard to conflict-of-law rules. You and
+        we submit to the exclusive jurisdiction of the courts at{" "}
+        <strong>New Delhi, India</strong>, except that either of us may seek
+        injunctive relief wherever it is needed.
       </p>
       <p>
         If you are a consumer, this does not deprive you of the protection of

@@ -1,0 +1,78 @@
+# Every check that used to be run by hand.
+#
+# HANDOFF.md carried "CI" as scope-for-improvement item 9 for weeks: the
+# typecheck, lint, test, build and secret-scan below were all real and all
+# run manually, which means they were run when someone remembered. A check
+# that depends on memory is a check that passes right up until the day it
+# matters.
+#
+# Deliberately not included: `npm run test:db`, which needs a Postgres
+# container and has never been executed anywhere (see HANDOFF.md section 5).
+# Adding it here would make CI red on day one for a reason unrelated to the
+# commit that turned it on. It belongs in its own workflow once it has passed
+# locally at least once.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  # So a red main can be re-run without an empty commit.
+  workflow_dispatch:
+
+concurrency:
+  # A second push supersedes the first: no point burning minutes on a commit
+  # nobody is waiting for any more.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # `ci` not `install`: it installs exactly package-lock.json and fails if
+      # the lockfile and package.json disagree, which is the difference between
+      # testing what will ship and testing whatever npm resolved this morning.
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      # Scans every tracked file, including inside binaries. The pre-commit
+      # hook covers what is staged; this covers what is already in the tree,
+      # which is what a fresh clone actually gets.
+      - name: Secret scan
+        run: npm run secrets:check
+
+      # Placeholders, on purpose.
+      #
+      # `lib/env.ts` fails a production build when the Supabase values are
+      # missing, and that gate is worth keeping - but CI is proving the code
+      # compiles, not that it can reach a database. Real credentials here would
+      # buy nothing and put a live anon key in a public workflow file. The
+      # Supabase URL must still parse as a URL, hence a well-formed dummy.
+      - name: Build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+          NEXT_PUBLIC_SITE_URL: https://www.eventerz.xyz
+          NEXT_PUBLIC_SOLANA_NETWORK: mainnet-beta
+        run: npm run build
