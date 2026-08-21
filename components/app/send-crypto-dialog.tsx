@@ -30,6 +30,11 @@ import {
 } from "@/lib/solana/amount";
 import { explorerTxUrl } from "@/lib/solana/cluster";
 import { confirmSignature } from "@/lib/solana/confirm";
+import { memoInstruction } from "@/lib/solana/memo";
+import {
+  describeSigningError,
+  isWalletCancellation,
+} from "@/lib/wallet-errors";
 import { shortenAddress } from "@/lib/format";
 import { useScrollLock } from "@/hooks/use-scroll-lock";
 import { cn } from "@/lib/utils";
@@ -219,6 +224,19 @@ export function SendCryptoDialog({
         }),
       );
 
+      /*
+       * The memo goes on-chain, not just into `payments.memo`.
+       *
+       * It used to do only the latter: the note was written to the database and
+       * rendered in the receipt, while the transaction stayed a bare transfer.
+       * So the receipt displayed a memo beside a signature that did not carry
+       * one - a claim the chain could not corroborate - and the wallet's
+       * approval sheet, the last thing anyone reads before money moves, could
+       * say nothing about what the payment was for. See `lib/solana/memo.ts`.
+       */
+      const note = memo.trim();
+      if (note) transaction.add(memoInstruction(note));
+
       sent = await sendTransaction(transaction, connection);
       setSignature(sent);
       setPhase("confirming");
@@ -251,16 +269,31 @@ export function SendCryptoDialog({
 
       setPhase("done");
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Could not send that transfer.";
       /*
        * A user declining in their wallet is not an error worth a red box - they
        * did exactly what they meant to. Close quietly.
+       *
+       * This used to test `err.message` against a local
+       * "user rejected|declined|denied" regex, which missed the most common way
+       * of backing out in a browser: closing the popup throws
+       * `WalletWindowClosedError`, and wallet-adapter puts that meaning in
+       * `error.name` rather than in the message. `isWalletCancellation` reads
+       * both - it is the same rule the connect flow already uses, and there was
+       * never a reason for a weaker second copy of it here.
        */
-      if (/user rejected|declined|denied/i.test(message)) {
+      if (isWalletCancellation(err)) {
         setPhase("form");
         return;
       }
+
+      /*
+       * Keep a sentence we wrote - "The network rejected that transfer." is
+       * thrown above and is more useful than any rewrite - but never show a
+       * bare library error name or a TypeError.
+       */
+      const message =
+        describeSigningError(err) ?? "Could not send that transfer.";
+
       setError(
         sent
           ? // The money may have moved. Say so - telling someone a transfer

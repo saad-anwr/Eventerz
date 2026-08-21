@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { describeWalletError, isWalletCancellation } from "./wallet-errors";
+import {
+  describeSigningError,
+  describeWalletError,
+  isWalletCancellation,
+} from "./wallet-errors";
 
 /**
  * The parity suite for wallet failures.
@@ -97,6 +101,68 @@ describe("describeWalletError", () => {
       const shown = describeWalletError(input);
       if (shown === null) continue;
       expect(shown.length).toBeGreaterThan(0);
+      expect(shown).toMatch(/[.!]$/);
+    }
+  });
+});
+
+/**
+ * Paying is not connecting.
+ *
+ * The transfer dialog used to test `err.message` against a local
+ * "user rejected|declined|denied" regex. Closing the wallet popup - the most
+ * ordinary way to back out in a browser - throws `WalletWindowClosedError`, and
+ * wallet-adapter carries that meaning in `error.name`, which the local regex
+ * never looked at. So backing out of a transfer showed a red error box.
+ */
+describe("describeSigningError", () => {
+  it("recognises the browser's real cancellation, which lives in `name`", () => {
+    const closed = adapterError("WalletWindowClosedError");
+    expect(isWalletCancellation(closed)).toBe(true);
+    expect(describeSigningError(closed)).toBeNull();
+
+    // ...and the local regex the dialog used could not see it.
+    expect(/user rejected|declined|denied/i.test(closed.message)).toBe(false);
+  });
+
+  it("does not offer 'continue with Google' as a way to send SOL", () => {
+    const shown = describeSigningError(adapterError("SomethingNew"));
+    expect(shown).not.toMatch(/Google/i);
+    expect(shown).not.toMatch(/could not be connected/i);
+    expect(shown).toMatch(/Nothing has been charged/i);
+  });
+
+  it("keeps a sentence the transfer flow wrote itself", () => {
+    // Thrown by the dialog when a confirmed transaction carries an error.
+    expect(
+      describeSigningError(new Error("The network rejected that transfer.")),
+    ).toBe("The network rejected that transfer.");
+  });
+
+  it("does not glue the error name onto our own sentence", () => {
+    // `messageOf` tags errors as `${name} ${message}` for pattern matching; the
+    // text shown must be the message alone.
+    const shown = describeSigningError(
+      new Error("Your wallet does not have enough SOL for this."),
+    );
+    expect(shown).toBe("Your wallet does not have enough SOL for this.");
+    expect(shown).not.toMatch(/^Error /);
+  });
+
+  it("still refuses class names and runtime errors", () => {
+    const inputs: unknown[] = [
+      adapterError("WalletSendTransactionError"),
+      new TypeError("Cannot read property 'toBase58' of undefined"),
+      "TypeError: undefined is not an object",
+      null,
+      42,
+      {},
+    ];
+
+    for (const input of inputs) {
+      const shown = describeSigningError(input);
+      if (shown === null) continue;
+      expect(shown).not.toMatch(/Wallet\w*Error|TypeError|Cannot read propert/);
       expect(shown).toMatch(/[.!]$/);
     }
   });

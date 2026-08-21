@@ -59,6 +59,79 @@ export function isWalletCancellation(error: unknown): boolean {
 }
 
 /**
+ * Turn a failure during **signing or paying** into a sentence.
+ *
+ * # Why this is not `describeWalletError`
+ *
+ * Same recognition rules, different fallback, and the fallback is the point.
+ * `describeWalletError` ends with "That wallet could not be connected. You can
+ * try again, or continue with Google." - right at a connect prompt, wrong at a
+ * payment, where the wallet is already connected and Google is not a way to
+ * send SOL.
+ *
+ * It also keeps sentences the caller wrote. The transfer flow throws real prose
+ * of its own - "The network rejected that transfer." - and routing that through
+ * a connect-flow catch-all would replace a precise statement with a misleading
+ * one.
+ *
+ * The dApp mirror is `describeSigningError` in `src/services/wallet/errors.ts`;
+ * both sides' suites pin the shared strings.
+ *
+ * @returns A message to show, or `null` when the user cancelled.
+ */
+export function describeSigningError(error: unknown): string | null {
+  if (isWalletCancellation(error)) return null;
+
+  const tagged = messageOf(error);
+
+  // Before the prose check: this rewrite is more useful than the adapter's own
+  // wording, which is already a sentence.
+  if (NOT_INSTALLED.test(tagged)) {
+    return "No Solana wallet was found in this browser to approve this with.";
+  }
+
+  /*
+   * The *raw* message, not the `name`-prefixed one `messageOf` builds. A plain
+   * `new Error("The network rejected that transfer.")` tags as "Error The
+   * network rejected..." - passing that through would show the reader the word
+   * "Error" glued to the front of our own sentence.
+   */
+  const raw = error instanceof Error ? error.message : "";
+  if (looksLikeProse(raw)) return raw;
+
+  if (UNAVAILABLE.test(tagged)) {
+    return "That wallet could not be reached. Try again, or use a different wallet.";
+  }
+
+  if (/network|timeout|unreachable|failed to fetch/i.test(tagged)) {
+    return "Could not reach the network to send this. Check your connection - nothing has been charged.";
+  }
+
+  return "That transaction could not be completed. Nothing has been charged - please try again.";
+}
+
+/**
+ * Does this read as a sentence written for a person?
+ *
+ * Library error names are single CamelCase tokens (`WalletWindowClosedError`),
+ * JS runtime errors are terse and unpunctuated (`Cannot read property 'x' of
+ * null`), and both are unfit to show. A sentence we wrote has spaces and ends
+ * in punctuation.
+ *
+ * Mirrors `looksLikeProse` in the dApp's `errors.ts`.
+ */
+function looksLikeProse(message: string): boolean {
+  const text = message.trim();
+  if (text.length < 12) return false;
+  if (/^[\w$]+(\.[\w$]+){2,}/.test(text)) return false; // dotted class path
+  if (/\bat\s+[\w$.]+\(/.test(text)) return false; // stack frame
+  if (/^(TypeError|ReferenceError|SyntaxError|RangeError)\b/.test(text)) return false;
+  if (/^Wallet\w*Error\b/.test(text)) return false; // wallet-adapter class name
+  if (/^Cannot read propert/i.test(text)) return false;
+  return /\s/.test(text) && /[.!?]$/.test(text);
+}
+
+/**
  * Turn any wallet failure into a sentence.
  *
  * @returns A message to show, or `null` when the user cancelled and should be

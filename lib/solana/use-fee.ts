@@ -23,12 +23,16 @@ import {
   Transaction,
 } from '@solana/web3.js';
 
+import { describeSigningError, isWalletCancellation } from '@/lib/wallet-errors';
+
 import { IS_MAINNET } from './cluster';
 import { explorerTxUrl } from './cluster';
 import { confirmSignature } from './confirm';
+import { memoInstruction } from './memo';
 import { computeBudgetInstructions } from './priority-fee';
 import {
   FEE_LABEL,
+  FEE_USD,
   TREASURY_ADDRESS,
   formatFeeSol,
   quoteFee,
@@ -130,6 +134,22 @@ export function useFee(kind: FeeKind) {
           }),
         );
 
+      /*
+       * Say what the money is for, where the user will actually read it.
+       *
+       * Without this the wallet's approval popup - the last thing anyone sees
+       * before a non-refundable charge - could only show "transfer N SOL to
+       * HUTXvj…", an address that means nothing to the person being asked to
+       * approve it. The mobile app was rejected by the dApp Store for exactly
+       * this ("SOL deduction without clarity on what for"); the same transfer
+       * is built here, so it carries the same memo.
+       */
+      transaction.add(
+        memoInstruction(
+          `Eventerz: ${FEE_LABEL[kind].toLowerCase()} ($${fresh.usd}). Non-refundable.`,
+        ),
+      );
+
       const signature = await sendTransaction(transaction, connection);
 
       /*
@@ -155,25 +175,54 @@ export function useFee(kind: FeeKind) {
 
       return { signature, explorerUrl: explorerTxUrl(signature), quote: fresh };
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'The fee could not be taken.';
-
-      // Declining is a choice, not a fault - surface it as a cancellation so
-      // the caller can stop quietly rather than showing a red error.
-      if (/user rejected|declined|denied|cancell?ed/i.test(message)) {
+      /*
+       * Declining is a choice, not a fault - surface it as a cancellation so
+       * the caller can stop quietly rather than showing a red error.
+       *
+       * The test used to be a local regex over `error.message`, which missed
+       * the most common way of backing out in a browser: closing the wallet
+       * popup throws `WalletWindowClosedError`, and wallet-adapter carries that
+       * meaning in `error.name`. So closing the popup on a payment produced a
+       * red error instead of a quiet stop. `isWalletCancellation` reads both,
+       * and is the same rule the connect flow already uses.
+       */
+      if (isWalletCancellation(error)) {
         throw new FeeCancelled();
       }
-      throw new Error(message);
+
+      /*
+       * Everything else is translated rather than shown raw. The real sentences
+       * this hook throws itself - the SOL price failing, a confirmed on-chain
+       * rejection - are preserved by `describeSigningError`; library error
+       * names and TypeErrors are not.
+       */
+      throw new Error(
+        describeSigningError(error) ?? 'The fee could not be taken.',
+      );
     } finally {
       setPaying(false);
     }
   }, [connected, connection, kind, publicKey, sendTransaction]);
 
-  /** `$5 (about 0.0234 SOL)`, or null when fees are off or not yet quoted. */
+  /**
+   * `$5 (about 0.0234 SOL)`, or null only when fees are genuinely off.
+   *
+   * It used to return null while the quote was still in flight, which meant the
+   * *disclosure* was in flight too: every caller renders this behind
+   * `{feeLabel && ...}`, so on a slow connection the sentence naming a
+   * non-refundable charge simply was not on the page yet - and the submit
+   * button was, from first paint. Someone who moved quickly could be charged
+   * having never seen a price.
+   *
+   * The dollar figure is a constant (`FEE_USD`), known without any network
+   * call, so there is no reason to withhold it. Only the SOL conversion needs
+   * the rate, and it is the half that matters least to a reader.
+   */
   const label = React.useMemo(() => {
-    if (!feesEnabled() || !quote) return null;
+    if (!feesEnabled()) return null;
+    if (!quote) return `$${FEE_USD[kind]}`;
     return `$${quote.usd} (about ${formatFeeSol(quote.lamports)})`;
-  }, [quote]);
+  }, [kind, quote]);
 
   return { pay, paying, quote, label, enabled: feesEnabled(), kindLabel: FEE_LABEL[kind] };
 }
