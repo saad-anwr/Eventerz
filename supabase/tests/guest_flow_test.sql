@@ -26,8 +26,19 @@
 -- database exactly as it found it.
 -- ---------------------------------------------------------------------------
 
-\set ON_ERROR_STOP on
-\timing off
+-- No psql meta-commands below this line, on purpose.
+--
+-- This file used to open with `\set ON_ERROR_STOP on` and `\timing off`. Both
+-- were redundant: `scripts/test-db.mjs` already passes `-v ON_ERROR_STOP=1` on
+-- the command line down *both* of its paths (host psql and the psql inside the
+-- Supabase container), and `\timing` only affects what psql prints.
+--
+-- What they cost was the ability to run this anywhere else. A backslash is a
+-- psql client directive, not SQL, so pasting this suite into the Supabase SQL
+-- editor - or any other client - failed on line 1 with
+-- `syntax error at or near "\"` before a single assertion ran. Since this is
+-- the only harness some environments have (no Docker, no psql on PATH), that
+-- made the suite unrunnable exactly where it was most needed.
 
 begin;
 
@@ -815,6 +826,18 @@ begin
   raise notice '=== all guest-flow assertions passed ===';
   raise notice '';
 end $$;
+
+/*
+ * The same verdict as a result set, because `raise notice` is invisible in
+ * most GUI clients - the Supabase SQL editor shows result grids and errors and
+ * drops NOTICE entirely. Without this, a passing run and a run that did
+ * nothing at all look identical there: "Success, no rows returned".
+ *
+ * A failure needs no equivalent. `ok`/`eq`/`raises` raise an exception, which
+ * every client surfaces, and which aborts the transaction before reaching
+ * this line - so if you can see this row, everything above it passed.
+ */
+select '=== all guest-flow assertions passed ===' as result;
 
 -- Nothing is kept. A test run must leave the database as it found it.
 rollback;

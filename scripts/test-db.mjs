@@ -120,8 +120,12 @@ if (hasPsql) {
   console.log(dim(`Using the psql inside ${container} (none on PATH).\n`));
 
   // -f cannot be used here: the file lives on the host, not in the container.
-  // Piping it to stdin is equivalent - psql still parses the \set and \echo
-  // meta-commands, which is the whole reason this has to be psql.
+  // Piping it to stdin is equivalent.
+  //
+  // The suite itself no longer contains psql meta-commands - see the note at
+  // the top of it - so this no longer *has* to be psql. It stays psql because
+  // it is the client that already exists in the container, and because
+  // ON_ERROR_STOP below is how a failed assertion becomes a non-zero exit.
   result = spawnSync(
     engine,
     ['exec', '-i', container, 'psql', '-U', 'postgres', '-d', 'postgres', '-v', 'ON_ERROR_STOP=1'],
