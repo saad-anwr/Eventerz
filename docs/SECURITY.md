@@ -175,10 +175,12 @@ the new key; none of it stops the old one, which was public for ~17½ hours and
 should be assumed scraped.
 
 Revoking carries no risk to the website: `NEXT_PUBLIC_HELIUS_RPC_URL` was never
-configured on Vercel, so production has been using the public
-`api.mainnet-beta.solana.com` fallback rather than the leaked key. That is its
-own problem - see *Known gaps* - but it means the leak never reached the web
-deployment at all.
+configured on Vercel, so production **was**, at the time this was written,
+using the public `api.mainnet-beta.solana.com` fallback rather than the leaked
+key - that meant the leak never reached the web deployment at all. This has
+since been fixed properly rather than left as a fallback: see *Known gaps*
+item 6, closed 21 Aug - `HELIUS_RPC_URL` (unprefixed) is now set on Vercel and
+the site talks to Helius through its own `/api/rpc` proxy.
 
 ### What stands in the way
 
@@ -310,18 +312,23 @@ the function is advice rather than a gate.
 
 Listed because an unlisted gap is a gap nobody fixes.
 
-1. **9 npm advisories remain on the website**, all one path: `uuid@8.3.2` under
-   `jayson` under `@solana/web3.js` v1. The advisory is a missing bounds check in
-   `v3/v5/v6` **when the caller supplies its own buffer**; jayson only calls
-   `v4()` with no buffer, so the vulnerable code is unreachable from here.
-   Forcing uuid 11 would be a major bump across a CJS/ESM boundary to fix a path
-   that cannot be hit - trading real breakage risk for a cosmetic audit number.
-   The permanent fix is the `@solana/web3.js` v2 migration.
+1. **`npm audit` on the website now reports 15 (9 moderate, 6 high), up from 9
+   as of 21 Aug** - two new advisory chains (`js-yaml` CVE-2026-59870, `nanoid`,
+   both under `metro-transform-worker`/`@istanbuljs`) appeared since this was
+   last written, both with fixes available via `npm audit fix`, and unrelated to
+   the analysis below. That analysis still holds for the original path: one
+   unreachable route, `uuid@8.3.2` under `jayson` under `@solana/web3.js` v1. The
+   advisory is a missing bounds check in `v3/v5/v6` **when the caller supplies
+   its own buffer**; jayson only calls `v4()` with no buffer, so the vulnerable
+   code is unreachable from here. Forcing uuid 11 would be a major bump across a
+   CJS/ESM boundary to fix a path that cannot be hit - trading real breakage risk
+   for a cosmetic audit number. The permanent fix is the `@solana/web3.js` v2
+   migration; the two new chains should just be patched.
 
-   The other 22 (postcss path traversal + arbitrary file read + `</style>` XSS,
-   sharp's inherited libvips CVEs, brace-expansion DoS) are pinned out via
-   `overrides` in `package.json`, all patch-or-minor inside the same major, with
-   `next build` as the proof.
+   The other 22 (as of the original count; postcss path traversal + arbitrary
+   file read + `</style>` XSS, sharp's inherited libvips CVEs, brace-expansion
+   DoS) are pinned out via `overrides` in `package.json`, all patch-or-minor
+   inside the same major, with `next build` as the proof.
 
 2. **Rate limiting is now partial** (0016, 0018). Every Edge Function consumes
    quota from `check_rate_limit` keyed on the caller's profile id, `messages`
@@ -344,14 +351,17 @@ Listed because an unlisted gap is a gap nobody fixes.
    one was deleted because the leaked Helius key was extractable from it. The
    next build must come after rotation.
 
-5. **The two hand-written Anchor clients must agree with the Rust by hand.**
-   Two checks exist in the program workspace and neither runs automatically yet:
-   `npm run idl:sync` compares against the IDL that `anchor build` emits (the
-   authority, but it needs the Rust toolchain), and `npm run verify:clients`
-   derives the same discriminators straight from `lib.rs` with nothing but Node -
-   so it is the one that can actually run here. The website's test suite
-   recomputes them too. Last run 3 Aug 2026: both clients agree, 8 instructions
-   and 2 accounts. See the CI item in `HANDOFF.md`.
+5. ~~**The two hand-written Anchor clients must agree with the Rust by hand.**~~
+   **Moot as of 21 Aug 2026.** The `Eventerz Program` Anchor program was
+   retired in favour of Metaplex Bubblegum (see `Eventerz Program/DEPLOY_MAINNET.md`)
+   and will never be built, so the `npm run idl:sync` / `npm run verify:clients`
+   scripts that checked hand-written-client-vs-Rust agreement were removed -
+   there is no Rust to agree with anymore. The hand-written clients themselves
+   (`Eventerz/lib/solana/eventerz-program.ts`,
+   `Eventerz dApp/src/services/solana/program.ts`) are still live code, just
+   permanently inert while `*_EVENTERZ_PROGRAM_ID` stays blank - both apps skip
+   the on-chain step cleanly by design. Last real run, 3 Aug 2026, before
+   retirement: both clients agreed, 8 instructions and 2 accounts.
 
 6. ~~**The website has been running on the public RPC in production.**~~ Found
    4 Aug 2026 - `NEXT_PUBLIC_HELIUS_RPC_URL` had never been set on the Vercel
@@ -359,13 +369,16 @@ Listed because an unlisted gap is a gap nobody fixes.
    life of the deployment. Silent apart from one browser-console warning per page
    load, which is why it went unnoticed.
 
-   Now superseded by the proxy: the variable to set is **`HELIUS_RPC_URL`**, no
-   prefix, read server-side by `/api/rpc`. **Outstanding until that is set on
-   Vercel** - a prefixed leftover republishes the key and is warned about at build
-   time.
+   ~~Superseded by the proxy: the variable to set is **`HELIUS_RPC_URL`**, no
+   prefix, read server-side by `/api/rpc`.~~ **Closed as of 21 Aug 2026**:
+   `HELIUS_RPC_URL` is set and redeployed on Vercel (`README.md`'s rotation
+   table), `app/api/rpc/route.ts` is committed and clean in git, and a live
+   fetch confirms it - `GET https://www.eventerz.xyz/api/rpc` returns
+   `{"ok":true,"methods":18}`, not a 404. This gap is resolved; remove this
+   item's "outstanding" framing on the next real edit to this file.
 
-   One accidental upside of the gap: the key that leaked never reached Vercel, so
-   the website was never serving it.
+   One accidental upside of the original gap: the key that leaked never reached
+   Vercel, so the website was never serving it.
 
 7. **`NEXT_PUBLIC_SITE_URL` is scoped to Production only.** It is in `REQUIRED`
    in `lib/env.ts`, and a Vercel *Preview* build runs `next build` with

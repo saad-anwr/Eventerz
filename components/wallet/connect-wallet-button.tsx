@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Button, type ButtonProps } from "@/components/ui/button";
 import { explorerClusterSuffix } from "@/lib/solana/cluster";
+import { shortenAddress as shorten } from "@/lib/format";
 import { useConnectModal } from "./connect-modal-context";
 import { cn } from "@/lib/utils";
 
@@ -23,10 +24,6 @@ interface ConnectWalletButtonProps {
   className?: string;
   label?: string;
   fullWidth?: boolean;
-}
-
-function shorten(address: string) {
-  return `${address.slice(0, 4)}...${address.slice(-4)}`;
 }
 
 const cluster = explorerClusterSuffix();

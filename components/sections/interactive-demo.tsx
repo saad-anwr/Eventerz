@@ -21,6 +21,7 @@ import { AnimatedCounter } from "@/components/ui/animated-counter";
 import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/ui/logo";
 import { demoEvents } from "@/lib/data";
+import { shortenAddress } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 type RsvpState = "idle" | "minting" | "done";
@@ -80,9 +81,7 @@ export function InteractiveDemo() {
   const { connected, publicKey } = useWallet();
 
   const walletLabel =
-    connected && publicKey
-      ? `${publicKey.toBase58().slice(0, 4)}...${publicKey.toBase58().slice(-4)}`
-      : "9xQe...4dRt";
+    connected && publicKey ? shortenAddress(publicKey.toBase58()) : "9xQe...4dRt";
 
   const selected = demoEvents.find((e) => e.id === selectedId)!;
   const state = rsvp[selectedId] ?? "idle";

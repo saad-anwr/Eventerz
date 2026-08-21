@@ -12,7 +12,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { uid } from "@/lib/format";
+import { shortenAddress, uid } from "@/lib/format";
 import type { AuthMethod, User } from "./types";
 import { seedUsers } from "./seed";
 
@@ -111,7 +111,7 @@ export const useAppStore = create<AppState>()(
         const id = uid("u");
         const user: User = {
           id,
-          name: `${address.slice(0, 4)}...${address.slice(-4)}`,
+          name: shortenAddress(address),
           handle: `sol${address.slice(0, 6).toLowerCase()}`,
           walletAddress: address,
           authMethod: "wallet",

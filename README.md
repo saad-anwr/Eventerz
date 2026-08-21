@@ -152,7 +152,7 @@ happened. Env placeholders are in [`.env.example`](.env.example).
 | Anchor program (RSVP, check-in) | [`lib/solana/use-onchain-actions.ts`](lib/solana/use-onchain-actions.ts) - hand-built instructions; see `Eventerz Program/README.md` for why the Anchor client is not used at runtime |
 | Helius RPC | [`lib/solana/cluster.ts`](lib/solana/cluster.ts) |
 | cNFT tickets & badges | `supabase/functions/mint-cnft/` - server-side, because a Bubblegum mint is signed by the tree authority |
-| Token gating | `supabase/functions/check-gate/` + [`lib/solana/gate.ts`](lib/solana/gate.ts) |
+| Token gating | `supabase/functions/check-gate/` - balance-comparison and display logic live entirely there; the create-event form only sets a boolean `tokenGated` flag |
 | Reputation | derived in Postgres, migration `0013` |
 | Supabase client | [`lib/supabase/client.ts`](lib/supabase/client.ts); data access in [`lib/supabase/data.ts`](lib/supabase/data.ts) |
 | Newsletter | `subscribe_newsletter`, migration `0012` |
