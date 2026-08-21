@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useParams } from "next/navigation";
 import {
   AlertCircle,
@@ -33,7 +34,6 @@ import { Avatar } from "@/components/app/avatar";
 import { AttendeeList } from "@/components/app/attendee-list";
 import { ChatPanel } from "@/components/app/chat-panel";
 import { EventMap } from "@/components/app/event-map";
-import { GuestManager } from "@/components/app/guest-manager";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useWallet } from "@solana/wallet-adapter-react";
@@ -54,6 +54,14 @@ import {
   spotsLeft,
 } from "@/lib/events";
 import { cn } from "@/lib/utils";
+
+// Host-only, so most viewers of an event page never need it - code-split so
+// only hosts fetch its ~250 lines of guest-approval UI. Default `ssr: true`
+// keeps the host's own render server-rendered exactly as before; this only
+// stops attendees and anonymous visitors from downloading the chunk.
+const GuestManager = dynamic(() =>
+  import("@/components/app/guest-manager").then((m) => m.GuestManager)
+);
 
 export function EventDetail() {
   const params = useParams<{ id: string }>();

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useParams } from "next/navigation";
 import { ArrowLeft, Coins, Loader2, UserRound } from "lucide-react";
 import {
@@ -14,9 +15,18 @@ import { EmptyState } from "@/components/app/empty-state";
 import { Avatar } from "@/components/app/avatar";
 import { ChatPanel } from "@/components/app/chat-panel";
 import { FriendButton } from "@/components/app/friend-button";
-import { SendCryptoDialog } from "@/components/app/send-crypto-dialog";
 import { Button } from "@/components/ui/button";
 import { shortenAddress } from "@/lib/format";
+
+// Renders nothing until the "send crypto" action opens it - code-split so its
+// wallet-transfer flow (~550 lines) is not part of every thread's bundle.
+const SendCryptoDialog = dynamic(
+  () =>
+    import("@/components/app/send-crypto-dialog").then(
+      (m) => m.SendCryptoDialog
+    ),
+  { ssr: false }
+);
 
 export default function DirectMessagePage() {
   const params = useParams<{ id: string }>();
