@@ -15,6 +15,7 @@
  */
 
 import * as React from "react";
+import dynamic from "next/dynamic";
 import { useWallet } from "@solana/wallet-adapter-react";
 import type { Session, User as SupabaseUser } from "@supabase/supabase-js";
 
@@ -33,7 +34,12 @@ import { profileToUser } from "@/lib/supabase/map-profile";
 import { myWallets, type LinkedWallet } from "@/lib/supabase/data";
 import { PROFILE_COLUMNS } from "@/lib/supabase/types";
 import type { ProfileRow } from "@/lib/supabase/types";
-import { AuthModal } from "./auth-modal";
+// Renders nothing until "sign in" opens it (same AnimatePresence gating as
+// WalletModal) - code-split so its ~330 lines are not part of every page's
+// bundle just because AuthProvider wraps the whole app.
+const AuthModal = dynamic(() => import("./auth-modal").then((m) => m.AuthModal), {
+  ssr: false,
+});
 
 type SocialMethod = "google" | "apple" | "email";
 
