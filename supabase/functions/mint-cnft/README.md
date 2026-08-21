@@ -84,7 +84,7 @@ Per mint there is no rent at all, only the transaction fee: 0.000005 SOL, so
 ## 3. Set the secrets
 
 ```bash
-cd C:\Dev\Eventerz\Eventerz
+# From the website project root (the folder holding `supabase/`).
 
 # The tree address, and the authority secret in base58 (not the JSON array).
 supabase secrets set MERKLE_TREE_ADDRESS=<the address printed above>
