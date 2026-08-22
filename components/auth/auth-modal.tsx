@@ -5,7 +5,6 @@ import { ModalShell } from "@/components/ui/modal-shell";
 import { ArrowRight, Loader2, Mail, ShieldCheck, Wallet, X } from "lucide-react";
 import { useAuth } from "./auth-provider";
 import { useConnectModal } from "@/components/wallet/connect-modal-context";
-import { useScrollLock } from "@/hooks/use-scroll-lock";
 import { EventerzMark } from "@/components/ui/logo";
 import { cn } from "@/lib/utils";
 
@@ -65,7 +64,6 @@ export function AuthModal() {
     isLive,
   } = useAuth();
   const { open: openWalletModal } = useConnectModal();
-  useScrollLock(authOpen);
 
   const [busy, setBusy] = React.useState<null | "google" | "apple" | "email">(
     null

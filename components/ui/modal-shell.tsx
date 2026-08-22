@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { useScrollLock } from "@/hooks";
 
 /**
  * The dialog chrome every Eventerz modal shares: the full-screen overlay, the
@@ -32,6 +33,10 @@ export function ModalShell({
   label: string;
   children: React.ReactNode;
 }) {
+  // The page behind a dialog must not scroll under it. Each modal used to call
+  // this for itself, on the same value it passes as `open`.
+  useScrollLock(open);
+
   return (
     <AnimatePresence>
       {open && (

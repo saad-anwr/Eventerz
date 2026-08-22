@@ -52,6 +52,35 @@ export function Field({
   );
 }
 
+/** The category chips. Both event forms list the same set, in the same order. */
+export function CategoryPicker({
+  value,
+  onChange,
+}: {
+  value: EventCategory;
+  onChange: (c: EventCategory) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {EVENT_CATEGORIES.map((c) => (
+        <button
+          key={c}
+          type="button"
+          onClick={() => onChange(c)}
+          className={cn(
+            "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+            value === c
+              ? "border-brand-purple/50 bg-brand-purple/15 text-white"
+              : "border-white/10 bg-white/[0.03] text-muted-foreground hover:text-white"
+          )}
+        >
+          {c}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /** An on/off row with a leading icon and a switch on the right. */
 export function Toggle({
   checked,

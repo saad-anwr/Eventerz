@@ -38,6 +38,7 @@ import {
   useDiscoverablePeople,
   useFriendRequests,
 } from "@/lib/hooks/use-eventerz-data";
+import type { ProfileRow } from "@/lib/supabase/types";
 import { profileToUser } from "@/lib/supabase/map-profile";
 import { useSession } from "@/components/auth/use-session";
 import { GoogleGate, useHasGoogleAccount } from "@/components/auth/google-gate";
@@ -50,6 +51,45 @@ import { timeAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 type Segment = "friends" | "requests" | "messages";
+
+/**
+ * One pending friend request. The incoming and outgoing lists show the same
+ * row and differ only in its caption - and in the ring, which marks the people
+ * still waiting on you.
+ */
+function RequestRow({
+  profile,
+  caption,
+  ring,
+}: {
+  profile: ProfileRow;
+  caption: string;
+  ring?: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+      <Link href={`/u/${profile.id}`}>
+        <Avatar
+          name={profile.name}
+          seed={profile.id}
+          size="md"
+          ring={ring}
+          src={profile.avatar_url}
+        />
+      </Link>
+      <div className="min-w-0 flex-1">
+        <Link
+          href={`/u/${profile.id}`}
+          className="block truncate font-semibold text-white hover:underline"
+        >
+          {profile.name}
+        </Link>
+        <p className="truncate text-xs text-muted-foreground">{caption}</p>
+      </div>
+      <FriendButton userId={profile.id} />
+    </div>
+  );
+}
 
 export default function CommunityPage() {
   const { userId: me } = useSession();
@@ -245,32 +285,7 @@ export default function CommunityPage() {
                 </h2>
                 <div className="space-y-2">
                   {incoming.map((p) => (
-                    <div
-                      key={p.id}
-                      className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3"
-                    >
-                      <Link href={`/u/${p.id}`}>
-                        <Avatar
-                          name={p.name}
-                          seed={p.id}
-                          size="md"
-                          ring
-                          src={p.avatar_url}
-                        />
-                      </Link>
-                      <div className="min-w-0 flex-1">
-                        <Link
-                          href={`/u/${p.id}`}
-                          className="block truncate font-semibold text-white hover:underline"
-                        >
-                          {p.name}
-                        </Link>
-                        <p className="truncate text-xs text-muted-foreground">
-                          wants to connect
-                        </p>
-                      </div>
-                      <FriendButton userId={p.id} />
-                    </div>
+                    <RequestRow key={p.id} profile={p} caption="wants to connect" ring />
                   ))}
                 </div>
               </section>
@@ -283,31 +298,7 @@ export default function CommunityPage() {
                 </h2>
                 <div className="space-y-2">
                   {outgoing.map((p) => (
-                    <div
-                      key={p.id}
-                      className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3"
-                    >
-                      <Link href={`/u/${p.id}`}>
-                        <Avatar
-                          name={p.name}
-                          seed={p.id}
-                          size="md"
-                          src={p.avatar_url}
-                        />
-                      </Link>
-                      <div className="min-w-0 flex-1">
-                        <Link
-                          href={`/u/${p.id}`}
-                          className="block truncate font-semibold text-white hover:underline"
-                        >
-                          {p.name}
-                        </Link>
-                        <p className="truncate text-xs text-muted-foreground">
-                          Request sent
-                        </p>
-                      </div>
-                      <FriendButton userId={p.id} />
-                    </div>
+                    <RequestRow key={p.id} profile={p} caption="Request sent" />
                   ))}
                 </div>
               </section>

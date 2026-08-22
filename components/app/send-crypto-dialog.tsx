@@ -37,7 +37,6 @@ import {
   isWalletCancellation,
 } from "@/lib/wallet-errors";
 import { shortenAddress } from "@/lib/format";
-import { useScrollLock } from "@/hooks/use-scroll-lock";
 import { cn } from "@/lib/utils";
 
 interface Recipient {
@@ -104,7 +103,6 @@ export function SendCryptoDialog({
   const [signature, setSignature] = React.useState("");
   const [balance, setBalance] = React.useState<bigint | null>(null);
 
-  useScrollLock(open);
 
   // Reset every time the dialog opens, so a previous success is not still on
   // screen when someone comes back to send a second time.

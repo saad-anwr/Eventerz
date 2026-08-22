@@ -263,51 +263,68 @@ export async function fetchEventsAttending(profileId: string) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Banner upload                                                              */
+/*  Image uploads                                                             */
 /* -------------------------------------------------------------------------- */
 
 const BANNER_BUCKET = 'event-banners';
 const MAX_BANNER_BYTES = 5 * 1024 * 1024;
-const BANNER_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/avif'];
+const AVATAR_BUCKET = 'avatars';
+/** 2 MB, matching the bucket's own `file_size_limit` in migration 0014. */
+const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
+const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/avif'];
 
 /**
- * Upload an event banner and return its public URL.
+ * Put an image in a storage bucket and return its public URL.
  *
  * Validated client-side for a fast, specific error; the bucket enforces the
  * same limits server-side, because a client check is a convenience and not a
  * control.
  *
- * The path is `<uid>/<random>.<ext>` - the uid prefix is what the storage
- * policy checks, and the random name avoids one upload clobbering another.
+ * The path is `<uid>/<random>.<ext>`: the uid prefix is what the storage policy
+ * matches on (`storage.foldername(name)[1] = auth.uid()`), and the random name
+ * means a new upload never overwrites the old one - which also sidesteps CDN
+ * caching serving the previous image from a reused URL.
  */
-export async function uploadEventBanner(
+async function uploadImage(
   file: File,
   profileId: string,
+  bucket: string,
+  maxBytes: number,
+  /** What was being uploaded, for the error a failure surfaces. */
+  what: string,
 ): Promise<string> {
-  if (!BANNER_TYPES.includes(file.type)) {
+  if (!IMAGE_TYPES.includes(file.type)) {
     throw new Error('Use a JPEG, PNG, WebP or AVIF image.');
   }
-  if (file.size > MAX_BANNER_BYTES) {
+  if (file.size > maxBytes) {
     const mb = (file.size / 1024 / 1024).toFixed(1);
-    throw new Error(`That image is ${mb} MB. The limit is 5 MB.`);
+    throw new Error(
+      `That image is ${mb} MB. The limit is ${maxBytes / 1024 / 1024} MB.`,
+    );
   }
 
   const ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg';
   const path = `${profileId}/${crypto.randomUUID()}.${ext}`;
 
   const { error } = await client()
-    .storage.from(BANNER_BUCKET)
+    .storage.from(bucket)
     .upload(path, file, { cacheControl: '31536000', upsert: false });
 
-  if (error) fail('Uploading the banner', error);
+  if (error) fail(what, error);
 
-  const { data } = client().storage.from(BANNER_BUCKET).getPublicUrl(path);
+  const { data } = client().storage.from(bucket).getPublicUrl(path);
   return data.publicUrl;
 }
 
-const AVATAR_BUCKET = 'avatars';
-/** 2 MB, matching the bucket's own `file_size_limit` in migration 0014. */
-const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
+/** Upload an event banner and return its public URL. */
+export const uploadEventBanner = (file: File, profileId: string) =>
+  uploadImage(
+    file,
+    profileId,
+    BANNER_BUCKET,
+    MAX_BANNER_BYTES,
+    'Uploading the banner',
+  );
 
 /**
  * Upload a profile picture and return its public URL.
@@ -316,41 +333,15 @@ const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
  * which meant a picture set on a phone showed up everywhere and there was no
  * way to set one from a browser at all - the edit form simply had no control
  * for it.
- *
- * Limits are checked here *and* enforced by the bucket. The client check exists
- * to give a useful message instead of an opaque storage error; the bucket's is
- * the one that actually holds, because a client check is a convenience and
- * never a control.
- *
- * The path is `<uid>/<random>.<ext>`: the uid prefix is what the storage policy
- * matches on (`storage.foldername(name)[1] = auth.uid()`), and the random name
- * means a new picture never has to overwrite the old one - which also sidesteps
- * CDN caching serving the previous image from a reused URL.
  */
-export async function uploadAvatar(
-  file: File,
-  profileId: string,
-): Promise<string> {
-  if (!BANNER_TYPES.includes(file.type)) {
-    throw new Error('Use a JPEG, PNG, WebP or AVIF image.');
-  }
-  if (file.size > MAX_AVATAR_BYTES) {
-    const mb = (file.size / 1024 / 1024).toFixed(1);
-    throw new Error(`That image is ${mb} MB. The limit is 2 MB.`);
-  }
-
-  const ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg';
-  const path = `${profileId}/${crypto.randomUUID()}.${ext}`;
-
-  const { error } = await client()
-    .storage.from(AVATAR_BUCKET)
-    .upload(path, file, { cacheControl: '31536000', upsert: false });
-
-  if (error) fail('Uploading your picture', error);
-
-  const { data } = client().storage.from(AVATAR_BUCKET).getPublicUrl(path);
-  return data.publicUrl;
-}
+export const uploadAvatar = (file: File, profileId: string) =>
+  uploadImage(
+    file,
+    profileId,
+    AVATAR_BUCKET,
+    MAX_AVATAR_BYTES,
+    'Uploading your picture',
+  );
 
 export interface CreateEventInput {
   title: string;

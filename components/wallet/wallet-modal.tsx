@@ -15,7 +15,6 @@ import {
   X,
 } from "lucide-react";
 import { useConnectModal } from "./connect-modal-context";
-import { useScrollLock } from "@/hooks/use-scroll-lock";
 import { useAuth } from "@/components/auth/auth-provider";
 import { GoogleMark } from "@/components/auth/google-gate";
 import { describeWalletError } from "@/lib/wallet-errors";
@@ -250,7 +249,6 @@ export function WalletModal() {
 
   const { isLive, signInWithGoogle, loading: authLoading } = useAuth();
 
-  useScrollLock(visible);
 
   /*
    * The permission MWA cannot work without.

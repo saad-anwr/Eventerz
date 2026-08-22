@@ -35,7 +35,7 @@ import {
 } from "@/lib/price";
 import { cn } from "@/lib/utils";
 import {
-  EVENT_CATEGORIES,
+  CategoryPicker,
   Field,
   Toggle,
   inputCls,
@@ -257,23 +257,10 @@ export default function CreateEventPage() {
           </Field>
 
           <Field label="Category">
-            <div className="flex flex-wrap gap-2">
-              {EVENT_CATEGORIES.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => set("category", c)}
-                  className={cn(
-                    "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                    form.category === c
-                      ? "border-brand-purple/50 bg-brand-purple/15 text-white"
-                      : "border-white/10 bg-white/[0.03] text-muted-foreground hover:text-white"
-                  )}
-                >
-                  {c}
-                </button>
-              ))}
-            </div>
+            <CategoryPicker
+              value={form.category}
+              onChange={(c) => set("category", c)}
+            />
           </Field>
 
           <div className="grid gap-5 sm:grid-cols-2">

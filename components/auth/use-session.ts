@@ -1,7 +1,7 @@
 "use client";
 
 import { useAppStore } from "@/lib/store/use-app-store";
-import { useHydrated } from "@/hooks/use-hydrated";
+import { useHydrated } from "@/hooks";
 
 /** Unified session - the current app user (from wallet or social/email auth). */
 export function useSession() {

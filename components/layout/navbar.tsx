@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/ui/logo";
 import { Magnetic } from "@/components/ui/magnetic";
 import { NavAuth } from "@/components/auth/nav-auth";
-import { useScrollLock } from "@/hooks/use-scroll-lock";
+import { useScrollLock } from "@/hooks";
 
 export function Navbar() {
   const [scrolled, setScrolled] = React.useState(false);
