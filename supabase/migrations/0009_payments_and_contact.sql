@@ -260,9 +260,34 @@ begin
    * without a transfer behind it.
    */
   if p_channel_id is not null and public.can_access_channel(p_channel_id, me) then
+    /*
+     * The cast on `scope` is load-bearing, and without it this insert failed
+     * with:
+     *
+     *   column "scope" is of type message_scope but expression is of type text
+     *
+     * A bare `'dm'` would have been fine - an unknown-type literal coerces to
+     * the enum on assignment. Wrapping it in a CASE is what breaks it: CASE
+     * resolves two unknown literals to `text`, and there is no implicit cast
+     * from `text` to an enum, so the coercion that would have happened never
+     * gets the chance. `kind` on the next line survives only because
+     * `messages.kind` is a plain text column with a check constraint.
+     *
+     * Scope of the damage: this insert is guarded, so `record_payment` only
+     * failed when it was given a channel to post into - which is every payment
+     * sent from a chat, and the reason the function takes a channel at all. A
+     * payment recorded with `p_channel_id => null` succeeded. And because the
+     * payments row is written earlier in the same function, the exception took
+     * that row down with it: the caller got no receipt *and* no payment record,
+     * from a transfer that had already settled on-chain.
+     *
+     * Found by the guest-flow suite on its first ever run. `update_event`
+     * casts `p_category::event_category` in exactly this situation, so the
+     * pattern was known - this call site just missed it.
+     */
     insert into public.messages (scope, channel_id, sender_id, body, kind, payment_id)
     values (
-      case when p_channel_id like 'dm:%' then 'dm' else 'event' end,
+      (case when p_channel_id like 'dm:%' then 'dm' else 'event' end)::message_scope,
       p_channel_id, me, format('Sent %s', pretty), 'payment', result.id
     );
   end if;
