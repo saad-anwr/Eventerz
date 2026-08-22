@@ -123,9 +123,32 @@ begin
 end $$;
 
 /** Give a profile a wallet without going through the signature flow. */
+/*
+ * Give a profile a proven wallet, the way the product does.
+ *
+ * This used to write `profiles.wallet_address` directly, which was right until
+ * 0022 introduced multi-wallet identity and inverted the relationship. Since
+ * then `wallet_links.address` is the claim - it is the primary key, and it is
+ * what makes a wallet belong to exactly one account - while
+ * `profiles.wallet_address` is a *mirror* of the primary link, maintained by
+ * the `wallet_links_sync_primary` trigger.
+ *
+ * So the old fixture set the mirror and never made the claim. Nothing owned the
+ * address, and the section-10 assertion that a wallet claimed by another
+ * account is refused had nothing to be refused against:
+ * `issue_wallet_link_nonce` looks the owner up in `wallet_links`, found no row,
+ * and issued a challenge exactly as it should have. The suite read that as a
+ * missing guard; the guard was fine and the fixture was lying.
+ *
+ * Writing the link and letting the trigger mirror it is also the point of an
+ * integration suite: 0022 says every path that touches `wallet_links` lands the
+ * column in the same state, and a fixture that goes around that is not testing
+ * the system that ships.
+ */
 create or replace function eventerz_test.give_wallet(p_profile_id uuid, p_address text)
 returns void language sql as $$
-  update public.profiles set wallet_address = p_address where id = p_profile_id;
+  insert into public.wallet_links (address, profile_id, is_primary)
+  values (p_address, p_profile_id, true);
 $$;
 
 /*
