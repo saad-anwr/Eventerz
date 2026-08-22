@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { ModalShell } from "@/components/ui/modal-shell";
 import { ArrowRight, Loader2, Mail, ShieldCheck, Wallet, X } from "lucide-react";
 import { useAuth } from "./auth-provider";
 import { useConnectModal } from "@/components/wallet/connect-modal-context";
@@ -154,176 +154,154 @@ export function AuthModal() {
   };
 
   return (
-    <AnimatePresence>
-      {authOpen && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
-          className="fixed inset-0 z-[100] flex items-end justify-center p-4 sm:items-center"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Sign in to Eventerz"
-        >
-          <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-md"
-            onClick={closeAuth}
-          />
+    <ModalShell
+      open={authOpen}
+      label="Sign in to Eventerz"
+      onDismiss={closeAuth}
+    >
+      <button
+        onClick={closeAuth}
+        aria-label="Close"
+        className="absolute right-4 top-4 flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-white/10 hover:text-white"
+      >
+        <X className="size-4" />
+      </button>
 
-          <motion.div
-            initial={{ opacity: 0, y: 24, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 24, scale: 0.97 }}
-            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-            className="gradient-border relative z-10 flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col overflow-hidden rounded-3xl bg-brand-bg-soft/95 shadow-card backdrop-blur-2xl"
+      <div className="min-h-0 flex-1 overflow-y-auto p-6 pt-8 text-center">
+        <EventerzMark className="mx-auto size-12" />
+        <h2 className="mt-4 font-display text-xl font-bold text-white">
+          {sentTo ? "Check your inbox" : "Sign in to Eventerz"}
+        </h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {sentTo
+            ? `We sent a one-time sign-in link to ${sentTo}.`
+            : "Your wallet is your identity - Google keeps it recoverable."}
+        </p>
+      </div>
+
+      {sentTo ? (
+        <div className="px-6 pb-2">
+          <button
+            onClick={() => {
+              setSentTo("");
+              setEmail("");
+            }}
+            className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] text-sm font-semibold text-white transition-colors hover:bg-white/[0.08]"
           >
-            <button
-              onClick={closeAuth}
-              aria-label="Close"
-              className="absolute right-4 top-4 flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-white/10 hover:text-white"
-            >
-              <X className="size-4" />
-            </button>
+            Use a different email
+          </button>
+        </div>
+      ) : (
+      <div className="space-y-2.5 px-6">
+        {/* Social */}
+        <button
+          onClick={() => social("google")}
+          disabled={!!busy}
+          className="flex h-11 w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] text-sm font-semibold text-white transition-colors hover:bg-white/[0.08] disabled:opacity-60"
+        >
+          {busy === "google" ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <GoogleIcon />
+          )}
+          Continue with Google
+        </button>
+        <button
+          onClick={() => social("apple")}
+          disabled={!!busy}
+          className="flex h-11 w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] text-sm font-semibold text-white transition-colors hover:bg-white/[0.08] disabled:opacity-60"
+        >
+          {busy === "apple" ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <AppleIcon />
+          )}
+          Continue with Apple
+        </button>
 
-            <div className="min-h-0 flex-1 overflow-y-auto p-6 pt-8 text-center">
-              <EventerzMark className="mx-auto size-12" />
-              <h2 className="mt-4 font-display text-xl font-bold text-white">
-                {sentTo ? "Check your inbox" : "Sign in to Eventerz"}
-              </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {sentTo
-                  ? `We sent a one-time sign-in link to ${sentTo}.`
-                  : "Your wallet is your identity - Google keeps it recoverable."}
-              </p>
-            </div>
-
-            {sentTo ? (
-              <div className="px-6 pb-2">
-                <button
-                  onClick={() => {
-                    setSentTo("");
-                    setEmail("");
-                  }}
-                  className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] text-sm font-semibold text-white transition-colors hover:bg-white/[0.08]"
-                >
-                  Use a different email
-                </button>
-              </div>
+        {/* Email */}
+        <form onSubmit={submitEmail} className="space-y-2.5 pt-1">
+          {/*
+            Live, the display name comes from the provider or the profile
+            editor - asking for it here would be a field we then ignore.
+          */}
+          {!isLive && (
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Full name (optional)"
+              autoComplete="name"
+              className="h-11 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 text-sm text-white placeholder:text-muted-foreground focus:border-brand-purple/40 focus:outline-none"
+            />
+          )}
+          <div className="relative">
+            <Mail className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setError("");
+              }}
+              placeholder="you@email.com"
+              autoComplete="email"
+              className="h-11 w-full rounded-xl border border-white/10 bg-white/[0.03] pl-10 pr-4 text-sm text-white placeholder:text-muted-foreground focus:border-brand-purple/40 focus:outline-none"
+            />
+          </div>
+          {error && <p className="px-1 text-xs text-red-400">{error}</p>}
+          <button
+            type="submit"
+            disabled={!!busy}
+            className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand-gradient text-sm font-semibold text-white shadow-glow transition-transform hover:scale-[1.01] disabled:opacity-60"
+          >
+            {busy === "email" ? (
+              <Loader2 className="size-4 animate-spin" />
             ) : (
-            <div className="space-y-2.5 px-6">
-              {/* Social */}
-              <button
-                onClick={() => social("google")}
-                disabled={!!busy}
-                className="flex h-11 w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] text-sm font-semibold text-white transition-colors hover:bg-white/[0.08] disabled:opacity-60"
-              >
-                {busy === "google" ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <GoogleIcon />
-                )}
-                Continue with Google
-              </button>
-              <button
-                onClick={() => social("apple")}
-                disabled={!!busy}
-                className="flex h-11 w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] text-sm font-semibold text-white transition-colors hover:bg-white/[0.08] disabled:opacity-60"
-              >
-                {busy === "apple" ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <AppleIcon />
-                )}
-                Continue with Apple
-              </button>
-
-              {/* Email */}
-              <form onSubmit={submitEmail} className="space-y-2.5 pt-1">
-                {/*
-                  Live, the display name comes from the provider or the profile
-                  editor - asking for it here would be a field we then ignore.
-                */}
-                {!isLive && (
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Full name (optional)"
-                    autoComplete="name"
-                    className="h-11 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 text-sm text-white placeholder:text-muted-foreground focus:border-brand-purple/40 focus:outline-none"
-                  />
-                )}
-                <div className="relative">
-                  <Mail className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => {
-                      setEmail(e.target.value);
-                      setError("");
-                    }}
-                    placeholder="you@email.com"
-                    autoComplete="email"
-                    className="h-11 w-full rounded-xl border border-white/10 bg-white/[0.03] pl-10 pr-4 text-sm text-white placeholder:text-muted-foreground focus:border-brand-purple/40 focus:outline-none"
-                  />
-                </div>
-                {error && <p className="px-1 text-xs text-red-400">{error}</p>}
-                <button
-                  type="submit"
-                  disabled={!!busy}
-                  className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand-gradient text-sm font-semibold text-white shadow-glow transition-transform hover:scale-[1.01] disabled:opacity-60"
-                >
-                  {busy === "email" ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <>
-                      {isLive ? "Email me a sign-in link" : "Continue with Email"}
-                      <ArrowRight className="size-4" />
-                    </>
-                  )}
-                </button>
-              </form>
-
-              {/* Divider */}
-              <div className="flex items-center gap-3 py-1">
-                <span className="h-px flex-1 bg-white/10" />
-                <span className="text-xs text-muted-foreground">or</span>
-                <span className="h-px flex-1 bg-white/10" />
-              </div>
-
-              {/* Wallet */}
-              <button
-                onClick={goWallet}
-                disabled={!!busy}
-                className="flex h-11 w-full items-center justify-center gap-3 rounded-xl border border-brand-purple/30 bg-brand-purple/10 text-sm font-semibold text-white transition-colors hover:bg-brand-purple/15 disabled:opacity-60"
-              >
-                <Wallet className="size-4 text-brand-purple" />
-                Connect a wallet
-              </button>
-            </div>
+              <>
+                {isLive ? "Email me a sign-in link" : "Continue with Email"}
+                <ArrowRight className="size-4" />
+              </>
             )}
+          </button>
+        </form>
 
-            <div className="flex shrink-0 items-start gap-2 border-t border-white/10 px-6 py-3.5 text-xs text-muted-foreground">
-              <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-brand-green" />
-              <span>
-                {isLive ? (
-                  <>
-                    Your wallet stays the primary identity - Google and email
-                    only make the account recoverable. By continuing you agree to
-                    our Terms &amp; Privacy Policy.
-                  </>
-                ) : (
-                  <>
-                    Demo mode - social sign-in is simulated. Configure Supabase to
-                    enable real accounts (see docs/AUTH_SETUP.md).
-                  </>
-                )}
-              </span>
-            </div>
-          </motion.div>
-        </motion.div>
+        {/* Divider */}
+        <div className="flex items-center gap-3 py-1">
+          <span className="h-px flex-1 bg-white/10" />
+          <span className="text-xs text-muted-foreground">or</span>
+          <span className="h-px flex-1 bg-white/10" />
+        </div>
+
+        {/* Wallet */}
+        <button
+          onClick={goWallet}
+          disabled={!!busy}
+          className="flex h-11 w-full items-center justify-center gap-3 rounded-xl border border-brand-purple/30 bg-brand-purple/10 text-sm font-semibold text-white transition-colors hover:bg-brand-purple/15 disabled:opacity-60"
+        >
+          <Wallet className="size-4 text-brand-purple" />
+          Connect a wallet
+        </button>
+      </div>
       )}
-    </AnimatePresence>
+
+      <div className="flex shrink-0 items-start gap-2 border-t border-white/10 px-6 py-3.5 text-xs text-muted-foreground">
+        <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-brand-green" />
+        <span>
+          {isLive ? (
+            <>
+              Your wallet stays the primary identity - Google and email
+              only make the account recoverable. By continuing you agree to
+              our Terms &amp; Privacy Policy.
+            </>
+          ) : (
+            <>
+              Demo mode - social sign-in is simulated. Configure Supabase to
+              enable real accounts (see docs/AUTH_SETUP.md).
+            </>
+          )}
+        </span>
+      </div>
+    </ModalShell>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { ModalShell } from "@/components/ui/modal-shell";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import {
   LAMPORTS_PER_SOL,
@@ -309,246 +309,210 @@ export function SendCryptoDialog({
   const busy = phase !== "form" && phase !== "done";
 
   return (
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
-          className="fixed inset-0 z-[100] flex items-end justify-center p-4 sm:items-center"
-          role="dialog"
-          aria-modal="true"
-          aria-label={`Send crypto to ${recipient.name}`}
+    <ModalShell
+      open={open}
+      label={`Send crypto to ${recipient.name}`}
+      onDismiss={() => !busy && onClose()}
+    >
+      <div className="flex shrink-0 items-start justify-between gap-4 border-b border-white/10 p-5">
+        <div className="flex items-center gap-3">
+          <Avatar name={recipient.name} seed={recipient.id} size="md" src={recipient.avatarUrl} />
+          <div>
+            <h2 className="font-display text-lg font-semibold text-white">
+              Send SOL
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              to {recipient.name}
+              {recipient.walletAddress
+                ? ` · ${shortenAddress(recipient.walletAddress)}`
+                : ""}
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          disabled={busy}
+          aria-label="Close"
+          className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-white/10 hover:text-white disabled:opacity-40"
         >
-          <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-md"
-            onClick={() => !busy && onClose()}
-          />
+          <X className="size-4" />
+        </button>
+      </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 24, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 24, scale: 0.97 }}
-            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-            /*
-             * Capped to the window, with the body scrolling inside.
-             *
-             * The card was `overflow-hidden` with no height limit, so on a
-             * short viewport - a landscape phone, a small laptop, a browser
-             * with devtools open - the bottom of the form was clipped with no
-             * way to reach it. That put the Send button out of reach on a form
-             * that moves real money. The header and the "never holds your
-             * funds" footer stay pinned; only the middle scrolls.
-             *
-             * `dvh` rather than `vh`: on mobile browsers `vh` counts the space
-             * behind the retracting address bar, which is exactly the height
-             * this must not assume it has.
-             */
-            className="gradient-border relative z-10 flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col overflow-hidden rounded-3xl bg-brand-bg-soft/95 shadow-card backdrop-blur-2xl"
-          >
-            <div className="flex shrink-0 items-start justify-between gap-4 border-b border-white/10 p-5">
-              <div className="flex items-center gap-3">
-                <Avatar name={recipient.name} seed={recipient.id} size="md" src={recipient.avatarUrl} />
-                <div>
-                  <h2 className="font-display text-lg font-semibold text-white">
-                    Send SOL
-                  </h2>
-                  <p className="text-xs text-muted-foreground">
-                    to {recipient.name}
-                    {recipient.walletAddress
-                      ? ` · ${shortenAddress(recipient.walletAddress)}`
-                      : ""}
-                  </p>
-                </div>
+      {/* The only part that scrolls. `min-h-0` is required for a flex
+          child to be allowed to shrink below its content height. */}
+      <div className="min-h-0 flex-1 overflow-y-auto p-5">
+        {/* Blocking states first - an amount field is pointless if the
+            transfer cannot happen. */}
+        {!recipient.walletAddress ? (
+          <div className="rounded-2xl border border-amber-400/30 bg-amber-400/10 p-4 text-sm text-amber-200">
+            <p className="font-semibold">
+              {recipient.name} has not linked a wallet
+            </p>
+            <p className="mt-1 text-xs opacity-90">
+              There is nowhere to send to yet. They can link one from their
+              profile.
+            </p>
+          </div>
+        ) : !connected ? (
+          <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 text-center">
+            <div className="mx-auto flex size-11 items-center justify-center rounded-2xl bg-brand-purple/15 text-brand-purple">
+              <WalletIcon className="size-5" />
+            </div>
+            <p className="mt-3 text-sm font-medium text-white">
+              Connect a wallet to send
+            </p>
+            <Button className="mt-4 w-full" onClick={openWalletModal}>
+              <WalletIcon className="size-4" />
+              Connect wallet
+            </Button>
+          </div>
+        ) : phase === "done" ? (
+          <div className="text-center">
+            <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-brand-green/15 text-brand-green">
+              <Check className="size-6" />
+            </div>
+            <p className="mt-3 font-display text-lg font-semibold text-white">
+              Sent {amount} SOL
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              The receipt is in your conversation with{" "}
+              {recipient.name.split(" ")[0]}.
+            </p>
+            <a
+              href={explorerTxUrl(signature)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-4 inline-flex items-center gap-1.5 text-xs font-medium text-brand-cyan hover:underline"
+            >
+              View on Explorer
+              <ArrowRight className="size-3.5" />
+            </a>
+            <Button variant="secondary" className="mt-5 w-full" onClick={onClose}>
+              Done
+            </Button>
+          </div>
+        ) : (
+          <>
+            <label className="block">
+              <span className="mb-1.5 flex items-baseline justify-between">
+                <span className="text-sm font-medium text-white">Amount</span>
+                {balance !== null && (
+                  <span className="text-xs text-muted-foreground">
+                    Balance {lamportsToSol(balance)} SOL
+                  </span>
+                )}
+              </span>
+              <div className="relative">
+                <input
+                  inputMode="decimal"
+                  autoFocus
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="0.0"
+                  disabled={busy}
+                  className="h-14 w-full rounded-xl border border-white/10 bg-white/[0.03] pl-4 pr-16 font-display text-2xl font-semibold text-white placeholder:text-muted-foreground/50 focus:border-brand-purple/40 focus:outline-none disabled:opacity-60"
+                />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-muted-foreground">
+                  SOL
+                </span>
               </div>
-              <button
-                onClick={onClose}
-                disabled={busy}
-                aria-label="Close"
-                className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-white/10 hover:text-white disabled:opacity-40"
-              >
-                <X className="size-4" />
-              </button>
+            </label>
+
+            <div className="mt-2.5 flex flex-wrap gap-2">
+              {QUICK_AMOUNTS.map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  disabled={busy}
+                  onClick={() => setAmount(value)}
+                  className={cn(
+                    "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                    amount === value
+                      ? "border-brand-purple/50 bg-brand-purple/15 text-white"
+                      : "border-white/10 bg-white/[0.03] text-muted-foreground hover:text-white",
+                  )}
+                >
+                  {value}
+                </button>
+              ))}
+              {max !== null && max > 0n && (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => setAmount(fromBaseUnits(max, 9))}
+                  className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-white"
+                >
+                  Max
+                </button>
+              )}
             </div>
 
-            {/* The only part that scrolls. `min-h-0` is required for a flex
-                child to be allowed to shrink below its content height. */}
-            <div className="min-h-0 flex-1 overflow-y-auto p-5">
-              {/* Blocking states first - an amount field is pointless if the
-                  transfer cannot happen. */}
-              {!recipient.walletAddress ? (
-                <div className="rounded-2xl border border-amber-400/30 bg-amber-400/10 p-4 text-sm text-amber-200">
-                  <p className="font-semibold">
-                    {recipient.name} has not linked a wallet
-                  </p>
-                  <p className="mt-1 text-xs opacity-90">
-                    There is nowhere to send to yet. They can link one from their
-                    profile.
-                  </p>
-                </div>
-              ) : !connected ? (
-                <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 text-center">
-                  <div className="mx-auto flex size-11 items-center justify-center rounded-2xl bg-brand-purple/15 text-brand-purple">
-                    <WalletIcon className="size-5" />
-                  </div>
-                  <p className="mt-3 text-sm font-medium text-white">
-                    Connect a wallet to send
-                  </p>
-                  <Button className="mt-4 w-full" onClick={openWalletModal}>
-                    <WalletIcon className="size-4" />
-                    Connect wallet
-                  </Button>
-                </div>
-              ) : phase === "done" ? (
-                <div className="text-center">
-                  <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-brand-green/15 text-brand-green">
-                    <Check className="size-6" />
-                  </div>
-                  <p className="mt-3 font-display text-lg font-semibold text-white">
-                    Sent {amount} SOL
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    The receipt is in your conversation with{" "}
-                    {recipient.name.split(" ")[0]}.
-                  </p>
+            <label className="mt-4 block">
+              <span className="mb-1.5 block text-sm font-medium text-white">
+                Note (optional)
+              </span>
+              <input
+                value={memo}
+                onChange={(e) => setMemo(e.target.value.slice(0, 200))}
+                placeholder="Ticket split for Friday"
+                disabled={busy}
+                className={cn(inputCls, "disabled:opacity-60")}
+              />
+            </label>
+
+            {(validationError || error) && (
+              <div className="mt-3 rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+                <p className="flex items-start gap-1.5">
+                  <AlertCircle className="mt-0.5 size-3.5 shrink-0" />
+                  {validationError ?? error}
+                </p>
+                {/* If it was submitted, "check the explorer" needs to be a
+                    link. Telling someone to go and look without saying
+                    where is the dead end this message was meant to avoid. */}
+                {!validationError && signature && (
                   <a
                     href={explorerTxUrl(signature)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-4 inline-flex items-center gap-1.5 text-xs font-medium text-brand-cyan hover:underline"
+                    className="mt-1.5 inline-flex items-center gap-1 pl-5 font-medium text-red-200 underline underline-offset-2 hover:text-white"
                   >
-                    View on Explorer
-                    <ArrowRight className="size-3.5" />
+                    View transaction
+                    <ArrowRight className="size-3" />
                   </a>
-                  <Button variant="secondary" className="mt-5 w-full" onClick={onClose}>
-                    Done
-                  </Button>
-                </div>
+                )}
+              </div>
+            )}
+
+            <Button
+              className="mt-5 w-full"
+              size="lg"
+              disabled={!canSend}
+              onClick={() => void send()}
+            >
+              {busy ? (
+                <Loader2 className="size-4 animate-spin" />
               ) : (
-                <>
-                  <label className="block">
-                    <span className="mb-1.5 flex items-baseline justify-between">
-                      <span className="text-sm font-medium text-white">Amount</span>
-                      {balance !== null && (
-                        <span className="text-xs text-muted-foreground">
-                          Balance {lamportsToSol(balance)} SOL
-                        </span>
-                      )}
-                    </span>
-                    <div className="relative">
-                      <input
-                        inputMode="decimal"
-                        autoFocus
-                        value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
-                        placeholder="0.0"
-                        disabled={busy}
-                        className="h-14 w-full rounded-xl border border-white/10 bg-white/[0.03] pl-4 pr-16 font-display text-2xl font-semibold text-white placeholder:text-muted-foreground/50 focus:border-brand-purple/40 focus:outline-none disabled:opacity-60"
-                      />
-                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-muted-foreground">
-                        SOL
-                      </span>
-                    </div>
-                  </label>
-
-                  <div className="mt-2.5 flex flex-wrap gap-2">
-                    {QUICK_AMOUNTS.map((value) => (
-                      <button
-                        key={value}
-                        type="button"
-                        disabled={busy}
-                        onClick={() => setAmount(value)}
-                        className={cn(
-                          "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                          amount === value
-                            ? "border-brand-purple/50 bg-brand-purple/15 text-white"
-                            : "border-white/10 bg-white/[0.03] text-muted-foreground hover:text-white",
-                        )}
-                      >
-                        {value}
-                      </button>
-                    ))}
-                    {max !== null && max > 0n && (
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => setAmount(fromBaseUnits(max, 9))}
-                        className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-white"
-                      >
-                        Max
-                      </button>
-                    )}
-                  </div>
-
-                  <label className="mt-4 block">
-                    <span className="mb-1.5 block text-sm font-medium text-white">
-                      Note (optional)
-                    </span>
-                    <input
-                      value={memo}
-                      onChange={(e) => setMemo(e.target.value.slice(0, 200))}
-                      placeholder="Ticket split for Friday"
-                      disabled={busy}
-                      className={cn(inputCls, "disabled:opacity-60")}
-                    />
-                  </label>
-
-                  {(validationError || error) && (
-                    <div className="mt-3 rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
-                      <p className="flex items-start gap-1.5">
-                        <AlertCircle className="mt-0.5 size-3.5 shrink-0" />
-                        {validationError ?? error}
-                      </p>
-                      {/* If it was submitted, "check the explorer" needs to be a
-                          link. Telling someone to go and look without saying
-                          where is the dead end this message was meant to avoid. */}
-                      {!validationError && signature && (
-                        <a
-                          href={explorerTxUrl(signature)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="mt-1.5 inline-flex items-center gap-1 pl-5 font-medium text-red-200 underline underline-offset-2 hover:text-white"
-                        >
-                          View transaction
-                          <ArrowRight className="size-3" />
-                        </a>
-                      )}
-                    </div>
-                  )}
-
-                  <Button
-                    className="mt-5 w-full"
-                    size="lg"
-                    disabled={!canSend}
-                    onClick={() => void send()}
-                  >
-                    {busy ? (
-                      <Loader2 className="size-4 animate-spin" />
-                    ) : (
-                      <ArrowRight className="size-4" />
-                    )}
-                    {phase === "signing"
-                      ? "Approve in your wallet..."
-                      : phase === "confirming"
-                        ? "Confirming on-chain..."
-                        : phase === "recording"
-                          ? "Filing the receipt..."
-                          : `Send${amount ? ` ${amount} SOL` : ""}`}
-                  </Button>
-                </>
+                <ArrowRight className="size-4" />
               )}
-            </div>
+              {phase === "signing"
+                ? "Approve in your wallet..."
+                : phase === "confirming"
+                  ? "Confirming on-chain..."
+                  : phase === "recording"
+                    ? "Filing the receipt..."
+                    : `Send${amount ? ` ${amount} SOL` : ""}`}
+            </Button>
+          </>
+        )}
+      </div>
 
-            <div className="flex shrink-0 items-start gap-2 border-t border-white/10 px-5 py-3.5 text-xs text-muted-foreground">
-              <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-brand-green" />
-              Eventerz never holds your funds. The transfer goes straight from
-              your wallet to theirs, and you approve it there.
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+      <div className="flex shrink-0 items-start gap-2 border-t border-white/10 px-5 py-3.5 text-xs text-muted-foreground">
+        <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-brand-green" />
+        Eventerz never holds your funds. The transfer goes straight from
+        your wallet to theirs, and you approve it there.
+      </div>
+    </ModalShell>
   );
 }
 

@@ -13,7 +13,6 @@ import {
   MapPin,
   Pencil,
   Phone,
-  Ticket,
   Twitter,
   Wallet,
   X,
@@ -37,8 +36,14 @@ import { eventRowToItem } from "@/lib/supabase/map-event";
 import { useSession } from "@/components/auth/use-session";
 import { useConnectModal } from "@/components/wallet/connect-modal-context";
 import { Avatar } from "@/components/app/avatar";
-import { EventCard } from "@/components/app/event-card";
 import { inputCls } from "@/components/app/form-controls";
+import {
+  DetailRow,
+  DetailsCard,
+  ProfileAbout,
+  ProfileHosting,
+  ProfileInterests,
+} from "@/components/app/profile-sections";
 import { Button } from "@/components/ui/button";
 import { shortenAddress } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -517,109 +522,31 @@ export default function ProfilePage() {
         /* View */
         <div className="mt-6 grid gap-6 lg:grid-cols-3">
           <div className="space-y-6 lg:col-span-2">
-            {user.bio && (
-              <section>
-                <h2 className="mb-2 font-display text-lg font-semibold text-white">
-                  About
-                </h2>
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  {user.bio}
-                </p>
-              </section>
-            )}
-
-            {user.interests.length > 0 && (
-              <section>
-                <h2 className="mb-2 font-display text-lg font-semibold text-white">
-                  Interests
-                </h2>
-                <div className="flex flex-wrap gap-2">
-                  {user.interests.map((t) => (
-                    <span
-                      key={t}
-                      className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs text-muted-foreground"
-                    >
-                      {t}
-                    </span>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            <section>
-              <div className="mb-3 flex items-center gap-2">
-                <Ticket className="size-5 text-brand-purple" />
-                <h2 className="font-display text-lg font-semibold text-white">
-                  Hosting ({hosted.length})
-                </h2>
-              </div>
-              {hosted.length ? (
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {hosted.slice(0, 4).map((e) => (
-                    <EventCard key={e.id} event={e} />
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">
+            <ProfileAbout bio={user.bio} />
+            <ProfileInterests interests={user.interests} />
+            <ProfileHosting
+              events={hosted}
+              empty={
+                <>
                   No events yet.{" "}
                   <Link href="/create" className="text-brand-cyan">
                     Create one →
                   </Link>
-                </p>
-              )}
-            </section>
+                </>
+              }
+            />
           </div>
 
           {/* Details sidebar */}
           <aside className="space-y-3">
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-              <h3 className="mb-3 text-sm font-semibold text-white">Details</h3>
-              <ul className="space-y-3 text-sm">
-                {user.email && (
-                  <li className="flex items-center gap-2.5 text-muted-foreground">
-                    <Mail className="size-4 shrink-0" />
-                    <span className="truncate">{user.email}</span>
-                  </li>
-                )}
-                {/* From `profile_private`, and only ever your own - see 0019. */}
-                {phone && (
-                  <li className="flex items-center gap-2.5 text-muted-foreground">
-                    <Phone className="size-4 shrink-0" />
-                    {phone}
-                  </li>
-                )}
-                {user.location && (
-                  <li className="flex items-center gap-2.5 text-muted-foreground">
-                    <MapPin className="size-4 shrink-0" />
-                    {user.location}
-                  </li>
-                )}
-                {user.website && (
-                  <li className="flex items-center gap-2.5 text-muted-foreground">
-                    <Globe2 className="size-4 shrink-0" />
-                    <span className="truncate">{user.website}</span>
-                  </li>
-                )}
-                {user.twitter && (
-                  <li className="flex items-center gap-2.5 text-muted-foreground">
-                    <Twitter className="size-4 shrink-0" />
-                    <a
-                      href={`https://x.com/${user.twitter}`}
-                      target="_blank"
-                      rel="noopener noreferrer me"
-                      className="truncate hover:text-white hover:underline"
-                    >
-                      x.com/{user.twitter}
-                    </a>
-                  </li>
-                )}
-              </ul>
-
-              <div className="mt-4 border-t border-white/10 pt-4">
-                {user.walletAddress ? (
+            <DetailsCard
+              footer={
+                user.walletAddress ? (
                   <div className="flex items-center gap-2 text-sm text-brand-green">
                     <Wallet className="size-4" />
-                    <span data-no-translate>{shortenAddress(user.walletAddress)}</span>
+                    <span data-no-translate>
+                      {shortenAddress(user.walletAddress)}
+                    </span>
                   </div>
                 ) : (
                   <Button
@@ -631,10 +558,37 @@ export default function ProfilePage() {
                     <Wallet className="size-4" />
                     Link a wallet
                   </Button>
-                )}
-              </div>
-
-            </div>
+                )
+              }
+            >
+              {user.email && (
+                <DetailRow icon={Mail}>
+                  <span className="truncate">{user.email}</span>
+                </DetailRow>
+              )}
+              {/* From `profile_private`, and only ever your own - see 0019. */}
+              {phone && <DetailRow icon={Phone}>{phone}</DetailRow>}
+              {user.location && (
+                <DetailRow icon={MapPin}>{user.location}</DetailRow>
+              )}
+              {user.website && (
+                <DetailRow icon={Globe2}>
+                  <span className="truncate">{user.website}</span>
+                </DetailRow>
+              )}
+              {user.twitter && (
+                <DetailRow icon={Twitter}>
+                  <a
+                    href={`https://x.com/${user.twitter}`}
+                    target="_blank"
+                    rel="noopener noreferrer me"
+                    className="truncate hover:text-white hover:underline"
+                  >
+                    x.com/{user.twitter}
+                  </a>
+                </DetailRow>
+              )}
+            </DetailsCard>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-center">

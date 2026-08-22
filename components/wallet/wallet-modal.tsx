@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { ModalShell } from "@/components/ui/modal-shell";
 import { useWallet, type Wallet } from "@solana/wallet-adapter-react";
 import { WalletReadyState } from "@solana/wallet-adapter-base";
 import { SolanaMobileWalletAdapterWalletName } from "@solana-mobile/wallet-standard-mobile";
@@ -448,244 +448,222 @@ export function WalletModal() {
   }, [signInWithGoogle]);
 
   return (
-    <AnimatePresence>
-      {visible && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
-          className="fixed inset-0 z-[100] flex items-end justify-center p-4 sm:items-center"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Connect a wallet"
+    <ModalShell
+      open={visible}
+      label="Connect a wallet"
+      onDismiss={close}
+    >
+      {/* Header */}
+      <div className="flex shrink-0 items-start justify-between gap-4 border-b border-white/10 p-5">
+        <div className="flex items-center gap-3">
+          {view === "no-mwa" ? (
+            <button
+              onClick={() => setView("wallets")}
+              aria-label="Back to wallets"
+              className="flex size-10 items-center justify-center rounded-2xl bg-white/[0.06] text-muted-foreground transition-colors hover:bg-white/10 hover:text-white"
+            >
+              <ChevronLeft className="size-5" />
+            </button>
+          ) : (
+            <span className="flex size-10 items-center justify-center rounded-2xl bg-brand-purple/15 text-brand-purple">
+              <WalletIcon className="size-5" />
+            </span>
+          )}
+          <div>
+            <h2 className="font-display text-lg font-semibold text-white">
+              {view === "no-mwa"
+                ? "Wallet apps can't open here"
+                : "Connect a wallet"}
+            </h2>
+            {/* The website's own line, kept as it was. Mirroring the
+                app's wording belongs after sign-in, not here. */}
+            <p className="text-xs text-muted-foreground">
+              {view === "no-mwa"
+                ? "Here are three ways in that do work"
+                : "Choose how you want to connect"}
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={close}
+          aria-label="Close"
+          className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-white/10 hover:text-white"
         >
-          <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-md"
-            onClick={close}
-          />
+          <X className="size-4" />
+        </button>
+      </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 24, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 24, scale: 0.97 }}
-            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-            className="gradient-border relative z-10 flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col overflow-hidden rounded-3xl bg-brand-bg-soft/95 shadow-card backdrop-blur-2xl"
-          >
-            {/* Header */}
-            <div className="flex shrink-0 items-start justify-between gap-4 border-b border-white/10 p-5">
-              <div className="flex items-center gap-3">
-                {view === "no-mwa" ? (
-                  <button
-                    onClick={() => setView("wallets")}
-                    aria-label="Back to wallets"
-                    className="flex size-10 items-center justify-center rounded-2xl bg-white/[0.06] text-muted-foreground transition-colors hover:bg-white/10 hover:text-white"
-                  >
-                    <ChevronLeft className="size-5" />
-                  </button>
-                ) : (
-                  <span className="flex size-10 items-center justify-center rounded-2xl bg-brand-purple/15 text-brand-purple">
-                    <WalletIcon className="size-5" />
-                  </span>
-                )}
-                <div>
-                  <h2 className="font-display text-lg font-semibold text-white">
-                    {view === "no-mwa"
-                      ? "Wallet apps can't open here"
-                      : "Connect a wallet"}
-                  </h2>
-                  {/* The website's own line, kept as it was. Mirroring the
-                      app's wording belongs after sign-in, not here. */}
-                  <p className="text-xs text-muted-foreground">
-                    {view === "no-mwa"
-                      ? "Here are three ways in that do work"
-                      : "Choose how you want to connect"}
-                  </p>
-                </div>
+      <div className="min-h-0 flex-1 overflow-y-auto p-5">
+        {view === "no-mwa" ? (
+          <>
+            {/*
+              Said plainly and once, instead of a fourth identical
+              failure. Every part of this is what the user can act on -
+              the reason is one sentence and the rest is routes out.
+            */}
+            <p className="rounded-xl border border-amber-400/25 bg-amber-500/10 px-3.5 py-3 text-xs leading-relaxed text-amber-200/90">
+              A mobile browser can&apos;t open your wallet app. Chrome has
+              to grant this site access to apps on your device first, and
+              it never offers the choice - so there is nothing to allow
+              and nothing for the connection to reach.
+            </p>
+
+            <div className="mt-5">
+              <p className="px-1 text-sm font-semibold text-white">
+                Open Eventerz in your wallet
+              </p>
+              <p className="mb-2.5 mt-1 px-1 text-xs leading-relaxed text-muted-foreground">
+                Every wallet ships its own browser. The page reopens
+                inside it and connects straight away, with no permission
+                involved. This is the one to use on a phone.
+              </p>
+              <div className="space-y-2">
+                {discover.map((c) => (
+                  <WalletLinkRow
+                    key={c.name}
+                    wallet={c}
+                    isMobile={isMobile}
+                    browseTarget={browseTarget}
+                  />
+                ))}
               </div>
-              <button
-                onClick={close}
-                aria-label="Close"
-                className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-white/10 hover:text-white"
-              >
-                <X className="size-4" />
-              </button>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto p-5">
-              {view === "no-mwa" ? (
-                <>
-                  {/*
-                    Said plainly and once, instead of a fourth identical
-                    failure. Every part of this is what the user can act on -
-                    the reason is one sentence and the rest is routes out.
-                  */}
-                  <p className="rounded-xl border border-amber-400/25 bg-amber-500/10 px-3.5 py-3 text-xs leading-relaxed text-amber-200/90">
-                    A mobile browser can&apos;t open your wallet app. Chrome has
-                    to grant this site access to apps on your device first, and
-                    it never offers the choice - so there is nothing to allow
-                    and nothing for the connection to reach.
-                  </p>
+            <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.02] p-3.5">
+              <p className="text-sm font-semibold text-white">
+                Or use a computer
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                On a desktop browser, connect with a wallet extension as
+                normal. It is the same account either way - whatever you
+                do there shows up here.
+              </p>
+            </div>
+          </>
+        ) : (
+          <>
+          {/* A failed connection has to say so - see the handshake effect. */}
+          {error && (
+            <p
+              role="alert"
+              className="mb-4 rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs text-red-300"
+            >
+              {error}
+            </p>
+          )}
 
-                  <div className="mt-5">
-                    <p className="px-1 text-sm font-semibold text-white">
-                      Open Eventerz in your wallet
-                    </p>
-                    <p className="mb-2.5 mt-1 px-1 text-xs leading-relaxed text-muted-foreground">
-                      Every wallet ships its own browser. The page reopens
-                      inside it and connects straight away, with no permission
-                      involved. This is the one to use on a phone.
-                    </p>
-                    <div className="space-y-2">
-                      {discover.map((c) => (
-                        <WalletLinkRow
-                          key={c.name}
-                          wallet={c}
-                          isMobile={isMobile}
-                          browseTarget={browseTarget}
-                        />
-                      ))}
-                    </div>
-                  </div>
+          {/* Detected wallets */}
+          {detected.length > 0 ? (
+            <div className="space-y-2">
+              {detected.map((w) => {
+                const isMwa =
+                  w.adapter.name === SolanaMobileWalletAdapterWalletName;
+                return (
+                  <WalletRow
+                    key={w.adapter.name}
+                    wallet={w}
+                    pending={pending === w.adapter.name}
+                    onSelect={() => handleSelect(w.adapter.name)}
+                    /* "Detected" is right for an extension and misleading
+                       for MWA, which has not detected anything - it opens a
+                       chooser and hands off to whichever wallet app
+                       answers. Where that hand-off cannot work, the row
+                       says so up front and explains when tapped, rather
+                       than looking like every other row and failing. */
+                    caption={
+                      isMwa
+                        ? mwaIsHopeless(lna)
+                          ? "Not available in this browser"
+                          : "Opens your wallet app"
+                        : "Detected"
+                    }
+                    captionTone={
+                      isMwa && mwaIsHopeless(lna) ? "blocked" : "ready"
+                    }
+                  />
+                );
+              })}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 text-center">
+              <div className="mx-auto flex size-11 items-center justify-center rounded-2xl bg-white/[0.05] text-muted-foreground">
+                <WalletIcon className="size-5" />
+              </div>
+              <p className="mt-3 text-sm font-medium text-white">
+                No Solana wallet detected
+              </p>
+              {/* On a phone "install one below" is wrong - the apps are
+                  very likely already there, just invisible to a web page. */}
+              <p className="mt-1 text-xs text-muted-foreground">
+                {isMobile
+                  ? "A web page cannot see wallet apps. Open this page in your wallet's browser below."
+                  : "Install one of the wallets below to continue."}
+              </p>
+            </div>
+          )}
 
-                  <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.02] p-3.5">
-                    <p className="text-sm font-semibold text-white">
-                      Or use a computer
-                    </p>
-                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                      On a desktop browser, connect with a wallet extension as
-                      normal. It is the same account either way - whatever you
-                      do there shows up here.
-                    </p>
-                  </div>
-                </>
-              ) : (
-                <>
-                {/* A failed connection has to say so - see the handshake effect. */}
-                {error && (
-                  <p
-                    role="alert"
-                    className="mb-4 rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs text-red-300"
-                  >
-                    {error}
-                  </p>
-                )}
+          {/* Discovery */}
+          {discover.length > 0 && (
+            <div className="mt-6">
+              <p className="mb-2 px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                {isMobile
+                  ? "Open in a wallet app"
+                  : detected.length > 0
+                    ? "More wallets"
+                    : "Get a wallet"}
+              </p>
+              <div className="space-y-2">
+                {discover.map((c) => (
+                  <WalletLinkRow
+                    key={c.name}
+                    wallet={c}
+                    isMobile={isMobile}
+                    browseTarget={browseTarget}
+                  />
+                ))}
+              </div>
+            </div>
+            )}
+          </>
+        )}
 
-                {/* Detected wallets */}
-                {detected.length > 0 ? (
-                  <div className="space-y-2">
-                    {detected.map((w) => {
-                      const isMwa =
-                        w.adapter.name === SolanaMobileWalletAdapterWalletName;
-                      return (
-                        <WalletRow
-                          key={w.adapter.name}
-                          wallet={w}
-                          pending={pending === w.adapter.name}
-                          onSelect={() => handleSelect(w.adapter.name)}
-                          /* "Detected" is right for an extension and misleading
-                             for MWA, which has not detected anything - it opens a
-                             chooser and hands off to whichever wallet app
-                             answers. Where that hand-off cannot work, the row
-                             says so up front and explains when tapped, rather
-                             than looking like every other row and failing. */
-                          caption={
-                            isMwa
-                              ? mwaIsHopeless(lna)
-                                ? "Not available in this browser"
-                                : "Opens your wallet app"
-                              : "Detected"
-                          }
-                          captionTone={
-                            isMwa && mwaIsHopeless(lna) ? "blocked" : "ready"
-                          }
-                        />
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 text-center">
-                    <div className="mx-auto flex size-11 items-center justify-center rounded-2xl bg-white/[0.05] text-muted-foreground">
-                      <WalletIcon className="size-5" />
-                    </div>
-                    <p className="mt-3 text-sm font-medium text-white">
-                      No Solana wallet detected
-                    </p>
-                    {/* On a phone "install one below" is wrong - the apps are
-                        very likely already there, just invisible to a web page. */}
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {isMobile
-                        ? "A web page cannot see wallet apps. Open this page in your wallet's browser below."
-                        : "Install one of the wallets below to continue."}
-                    </p>
-                  </div>
-                )}
-
-                {/* Discovery */}
-                {discover.length > 0 && (
-                  <div className="mt-6">
-                    <p className="mb-2 px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                      {isMobile
-                        ? "Open in a wallet app"
-                        : detected.length > 0
-                          ? "More wallets"
-                          : "Get a wallet"}
-                    </p>
-                    <div className="space-y-2">
-                      {discover.map((c) => (
-                        <WalletLinkRow
-                          key={c.name}
-                          wallet={c}
-                          isMobile={isMobile}
-                          browseTarget={browseTarget}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                  )}
-                </>
-              )}
-
-              {/*
-                Google, below the wallets and behind an "or" - the same order,
-                divider and helper text as the app's connect sheet, so the two
-                onboarding surfaces read as one product.
-              */}
-              {isLive && (
-                <>
-                  <div className="my-5 flex items-center gap-3">
-                    <span className="h-px flex-1 bg-white/10" />
-                    <span className="text-xs text-muted-foreground">or</span>
-                    <span className="h-px flex-1 bg-white/10" />
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleGoogle}
-                    disabled={authLoading}
-                    className="flex h-[52px] w-full items-center justify-center gap-2.5 rounded-full border border-white/[0.12] bg-white/[0.05] text-sm font-semibold text-white transition-colors hover:bg-white/[0.08] disabled:opacity-60"
-                  >
-                    <GoogleMark className="size-[18px]" />
-                    Continue with Google
-                  </button>
-
-                  <p className="mt-2.5 text-center text-xs leading-relaxed text-muted-foreground">
-                    {view === "no-mwa"
-                      ? "Carry on here with Google - discover events, message friends, build your profile. Add a wallet later, from any browser, to claim tickets."
-                      : "Google makes your profile discoverable and the account recoverable. Tickets and check-in still need a wallet."}
-                  </p>
-                </>
-              )}
+        {/*
+          Google, below the wallets and behind an "or" - the same order,
+          divider and helper text as the app's connect sheet, so the two
+          onboarding surfaces read as one product.
+        */}
+        {isLive && (
+          <>
+            <div className="my-5 flex items-center gap-3">
+              <span className="h-px flex-1 bg-white/10" />
+              <span className="text-xs text-muted-foreground">or</span>
+              <span className="h-px flex-1 bg-white/10" />
             </div>
 
-            {/* Footer */}
-            <div className="flex items-center gap-2 border-t border-white/10 px-5 py-3.5 text-xs text-muted-foreground">
-              <ShieldCheck className="size-3.5 shrink-0 text-brand-green" />
-              Eventerz never has access to your funds. You approve every action.
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+            <button
+              type="button"
+              onClick={handleGoogle}
+              disabled={authLoading}
+              className="flex h-[52px] w-full items-center justify-center gap-2.5 rounded-full border border-white/[0.12] bg-white/[0.05] text-sm font-semibold text-white transition-colors hover:bg-white/[0.08] disabled:opacity-60"
+            >
+              <GoogleMark className="size-[18px]" />
+              Continue with Google
+            </button>
+
+            <p className="mt-2.5 text-center text-xs leading-relaxed text-muted-foreground">
+              {view === "no-mwa"
+                ? "Carry on here with Google - discover events, message friends, build your profile. Add a wallet later, from any browser, to claim tickets."
+                : "Google makes your profile discoverable and the account recoverable. Tickets and check-in still need a wallet."}
+            </p>
+          </>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center gap-2 border-t border-white/10 px-5 py-3.5 text-xs text-muted-foreground">
+        <ShieldCheck className="size-3.5 shrink-0 text-brand-green" />
+        Eventerz never has access to your funds. You approve every action.
+      </div>
+    </ModalShell>
   );
 }
