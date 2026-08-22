@@ -9,6 +9,7 @@ import {
   type PlaceSuggestion,
 } from "@/lib/geocode";
 import { mapEmbedUrl } from "@/lib/maps";
+import { inputCls } from "./form-controls";
 import { cn } from "@/lib/utils";
 
 /**
@@ -30,9 +31,6 @@ interface LocationPickerProps {
   onChange: (next: PickedLocation) => void;
   placeholder?: string;
 }
-
-const inputCls =
-  "h-11 w-full rounded-xl border border-white/10 bg-white/[0.03] px-3.5 text-sm text-white placeholder:text-muted-foreground focus:border-brand-purple/40 focus:outline-none";
 
 /**
  * Location field with search-as-you-type and a map preview.

@@ -38,6 +38,7 @@ import { useSession } from "@/components/auth/use-session";
 import { useConnectModal } from "@/components/wallet/connect-modal-context";
 import { Avatar } from "@/components/app/avatar";
 import { EventCard } from "@/components/app/event-card";
+import { inputCls } from "@/components/app/form-controls";
 import { Button } from "@/components/ui/button";
 import { shortenAddress } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -63,9 +64,6 @@ function normaliseXHandle(input: string): string {
     .split(/[/?#]/)[0]
     .trim();
 }
-
-const inputCls =
-  "h-11 w-full rounded-xl border border-white/10 bg-white/[0.03] px-3.5 text-sm text-white placeholder:text-muted-foreground focus:border-brand-purple/40 focus:outline-none";
 
 export default function ProfilePage() {
   const { user, userId } = useSession();

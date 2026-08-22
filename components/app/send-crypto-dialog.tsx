@@ -21,6 +21,7 @@ import {
 import { useRecordPayment } from "@/lib/hooks/use-eventerz-data";
 import { useConnectModal } from "@/components/wallet/connect-modal-context";
 import { Avatar } from "./avatar";
+import { inputCls } from "./form-controls";
 import { Button } from "@/components/ui/button";
 import {
   fromBaseUnits,
@@ -489,7 +490,7 @@ export function SendCryptoDialog({
                       onChange={(e) => setMemo(e.target.value.slice(0, 200))}
                       placeholder="Ticket split for Friday"
                       disabled={busy}
-                      className="h-11 w-full rounded-xl border border-white/10 bg-white/[0.03] px-3.5 text-sm text-white placeholder:text-muted-foreground focus:border-brand-purple/40 focus:outline-none disabled:opacity-60"
+                      className={cn(inputCls, "disabled:opacity-60")}
                     />
                   </label>
 
