@@ -128,6 +128,31 @@ returns void language sql as $$
   update public.profiles set wallet_address = p_address where id = p_profile_id;
 $$;
 
+/*
+ * Let the impersonated role reach the harness.
+ *
+ * `act_as` does `set local role authenticated`, and from that moment every
+ * assertion in this file is a call *as `authenticated`* into a schema owned by
+ * whoever is running the suite. Without these grants the first assertion after
+ * the first `act_as` dies with:
+ *
+ *     permission denied for schema eventerz_test
+ *
+ * which reads like a broken database and is really a missing GRANT. Creating a
+ * schema gives no one else USAGE on it, and `authenticated` is deliberately an
+ * ordinary role - that is the whole point of impersonating it.
+ *
+ * `act_as_owner` needs it too, and needs it most: it is the function that drops
+ * *back* to the owner, so it is always called while still `authenticated`.
+ * Ungranted, there would be no way out of the role once in it.
+ *
+ * These are real privilege changes, and they are inside the transaction that
+ * wraps this whole file - so the rollback at the end removes them along with
+ * the schema. Nothing is granted to `authenticated` past the end of the run.
+ */
+grant usage on schema eventerz_test to authenticated;
+grant execute on all functions in schema eventerz_test to authenticated;
+
 /* ===========================================================================
    Fixtures
    =========================================================================== */
